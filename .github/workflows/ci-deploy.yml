@@ -1,0 +1,54 @@
+name: CI & Deploy
+
+on:
+  push:
+    branches: [ main, master ]
+    paths: 
+      - 'src/**'
+      - 'prisma/**'
+      - '.github/workflows/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: Run tests
+        run: npm test --silent
+
+  build_and_deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install production dependencies
+        run: npm ci --omit=dev
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: Build
+        run: npm run build
+      - name: Build Docker image
+        run: |
+          docker build -t backend:latest .
+
+      - name: Deploy to Fly (if token provided)
+        if: env.FLY_API_TOKEN != ''
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          curl -L https://fly.io/install.sh | sh
+          export FLYCTL_INSTALL="${HOME}/.fly"
+          $HOME/.fly/bin/flyctl deploy --config fly.toml --remote-only
