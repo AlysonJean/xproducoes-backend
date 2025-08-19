@@ -1,0 +1,41 @@
+// Caminho: backend/src/controllers/contactController.ts
+
+import { Request, Response, NextFunction } from "express";
+import { ContactService } from "../services/contactService";
+
+const contactService = new ContactService();
+
+export class ContactController {
+  // Rota Pública
+  submitForm = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const submission = await contactService.createSubmission(req.body);
+      return res.status(201).json(submission);
+    } catch (error) {
+      return next(error);
+    }
+  };
+
+  // Rotas de Admin
+  getAll = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const submissions = await contactService.getAllSubmissions();
+      return res.json(submissions);
+    } catch (error) {
+      return next(error);
+    }
+  };
+
+  markAsRead = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      if (!id) {
+        return res.status(400).json({ error: "ID é obrigatório" });
+      }
+      const updatedSubmission = await contactService.markAsRead(id);
+      return res.json(updatedSubmission);
+    } catch (error) {
+      return next(error);
+    }
+  };
+}

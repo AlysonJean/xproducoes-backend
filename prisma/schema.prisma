@@ -1,0 +1,614 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Contact {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Portfolio {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  eventDate   DateTime
+  imageUrl    String
+}
+
+model PortfolioItem {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  imageUrl    String
+  eventDate   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+model Faq {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("faqs")
+}
+
+model User {
+id                       String            @id @default(cuid())
+name                     String
+email                    String            @unique
+passwordHash             String
+avatarUrl                String?
+role                     UserRole          @default(CLIENT)
+bio                      String?
+location                 String?
+// Modelo PortfolioItem fora do User
+  website                  String?
+  socialLinks              Json?
+  verified                 Boolean           @default(false)
+  passwordResetToken       String?           @unique
+  passwordResetTokenExpiry DateTime?
+  emailVerificationToken   String?
+  emailVerificationTokenExpiry DateTime?
+  profileSettings          Json?
+  isActive                 Boolean           @default(true)
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  auditLogs                BookingAuditLog[]
+  assignedBookings         Booking[]         @relation("BookingAssignee")
+  createdBookings          Booking[]         @relation("BookingCreator")
+  clientProfile            Client?
+  collaboratorProfile      Collaborator?
+  receivedMessages         Message[]         @relation("MessageRecipient")
+  sentMessages             Message[]         @relation("MessageSender")
+  notifications            Notification[]
+  reviews                  Review[]
+
+  @@index([email])
+  @@index([role])
+  @@index([role, createdAt])
+  @@index([verified, role])
+  @@map("users")
+}
+
+model Client {
+  id                  String           @id @default(cuid())
+  phone               String?
+  companyName         String?
+  industry            String?
+  companySize         String?
+  address             Json?
+  jobTitle            String?
+  department          String?
+  budget              Json?
+  preferredCategories String[]
+  eventTypes          String[]
+  communicationPrefs  Json?
+  totalBookings       Int              @default(0)
+  totalSpent          Decimal          @default(0)
+  averageRating       Decimal          @default(0)
+  completedBookings   Int              @default(0)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  userId              String           @unique
+  bookings            Booking[]        @relation("ClientBookings")
+  favoriteEquipments  ClientFavorite[]
+  user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifications       Notification[]
+
+  @@index([userId])
+  @@map("clients")
+}
+
+model Collaborator {
+  id               String                     @id @default(cuid())
+  phone            String?
+  collaboratorRole CollaboratorRole
+  specialties      String[]
+  status           CollaboratorStatus         @default(PENDING_APPROVAL)
+  experience       String?
+  portfolio        Json?
+  hourlyRate       Decimal?
+  equipment        String[]
+  certifications   String[]
+  workingRadius    Int?
+  languages        String[]
+  totalEvents      Int                        @default(0)
+  totalEarnings    Decimal                    @default(0)
+  averageRating    Decimal                    @default(0)
+  completedEvents  Int                        @default(0)
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  userId           String                     @unique
+  availabilities   CollaboratorAvailability[]
+  payments         CollaboratorPayment[]
+  user             User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventAssignments EventCollaborator[]
+  reviews          Review[]                   @relation("CollaboratorReviews")
+
+  @@index([userId])
+  @@index([status])
+  @@index([collaboratorRole])
+  @@index([status, collaboratorRole])
+  @@index([userId, status])
+  @@map("collaborators")
+}
+
+model Equipment {
+  id                    String           @id @default(cuid())
+  name                  String
+  description           String
+  imageUrl              String
+  pricePerHour          Decimal          @db.Decimal(10, 2)
+  quantity              Int
+  isAvailable           Boolean          @default(true)
+  tags                  String[]
+  specifications        Json?
+  weight                Decimal?         @db.Decimal(8, 2)
+  dimensions            Json?
+  powerRequirements     String?
+  maintenanceNotes      String?
+  maintenanceDate       DateTime?
+  purchaseDate          DateTime?
+  warrantyExpiration    DateTime?
+  condition             String           @default("EXCELLENT")
+  serialNumber          String?          @unique
+  location              String?
+  minimumRentalDuration Int              @default(1)
+  replacementCost       Decimal?         @db.Decimal(10, 2)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  categoryId            String
+  clientFavorites       ClientFavorite[]
+  category              Category         @relation(fields: [categoryId], references: [id])
+  bookings              Booking[]        @relation("BookingEquipments")
+  kits                  Kit[]            @relation("KitEquipments")
+
+  @@index([categoryId])
+  @@index([name])
+  @@index([condition])
+  @@index([categoryId, condition])
+  @@index([pricePerHour])
+  @@index([name, categoryId])
+  @@map("equipments")
+}
+
+model Category {
+  id              String      @id @default(cuid())
+  name            String      @unique
+  slug            String      @unique
+  description     String?
+  color           String?
+  icon            String?
+  sortOrder       Int         @default(0)
+  active          Boolean     @default(true)
+  parentId        String?
+  metaTitle       String?
+  metaDescription String?
+  keywords        String?
+  ogImage         String?
+  imageUrl        String?
+  imageAlt        String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  equipments      Equipment[]
+
+  @@index([active, sortOrder])
+  @@index([slug])
+  @@index([parentId])
+  @@map("categories")
+}
+
+model Kit {
+  id                    String      @id @default(cuid())
+  name                  String
+  description           String
+  price                 Decimal     @db.Decimal(10, 2)
+  imageUrl              String
+  category              String?
+  tags                  String[]
+  minimumRentalDuration Int?
+  setupInstructions     String?
+  targetAudience        String[]
+  skillLevel            String?
+  estimatedSetupTime    Int?
+  weight                Decimal?    @db.Decimal(8, 2)
+  transportRequirements String?
+  isAvailable           Boolean     @default(true)
+  coverImage            String?
+  images                String[]
+  setupGuides           String[]
+  recommended           Boolean     @default(false)
+  popular               Boolean     @default(false)
+  discount              Decimal?    @db.Decimal(5, 2)
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  bookings              Booking[]
+  equipments            Equipment[] @relation("KitEquipments")
+
+  @@index([recommended])
+  @@index([popular])
+  @@map("kits")
+}
+
+model Booking {
+  id                 String              @id @default(cuid())
+  idempotencyKey     String?             @unique
+  eventTitle         String?
+  eventDate          DateTime
+  eventEndDate       DateTime
+  totalPrice         Decimal             @db.Decimal(10, 2)
+  serviceValue       Decimal?            @db.Decimal(10, 2)
+  paymentProofUrl    String?
+  status             BookingStatus       @default(DRAFT)
+  requiresStairs     Boolean             @default(false)
+  isCovered          Boolean             @default(true)
+  hasParking         Boolean             @default(true)
+  eventDuration      Int?
+  location           String?
+  street             String?
+  neighborhood       String?
+  city               String?
+  state              String?
+  zipCode            String?
+  addressNumber      String?
+  addressComplement  String?
+  clientName         String?
+  clientContact      String?
+  clientEmail        String?
+  notes              String?
+  internalNotes      String?
+  specialRequests    String?
+  deliveryStatus     DeliveryStatus      @default(PENDING)
+  setupTime          DateTime?
+  pickupTime         DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  clientId           String?
+  creatorId          String
+  assigneeId         String?
+  kitId              String?
+  auditLogs          BookingAuditLog[]
+  assignee           User?               @relation("BookingAssignee", fields: [assigneeId], references: [id])
+  client             Client?             @relation("ClientBookings", fields: [clientId], references: [id])
+  creator            User                @relation("BookingCreator", fields: [creatorId], references: [id])
+  kit                Kit?                @relation(fields: [kitId], references: [id])
+  eventCollaborators EventCollaborator[]
+  attachments        BookingAttachment[]
+  messages           Message[]
+  review             Review?
+  equipments         Equipment[]         @relation("BookingEquipments")
+
+  @@index([clientId])
+  @@index([creatorId])
+  @@index([assigneeId])
+  @@index([status])
+  @@index([eventDate])
+  @@index([deliveryStatus])
+  @@index([eventDate, status])
+  @@index([creatorId, status])
+  @@index([clientId, status])
+  @@index([status, eventDate])
+  @@index([eventDate, eventEndDate])
+  @@map("bookings")
+}
+
+model BookingAttachment {
+  id         String   @id @default(cuid())
+  bookingId  String
+  url        String
+  filename   String?
+  mimeType   String?
+  createdAt  DateTime @default(now())
+
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@map("booking_attachments")
+}
+
+model EventCollaborator {
+  id             String                  @id @default(cuid())
+  role           CollaboratorRole
+  startTime      String
+  endTime        String
+  hourlyRate     Decimal?                @db.Decimal(8, 2)
+  fixedRate      Decimal?                @db.Decimal(10, 2)
+  totalHours     Decimal?                @db.Decimal(5, 2)
+  totalPayment   Decimal?                @db.Decimal(10, 2)
+  status         EventCollaboratorStatus @default(ASSIGNED)
+  notes          String?
+  rating         Int?
+  feedback       String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  bookingId      String
+  collaboratorId String
+  booking        Booking                 @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  collaborator   Collaborator            @relation(fields: [collaboratorId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, collaboratorId, role])
+  @@index([bookingId])
+  @@index([collaboratorId])
+  @@index([status])
+  @@index([bookingId, status])
+  @@index([collaboratorId, status])
+  @@map("event_collaborators")
+}
+
+model ClientFavorite {
+  id          String    @id @default(cuid())
+  createdAt   DateTime  @default(now())
+  clientId    String
+  equipmentId String
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, equipmentId])
+  @@index([clientId])
+  @@map("client_favorites")
+}
+
+model Review {
+  id              String        @id @default(cuid())
+  rating          Int
+  comment         String?
+  photos          String[]
+  tags            String[]
+  punctuality     Int?
+  professionalism Int?
+  quality         Int?
+  communication   Int?
+  valueForMoney   Int?
+  helpful         Int           @default(0)
+  reported        Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  bookingId       String        @unique
+  reviewerId      String
+  collaboratorId  String?
+  booking         Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  collaborator    Collaborator? @relation("CollaboratorReviews", fields: [collaboratorId], references: [id])
+  reviewer        User          @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+
+  @@index([reviewerId])
+  @@index([collaboratorId])
+  @@index([rating])
+  @@index([rating, createdAt])
+  @@index([collaboratorId, rating])
+  @@map("reviews")
+}
+
+model Message {
+  id          String      @id @default(cuid())
+  content     String
+  type        MessageType @default(TEXT)
+  read        Boolean     @default(false)
+  important   Boolean     @default(false)
+  attachments Json?
+  metadata    Json?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  senderId    String
+  recipientId String
+  bookingId   String?
+  booking     Booking?    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  recipient   User        @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  sender      User        @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([recipientId])
+  @@index([bookingId])
+  @@index([read])
+  @@map("messages")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  title     String
+  message   String
+  type      NotificationType
+  read      Boolean          @default(false)
+  important Boolean          @default(false)
+  actionUrl String?
+  metadata  Json?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  userId    String
+  clientId  String?
+  client    Client?          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([clientId])
+  @@index([read])
+  @@index([type])
+  @@map("notifications")
+}
+
+model CollaboratorAvailability {
+  id             String             @id @default(cuid())
+  date           DateTime           @db.Date
+  startTime      String
+  endTime        String
+  status         AvailabilityStatus
+  eventId        String?
+  notes          String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  collaboratorId String
+  collaborator   Collaborator       @relation(fields: [collaboratorId], references: [id], onDelete: Cascade)
+
+  @@index([collaboratorId])
+  @@index([date])
+  @@index([status])
+  @@map("collaborator_availabilities")
+}
+
+model CollaboratorPayment {
+  id             String                    @id @default(cuid())
+  amount         Decimal                   @db.Decimal(10, 2)
+  type           PaymentType               @default(HOURLY)
+  description    String
+  dueDate        DateTime
+  paymentDate    DateTime?
+  status         CollaboratorPaymentStatus @default(PENDING)
+  notes          String?
+  eventId        String
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  collaboratorId String
+  collaborator   Collaborator              @relation(fields: [collaboratorId], references: [id], onDelete: Cascade)
+
+  @@index([collaboratorId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("collaborator_payments")
+}
+
+model BookingAuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  oldValues Json?
+  newValues Json?
+  timestamp DateTime @default(now())
+  bookingId String
+  userId    String?
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([bookingId])
+  @@index([userId])
+  @@index([timestamp])
+  @@index([action])
+  @@map("booking_audit_logs")
+}
+
+model WebhookLog {
+  id           String   @id @default(cuid())
+  url          String
+  event        String
+  payload      Json
+  status       String   @default("PENDING")
+  responseCode Int?
+  responseBody String?
+  attempts     Int      @default(0)
+  bookingId    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([event])
+  @@index([bookingId])
+  @@map("webhook_logs")
+}
+
+enum UserRole {
+  CLIENT
+  COLLABORATOR
+  ADMIN
+  MANAGER
+  OPERATOR
+}
+
+enum CollaboratorRole {
+  PHOTOGRAPHER
+  VIDEOGRAPHER
+  SOUND_TECHNICIAN
+  LIGHTING_TECHNICIAN
+  DJ
+  PRESENTER
+  COORDINATOR
+  ASSISTANT
+  SECURITY
+  TRANSPORT
+  OTHER
+}
+
+enum CollaboratorStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_APPROVAL
+}
+
+enum BookingStatus {
+  DRAFT
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum DeliveryStatus {
+  PENDING
+  PREPARING
+  ON_THE_WAY
+  ARRIVED
+  SETUP_COMPLETE
+  PICKUP_PENDING
+  COMPLETED
+}
+
+enum EventCollaboratorStatus {
+  ASSIGNED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  BUSY
+  OFF_DUTY
+  VACATION
+}
+
+enum PaymentType {
+  HOURLY
+  FIXED
+  COMMISSION
+  BONUS
+  DEDUCTION
+}
+
+enum CollaboratorPaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+  DISPUTED
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM
+  NOTIFICATION
+}
+
+enum NotificationType {
+  BOOKING_CREATED
+  BOOKING_UPDATED
+  BOOKING_CANCELLED
+  PAYMENT_DUE
+  PAYMENT_RECEIVED
+  REVIEW_RECEIVED
+  MESSAGE_RECEIVED
+  SYSTEM_ALERT
+  MAINTENANCE_SCHEDULED
+}
