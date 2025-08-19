@@ -1,0 +1,16 @@
+diff --git a/node_modules/etag/index.js b/node_modules/etag/index.js
+index 2a585c9..e721b6a 100644
+--- a/node_modules/etag/index.js
++++ b/node_modules/etag/index.js
+@@ -42,9 +42,9 @@ function entitytag (entity) {
+     return '"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk"'
+   }
+ 
+-  // compute hash of entity
++  // compute hash of entity (use sha256 instead of sha1 to avoid weak-hash usage)
+   var hash = crypto
+-    .createHash('sha1')
++    .createHash('sha256')
+     .update(entity, 'utf8')
+     .digest('base64')
+     .substring(0, 27)
