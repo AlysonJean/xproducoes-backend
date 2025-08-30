@@ -60,6 +60,8 @@ const equipmentService_1 = require("../services/equipmentService");
 const logger_1 = __importDefault(require("../config/logger"));
 const uploadService_1 = require("../services/uploadService");
 const emailService_1 = __importDefault(require("../services/emailService"));
+const bcrypt_1 = __importDefault(require("bcrypt"));
+const crypto_1 = __importDefault(require("crypto"));
 const bookingService = new bookingService_1.BookingService();
 const equipmentService = new equipmentService_1.EquipmentService();
 class AdminController {
@@ -108,8 +110,6 @@ class AdminController {
                     userData.avatarUrl = avatarUrl;
                 }
                 // Criação atômica: se enviar user data, cria user e client em transação
-                const bcrypt = require('bcryptjs');
-                const crypto = require('crypto');
                 let tempPassword;
                 let inviteToken;
                 const result = await prisma_1.prisma.$transaction(async (tx) => {
@@ -117,13 +117,13 @@ class AdminController {
                     if (payload.email) {
                         // Se não enviou senha, gera uma temporária e cria token de convite
                         if (!payload.password) {
-                            tempPassword = crypto.randomBytes(9).toString('hex'); // ~18 chars
-                            inviteToken = crypto.randomBytes(20).toString('hex');
+                            tempPassword = crypto_1.default.randomBytes(9).toString('hex'); // ~18 chars
+                            inviteToken = crypto_1.default.randomBytes(20).toString('hex');
                         }
                         createdUser = await tx.user.create({
                             data: {
                                 ...userData,
-                                passwordHash: (payload.password ? await bcrypt.hash(payload.password, 10) : await bcrypt.hash(tempPassword || '', 10)),
+                                passwordHash: (payload.password ? await bcrypt_1.default.hash(payload.password, 10) : await bcrypt_1.default.hash(tempPassword || '', 10)),
                                 passwordResetToken: inviteToken,
                                 passwordResetTokenExpiry: inviteToken ? new Date(Date.now() + 24 * 60 * 60 * 1000) : undefined,
                             },
@@ -472,8 +472,7 @@ class AdminController {
                 return res.status(404).json({ message: 'Usuário não encontrado' });
             if (user.verified)
                 return res.status(400).json({ message: 'E-mail já verificado' });
-            const crypto = require('crypto');
-            const token = crypto.randomBytes(20).toString('hex');
+            const token = crypto_1.default.randomBytes(20).toString('hex');
             const updated = await prisma_1.prisma.user.update({
                 where: { id },
                 data: { passwordResetToken: token, passwordResetTokenExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000) },

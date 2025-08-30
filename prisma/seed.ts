@@ -6,20 +6,28 @@
 // Carrega variáveis de ambiente (DATABASE_URL, SEED_ADMIN_*)
 import 'dotenv/config';
 import { PrismaClient, UserRole } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
+import { randomBytes } from 'crypto';
 
 const prisma = new PrismaClient();
+
+function genPassword(len = 12) {
+	return randomBytes(Math.ceil(len * 3 / 4))
+		.toString('base64')
+		.replace(/[^a-zA-Z0-9]/g, 'A')
+		.slice(0, len);
+}
 
 async function ensureAdminUser() {
 	const email = process.env.SEED_ADMIN_EMAIL || 'admin@xproducoes.local';
 	const name = process.env.SEED_ADMIN_NAME || 'Administrador';
-	const password = process.env.SEED_ADMIN_PASSWORD || 'admin123';
+	const passwordPlain = process.env.SEED_ADMIN_PASSWORD || genPassword();
 
 	const existing = await prisma.user.findUnique({ where: { email } });
 	if (existing) return existing;
 
-	const passwordHash = await bcrypt.hash(password, 10);
+	const passwordHash = await bcrypt.hash(passwordPlain, 10);
 	const created = await prisma.user.create({
 		data: {
 			name,
@@ -30,6 +38,11 @@ async function ensureAdminUser() {
 			isActive: true,
 		},
 	});
+	// show generated password if it wasn't provided via env
+	if (!process.env.SEED_ADMIN_PASSWORD) {
+		// eslint-disable-next-line no-console
+		console.log('[seed] Admin password generated:', passwordPlain);
+	}
 	return created;
 }
 
@@ -84,7 +97,20 @@ async function createIfNotExists(modelName: string, where: any, createData: any)
 
 async function createUserIfNotExists(email: string, name: string, password: string, role: UserRole = UserRole.CLIENT) {
 	const existing = await prisma.user.findUnique({ where: { email } });
-	if (existing) return existing;
+	if (existing) {
+		// Atualizar senha se o usuário já existir
+		const passwordHash = await bcrypt.hash(password, 10);
+		const updated = await prisma.user.update({
+			where: { email },
+			data: {
+				passwordHash,
+				verified: true,
+				isActive: true,
+			},
+		});
+		console.log(`[seed] Usuário atualizado: ${email} / ${password}`);
+		return updated;
+	}
 	const passwordHash = await bcrypt.hash(password, 10);
 	const u = await prisma.user.create({
 		data: {
@@ -96,6 +122,7 @@ async function createUserIfNotExists(email: string, name: string, password: stri
 			isActive: true,
 		},
 	});
+	console.log(`[seed] Usuário criado: ${email} / ${password}`);
 	return u;
 }
 
@@ -261,11 +288,13 @@ async function main() {
 	console.log('[seed] Categorias garantidas');
 
 	// Criar usuários de teste
-	const clientUser = await createUserIfNotExists('cliente.teste@exemplo.com', 'Cliente Teste', 'cliente123');
+	const clientPassword = 'cliente123';
+	const clientUser = await createUserIfNotExists('cliente.teste@exemplo.com', 'Cliente Teste', clientPassword);
 	console.log('[seed] Cliente criado:', clientUser.email);
 	const clientProfile = await createClientProfileForUser(clientUser.id, { companyName: 'Empresa Teste' });
 
-	const collabUser = await createUserIfNotExists('colaborador.teste@exemplo.com', 'Colaborador Teste', 'colab123', UserRole.COLLABORATOR);
+	const collabPassword = 'collab123';
+	const collabUser = await createUserIfNotExists('colaborador.teste@exemplo.com', 'Colaborador Teste', collabPassword, UserRole.COLLABORATOR);
 	console.log('[seed] Colaborador criado:', collabUser.email);
 	await createCollaboratorForUser(collabUser.id, 'PHOTOGRAPHER');
 
@@ -285,9 +314,9 @@ async function main() {
 	console.log('[seed] Reviews criadas');
 
 	console.log('[seed] Seed completo. Credenciais de teste:');
-	console.log('  Admin:', process.env.SEED_ADMIN_EMAIL || 'admin@xproducoes.local', '/', process.env.SEED_ADMIN_PASSWORD || 'admin123');
-	console.log('  Cliente:', clientUser.email, '/ cliente123');
-	console.log('  Colaborador:', collabUser.email, '/ colab123');
+	console.log('  Admin: admin@xproducoes.local / admin123');
+	console.log('  Cliente: cliente.teste@exemplo.com / cliente123');
+	console.log('  Colaborador: colaborador.teste@exemplo.com / collab123');
 }
 
 main()

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { config } from "../config/environment";
+import { securityMonitor } from "../config/securityMonitor";
 
 interface JWTPayload {
   userId: string;
@@ -26,8 +27,14 @@ export function authMiddleware(
   next: NextFunction,
 ) {
   const authHeader = req.headers.authorization;
+  const ip = req.ip || req.connection.remoteAddress || "unknown";
+  const userAgent = req.get("User-Agent") || "unknown";
+  const endpoint = `${req.method} ${req.path}`;
 
   if (!authHeader) {
+    securityMonitor.recordInvalidToken(ip, userAgent, endpoint, {
+      reason: "missing_auth_header",
+    });
     return res
       .status(401)
       .json({ message: "Token de autorização não fornecido" });
@@ -36,6 +43,10 @@ export function authMiddleware(
   const [bearer, token] = authHeader.split(" ");
 
   if (bearer !== "Bearer" || !token) {
+    securityMonitor.recordMalformedToken(ip, userAgent, endpoint, {
+      reason: "invalid_format",
+      authHeader: authHeader.substring(0, 50), // Limitar para logs
+    });
     return res.status(401).json({ message: "Formato de token inválido" });
   }
 
@@ -49,10 +60,22 @@ export function authMiddleware(
     return next();
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
+      securityMonitor.recordExpiredToken(ip, userAgent, endpoint, {
+        reason: "token_expired",
+        expiredAt: error.expiredAt,
+      });
       return res.status(401).json({ message: "Token expirado" });
     } else if (error instanceof jwt.JsonWebTokenError) {
+      securityMonitor.recordInvalidToken(ip, userAgent, endpoint, {
+        reason: "invalid_signature",
+        error: error.message,
+      });
       return res.status(401).json({ message: "Token inválido" });
     } else {
+      securityMonitor.recordInvalidToken(ip, userAgent, endpoint, {
+        reason: "unknown_error",
+        error: error instanceof Error ? error.message : String(error),
+      });
       return res.status(401).json({ message: "Erro de autenticação" });
     }
   }

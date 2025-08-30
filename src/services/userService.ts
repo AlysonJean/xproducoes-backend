@@ -69,7 +69,8 @@ export async function requestPasswordReset(email: string) {
     } catch (e) {
       // noop
     }
-    return { resetToken: null, email };
+  // Não vazar resetToken via API (melhor prática)
+  return { success: true };
   }
 
   // Gerar token de reset
@@ -86,14 +87,15 @@ export async function requestPasswordReset(email: string) {
 
   // Enviar email com link seguro para reset (não bloquear o fluxo se o envio falhar)
   try {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
     const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
     await (await import('./emailService')).default.sendPasswordResetEmail(user.email, user.name || '', resetUrl);
   } catch (e) {
     console.warn('Falha ao enviar email de reset:', e);
   }
 
-  return { resetToken, email: user.email };
+  // Não retornar o token no corpo da resposta
+  return { success: true };
 }
 
 export async function generateEmailVerificationToken(userId: string) {
@@ -150,7 +152,7 @@ export async function changePassword(userId: string, currentPassword: string, ne
 import { prisma } from "../config/prisma";
 import type { UserRole } from "@prisma/client";
 import crypto from "crypto";
-import bcrypt from "bcryptjs";
+import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { config as envConfig } from "../config/environment";
 
@@ -170,7 +172,22 @@ export async function register(data: RegisterInput) {
     data: { name: data.name, email: data.email, passwordHash: hash },
     select: { id: true, name: true, email: true, role: true, createdAt: true },
   });
-  return user;
+  // Cria perfil de cliente por padrão (não bloqueante)
+  try {
+    await prisma.client.create({ data: { userId: user.id } });
+  } catch (e) {
+    console.warn('Falha ao criar perfil de cliente (não bloqueante):', e);
+  }
+  // Envia e-mail de verificação (não bloqueante)
+  try {
+    const token = await generateEmailVerificationToken(user.id);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
+    await (await import('./emailService')).default.sendVerificationEmail(user.email, verifyUrl);
+  } catch (e) {
+    console.warn('Falha ao enviar e-mail de verificação (não bloqueante):', e);
+  }
+  return { ...user, needsEmailVerification: true } as const;
 }
 
 export async function login(data: LoginInput) {
@@ -178,6 +195,12 @@ export async function login(data: LoginInput) {
   if (!user) throw new Error("Usuário não encontrado");
   const valid = await bcrypt.compare(data.password, user.passwordHash);
   if (!valid) throw new Error("Senha inválida");
+  // Exigir verificação de e-mail se habilitado por ambiente
+  if (process.env.REQUIRE_EMAIL_VERIFICATION === 'true' && !user.verified) {
+    const err: any = new Error('E-mail não verificado');
+    err.code = 'EMAIL_NOT_VERIFIED';
+    throw err;
+  }
   const token = jwt.sign(
     { userId: user.id, role: user.role },
     config.jwtSecret,

@@ -1,0 +1,229 @@
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+import { prisma } from '../config/prisma';
+import { config as envConfig } from '../config/environment';
+
+const JWT_SECRET = envConfig.jwtSecret;
+
+function base64url(input: Buffer) {
+  return input.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function sha256(buffer: Buffer) {
+  return crypto.createHash('sha256').update(buffer).digest();
+}
+
+export type GoogleAuthorizeOptions = {
+  redirectUri: string;
+  scope?: string[];
+};
+
+export async function getGoogleAuthorizationUrl(opts: GoogleAuthorizeOptions) {
+  const { redirectUri, scope = ['openid', 'profile', 'email'] } = opts;
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error('Google OAuth não configurado. Defina GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET.');
+  }
+
+  // Lazy import para evitar quebrar build em ambientes sem a dependência instalada
+  // @ts-ignore - módulo pode não estar instalado em ambientes de teste
+  const mod = await import('openid-client').catch(() => null as any);
+  if (!mod || !mod.Issuer) {
+    throw new Error('Dependência openid-client ausente. Instale com: npm install openid-client');
+  }
+  const Issuer = (mod as any).Issuer as any;
+  const generators = (mod as any).generators as any;
+
+  const googleIssuer = await Issuer.discover('https://accounts.google.com');
+  const client = new googleIssuer.Client({
+    client_id: clientId,
+    client_secret: clientSecret,
+    redirect_uris: [redirectUri],
+    response_types: ['code'],
+  });
+
+  // PKCE
+  const codeVerifier = generators.codeVerifier();
+  const codeChallenge = generators.codeChallenge(codeVerifier);
+  const nonce = base64url(crypto.randomBytes(16));
+
+  // State JWT para manter verifier/nonce sem sessão no servidor
+  const state = jwt.sign({ v: codeVerifier, n: nonce }, JWT_SECRET, { expiresIn: '10m' });
+
+  const url = client.authorizationUrl({
+    scope: scope.join(' '),
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
+    state,
+    nonce,
+  });
+
+  return { url };
+}
+
+export async function handleGoogleCallback(params: { code?: string; state?: string; redirectUri: string }) {
+  const { code, state, redirectUri } = params;
+  if (!code || !state) throw new Error('Parâmetros inválidos');
+
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error('Google OAuth não configurado. Defina GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET.');
+  }
+
+  let payload: any;
+  try {
+    payload = jwt.verify(state, JWT_SECRET);
+  } catch {
+    throw new Error('STATE inválido');
+  }
+  const codeVerifier = payload?.v as string;
+  const expectedNonce = payload?.n as string;
+  if (!codeVerifier || !expectedNonce) throw new Error('STATE inválido');
+
+  // @ts-ignore - módulo pode não estar instalado em ambientes de teste
+  const mod = await import('openid-client').catch(() => null as any);
+  if (!mod || !mod.Issuer) {
+    throw new Error('Dependência openid-client ausente. Instale com: npm install openid-client');
+  }
+  const Issuer = (mod as any).Issuer as any;
+
+  const googleIssuer = await Issuer.discover('https://accounts.google.com');
+  const client = new googleIssuer.Client({
+    client_id: clientId,
+    client_secret: clientSecret,
+    redirect_uris: [redirectUri],
+    response_types: ['code'],
+  });
+
+  const tokenSet = await client.callback(redirectUri, { code, state }, { code_verifier: codeVerifier });
+  const claims = tokenSet.claims();
+
+  // Validações básicas de segurança
+  if (!claims || (claims as any).nonce && (claims as any).nonce !== expectedNonce) {
+    throw new Error('Nonce inválido');
+  }
+  const email = (claims as any).email as string || '';
+  const emailVerified = !!(claims as any).email_verified;
+  if (!email) throw new Error('Email não disponível pelo provedor');
+
+  // Vincular ou criar usuário local
+  let user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        name: ((claims as any).name as string) || email.split('@')[0],
+        email,
+        passwordHash: base64url(crypto.randomBytes(24)), // placeholder, login social
+        verified: emailVerified || true,
+      },
+    });
+    try { await prisma.client.create({ data: { userId: user.id } }); } catch {}
+  } else if (!user.verified && emailVerified) {
+    await prisma.user.update({ where: { id: user.id }, data: { verified: true } });
+  }
+
+  // Emitir JWT da aplicação
+  const appToken = jwt.sign({ userId: user.id, role: (user as any).role }, JWT_SECRET, { expiresIn: '7d' });
+
+  return {
+    user: { id: user.id, name: user.name, email: user.email, role: (user as any).role },
+    token: appToken,
+  };
+}
+
+// ===== Facebook OAuth 2.0 (Graph API) =====
+export type FacebookAuthorizeOptions = {
+  redirectUri: string;
+  scope?: string[];
+};
+
+export async function getFacebookAuthorizationUrl(opts: FacebookAuthorizeOptions) {
+  const { redirectUri, scope = ['email', 'public_profile'] } = opts;
+  const clientId = process.env.FACEBOOK_CLIENT_ID;
+  const clientSecret = process.env.FACEBOOK_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error('Facebook OAuth não configurado. Defina FACEBOOK_CLIENT_ID e FACEBOOK_CLIENT_SECRET.');
+  }
+
+  // PKCE (nem todas as apps FB exigem; adicionar para fortalecer segurança)
+  const codeVerifier = base64url(crypto.randomBytes(32));
+  const codeChallenge = base64url(sha256(Buffer.from(codeVerifier)));
+  const nonce = base64url(crypto.randomBytes(16));
+  const state = jwt.sign({ v: codeVerifier, n: nonce }, JWT_SECRET, { expiresIn: '10m' });
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    state,
+    response_type: 'code',
+    scope: scope.join(','),
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
+  } as any);
+  const url = `https://www.facebook.com/v19.0/dialog/oauth?${params.toString()}`;
+  return { url };
+}
+
+export async function handleFacebookCallback(params: { code?: string; state?: string; redirectUri: string }) {
+  const { code, state, redirectUri } = params;
+  if (!code || !state) throw new Error('Parâmetros inválidos');
+
+  const clientId = process.env.FACEBOOK_CLIENT_ID;
+  const clientSecret = process.env.FACEBOOK_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error('Facebook OAuth não configurado. Defina FACEBOOK_CLIENT_ID e FACEBOOK_CLIENT_SECRET.');
+  }
+
+  let payload: any;
+  try { payload = jwt.verify(state, JWT_SECRET); } catch { throw new Error('STATE inválido'); }
+  const codeVerifier = payload?.v as string;
+  const expectedNonce = payload?.n as string;
+  if (!codeVerifier || !expectedNonce) throw new Error('STATE inválido');
+
+  // Troca de código por access_token
+  const tokenParams = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    redirect_uri: redirectUri,
+    code,
+    code_verifier: codeVerifier,
+  } as any);
+  const tokenRes = await fetch('https://graph.facebook.com/v19.0/oauth/access_token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: tokenParams.toString(),
+  });
+  const tokenJson: any = await tokenRes.json();
+  if (!tokenRes.ok || !tokenJson.access_token) {
+    throw new Error(`Falha ao obter access_token do Facebook: ${tokenJson?.error?.message || tokenRes.statusText}`);
+  }
+  const accessToken = tokenJson.access_token as string;
+
+  // Buscar perfil básico
+  const meRes = await fetch(`https://graph.facebook.com/v19.0/me?fields=id,name,email&access_token=${encodeURIComponent(accessToken)}`);
+  const me: any = await meRes.json();
+  if (!meRes.ok || !me?.id) {
+    throw new Error(`Falha ao obter perfil do Facebook: ${me?.error?.message || meRes.statusText}`);
+  }
+  const email = (me.email as string) || '';
+  if (!email) throw new Error('Email não disponível pelo provedor');
+
+  // Vincular ou criar usuário local
+  let user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        name: (me.name as string) || email.split('@')[0],
+        email,
+        passwordHash: base64url(crypto.randomBytes(24)),
+        verified: true, // Facebook não expõe email_verified; assume-se consentido
+      },
+    });
+    try { await prisma.client.create({ data: { userId: user.id } }); } catch {}
+  }
+
+  const appToken = jwt.sign({ userId: user.id, role: (user as any).role }, JWT_SECRET, { expiresIn: '7d' });
+  return { user: { id: user.id, name: user.name, email: user.email, role: (user as any).role }, token: appToken };
+}

@@ -1,7 +1,8 @@
 import { prisma } from "../config/prisma";
 import * as userService from "./userService";
-import bcrypt from "bcryptjs";
+import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { config as envConfig } from "../config/environment";
 
 export class AuthService {
   async register(data: any) {
@@ -56,20 +57,18 @@ export class AuthService {
   }
 
   async findUserByEmail(email: string) {
-    // Implementação simples usando userService
-    const users = await userService.getAllUsers({ page: 1, limit: 1000 });
-    return users.users.find(user => user.email === email);
+    // Busca direta e eficiente via prisma
+    const user = await prisma.user.findUnique({ where: { email } });
+    return user ? { id: user.id, email: user.email, name: user.name, role: user.role } : null;
   }
 
   async loginById(userId: string) {
-    const user = await userService.getUserById(Number(userId));
-    if (!user) {
-      throw new Error('Usuário não encontrado');
-    }
-    // Simula login por ID
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new Error('Usuário não encontrado');
+    const token = jwt.sign({ userId: user.id, role: user.role }, envConfig.jwtSecret, { expiresIn: '7d' });
     return {
-      user,
-      token: `mock_token_${userId}_${Date.now()}`
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      token,
     };
   }
 }

@@ -118,7 +118,8 @@ async function requestPasswordReset(email) {
         catch (e) {
             // noop
         }
-        return { resetToken: null, email };
+        // Não vazar resetToken via API (melhor prática)
+        return { success: true };
     }
     // Gerar token de reset
     const resetToken = crypto_1.default.randomBytes(32).toString("hex");
@@ -132,14 +133,15 @@ async function requestPasswordReset(email) {
     });
     // Enviar email com link seguro para reset (não bloquear o fluxo se o envio falhar)
     try {
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
         const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
         await (await Promise.resolve().then(() => __importStar(require('./emailService')))).default.sendPasswordResetEmail(user.email, user.name || '', resetUrl);
     }
     catch (e) {
         console.warn('Falha ao enviar email de reset:', e);
     }
-    return { resetToken, email: user.email };
+    // Não retornar o token no corpo da resposta
+    return { success: true };
 }
 async function generateEmailVerificationToken(userId) {
     const token = crypto_1.default.randomBytes(32).toString('hex');
@@ -177,12 +179,12 @@ async function changePassword(userId, currentPassword, newPassword) {
         throw new Error("Usuário não encontrado");
     }
     // Verificar senha atual
-    const isValid = await bcryptjs_1.default.compare(currentPassword, user.passwordHash);
+    const isValid = await bcrypt_1.default.compare(currentPassword, user.passwordHash);
     if (!isValid) {
         throw new Error("Senha atual incorreta");
     }
     // Atualizar senha
-    const hashedPassword = await bcryptjs_1.default.hash(newPassword, 10);
+    const hashedPassword = await bcrypt_1.default.hash(newPassword, 10);
     await prisma_1.prisma.user.update({
         where: { id: userId },
         data: { passwordHash: hashedPassword }
@@ -191,7 +193,7 @@ async function changePassword(userId, currentPassword, newPassword) {
 }
 const prisma_1 = require("../config/prisma");
 const crypto_1 = __importDefault(require("crypto"));
-const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const environment_1 = require("../config/environment");
 // Use centralized, cryptographically generated secret from environment config
@@ -202,20 +204,43 @@ async function register(data) {
     });
     if (existing)
         throw new Error("Email já está em uso.");
-    const hash = await bcryptjs_1.default.hash(data.password, 10);
+    const hash = await bcrypt_1.default.hash(data.password, 10);
     const user = await prisma_1.prisma.user.create({
         data: { name: data.name, email: data.email, passwordHash: hash },
         select: { id: true, name: true, email: true, role: true, createdAt: true },
     });
-    return user;
+    // Cria perfil de cliente por padrão (não bloqueante)
+    try {
+        await prisma_1.prisma.client.create({ data: { userId: user.id } });
+    }
+    catch (e) {
+        console.warn('Falha ao criar perfil de cliente (não bloqueante):', e);
+    }
+    // Envia e-mail de verificação (não bloqueante)
+    try {
+        const token = await generateEmailVerificationToken(user.id);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+        const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
+        await (await Promise.resolve().then(() => __importStar(require('./emailService')))).default.sendVerificationEmail(user.email, verifyUrl);
+    }
+    catch (e) {
+        console.warn('Falha ao enviar e-mail de verificação (não bloqueante):', e);
+    }
+    return { ...user, needsEmailVerification: true };
 }
 async function login(data) {
     const user = await prisma_1.prisma.user.findUnique({ where: { email: data.email } });
     if (!user)
         throw new Error("Usuário não encontrado");
-    const valid = await bcryptjs_1.default.compare(data.password, user.passwordHash);
+    const valid = await bcrypt_1.default.compare(data.password, user.passwordHash);
     if (!valid)
         throw new Error("Senha inválida");
+    // Exigir verificação de e-mail se habilitado por ambiente
+    if (process.env.REQUIRE_EMAIL_VERIFICATION === 'true' && !user.verified) {
+        const err = new Error('E-mail não verificado');
+        err.code = 'EMAIL_NOT_VERIFIED';
+        throw err;
+    }
     const token = jsonwebtoken_1.default.sign({ userId: user.id, role: user.role }, config.jwtSecret, { expiresIn: "7d" });
     // Adicionar rota de redirecionamento baseada no role
     let dashboardRoute = '/dashboard';
@@ -270,7 +295,7 @@ async function updateProfile(userId, data, file) {
     // Se o campo 'password' vier como extra, gerar hash e atribuir
     const password = data.password;
     if (password) {
-        updateData.passwordHash = await bcryptjs_1.default.hash(password, 10);
+        updateData.passwordHash = await bcrypt_1.default.hash(password, 10);
     }
     try {
         const user = await prisma_1.prisma.user.update({
@@ -325,7 +350,7 @@ async function resetPassword(token, newPassword) {
     });
     if (!user)
         throw new Error("Token inválido ou expirado");
-    const hash = await bcryptjs_1.default.hash(newPassword, 10);
+    const hash = await bcrypt_1.default.hash(newPassword, 10);
     await prisma_1.prisma.user.update({
         where: { id: user.id },
         data: {

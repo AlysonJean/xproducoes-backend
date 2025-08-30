@@ -36,22 +36,45 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const authController_1 = require("../controllers/authController");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
+const rateLimitMiddleware_1 = require("../middlewares/rateLimitMiddleware");
+const zod_1 = require("zod");
+const userSchema_1 = require("../validators/userSchema");
+// Middleware simples de validação com Zod
+const validate = (schema) => (req, res, next) => {
+    try {
+        req.body = schema.parse(req.body);
+        next();
+    }
+    catch (err) {
+        if (err?.name === 'ZodError') {
+            return res.status(422).json({ message: 'Dados inválidos', details: err.issues });
+        }
+        next(err);
+    }
+};
+const resetSchema = zod_1.z.object({ email: zod_1.z.string().email().optional(), token: zod_1.z.string().min(10).optional(), password: zod_1.z.string().min(8).optional() });
 const authRoutes = (0, express_1.Router)();
 const authController = new authController_1.AuthController();
 // Rotas públicas
-authRoutes.post("/register", authController.register);
-authRoutes.post("/login", authController.login);
+authRoutes.post("/register", rateLimitMiddleware_1.authRateLimit, validate(userSchema_1.userRegisterSchema), authController.register);
+authRoutes.post("/login", rateLimitMiddleware_1.authRateLimit, validate(userSchema_1.userLoginSchema), authController.login);
 authRoutes.get('/verify-email', authController.verifyEmail);
-authRoutes.post('/resend-verification', authController.resendVerificationPublic);
+authRoutes.post('/resend-verification', rateLimitMiddleware_1.authRateLimit, authController.resendVerificationPublic);
 // Alias para compatibilidade REST/testes
-authRoutes.post("/auth/register", authController.register);
-authRoutes.post("/auth/login", authController.login);
-authRoutes.post("/request-password-reset", authController.requestPasswordReset);
-authRoutes.post("/reset-password", authController.resetPassword);
+authRoutes.post("/auth/register", rateLimitMiddleware_1.authRateLimit, validate(userSchema_1.userRegisterSchema), authController.register);
+authRoutes.post("/auth/login", rateLimitMiddleware_1.authRateLimit, validate(userSchema_1.userLoginSchema), authController.login);
+authRoutes.post("/request-password-reset", rateLimitMiddleware_1.passwordResetRateLimit, validate(resetSchema.pick({ email: true })), authController.requestPasswordReset);
+authRoutes.post("/reset-password", rateLimitMiddleware_1.passwordResetRateLimit, validate(resetSchema.pick({ token: true, password: true })), authController.resetPassword);
 authRoutes.post("/complete-registration", authController.completeRegistration);
 // Autenticação social
-authRoutes.post("/social/google", authController.socialLogin);
-authRoutes.post("/social/facebook", authController.socialLogin);
+authRoutes.post("/social/google", rateLimitMiddleware_1.authRateLimit, authController.socialLogin);
+authRoutes.post("/social/facebook", rateLimitMiddleware_1.authRateLimit, authController.socialLogin);
+// OAuth Google (OIDC Authorization Code + PKCE)
+authRoutes.get('/oauth/google/authorize', rateLimitMiddleware_1.authRateLimit, authController.googleAuthorize);
+authRoutes.get('/oauth/google/callback', rateLimitMiddleware_1.authRateLimit, authController.googleCallback);
+// OAuth Facebook
+authRoutes.get('/oauth/facebook/authorize', rateLimitMiddleware_1.authRateLimit, authController.facebookAuthorize);
+authRoutes.get('/oauth/facebook/callback', rateLimitMiddleware_1.authRateLimit, authController.facebookCallback);
 // Rotas protegidas
 authRoutes.get("/me", authMiddleware_1.authMiddleware, authController.getProfile);
 authRoutes.get("/profile", authMiddleware_1.authMiddleware, authController.getProfile);

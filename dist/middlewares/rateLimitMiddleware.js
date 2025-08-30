@@ -4,12 +4,42 @@
  * Implementação de rate limiting para proteção contra ataques
  * DDoS, força bruta e uso excessivo da API
  */
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.rateLimiters = exports.rateLimitLogger = exports.criticalEndpointRateLimit = exports.dynamicRateLimit = exports.passwordResetRateLimit = exports.searchRateLimit = exports.uploadRateLimit = exports.createResourceRateLimit = exports.apiRateLimit = exports.authRateLimit = void 0;
-const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
+const express_rate_limit_1 = __importStar(require("express-rate-limit"));
 // ✅ CONFIGURAÇÕES DE RATE LIMITING POR TIPO DE ENDPOINT
 /**
  * Rate limiting para autenticação - Mais restritivo
@@ -101,10 +131,12 @@ exports.passwordResetRateLimit = (0, express_rate_limit_1.default)({
     },
     standardHeaders: true,
     legacyHeaders: false,
-    // Aplicar por email além do IP
-    keyGenerator: (req) => {
-        return req.body.email || req.ip;
-    },
+    // Aplicar por email além do IP com fallback IPv6-safe
+    keyGenerator: (req) => req.body?.email || (0, express_rate_limit_1.ipKeyGenerator)({
+        // express-rate-limit types accept a minimal shape containing ip
+        // cast to any to satisfy helper signature across versions
+        ip: req.ip,
+    }),
 });
 /**
  * ✅ RATE LIMITING DINÂMICO BASEADO NO USUÁRIO
@@ -140,12 +172,14 @@ exports.criticalEndpointRateLimit = (0, express_rate_limit_1.default)({
     legacyHeaders: false,
     // Handler customizado para logging
     handler: (req, res) => {
-        console.warn(`Rate limit atingido para endpoint crítico: ${req.path} - IP: ${req.ip}`, {
+        // Log seguro: nunca use dados do usuário como string de formato
+        const logData = {
             ip: req.ip,
             userAgent: req.headers["user-agent"],
             timestamp: new Date().toISOString(),
             path: req.path,
-        });
+        };
+        console.warn("[RATE LIMIT] Endpoint crítico atingido", logData);
         res.status(429).json({
             error: "Operação crítica limitada. Aguarde alguns minutos.",
             retryAfter: "5 minutos",
@@ -161,13 +195,14 @@ const rateLimitLogger = (req, res, next) => {
     const limit = res.getHeader("X-RateLimit-Limit");
     if (remaining && limit && remaining < limit * 0.1) {
         // Menos de 10% restante
-        console.warn(`Rate limit próximo do limite: ${req.ip} - ${remaining}/${limit} restantes`, {
+        const logData = {
             ip: req.ip,
             path: req.path,
             remaining,
             limit,
             timestamp: new Date().toISOString(),
-        });
+        };
+        console.warn("[RATE LIMIT] Próximo do limite", logData);
     }
     next();
 };
