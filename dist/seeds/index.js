@@ -3,8 +3,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const bcrypt_1 = __importDefault(require("bcrypt"));
 const prisma_1 = require("../config/prisma");
+const crypto_1 = require("crypto");
 async function main() {
     console.log("🌱 Iniciando seed do banco de dados...");
     // Proteção: só executar seed quando RUN_SEED=true para evitar populações acidentais em cada run
@@ -15,9 +16,19 @@ async function main() {
     }
     // ========== USUÁRIOS ==========
     console.log("👥 Criando usuários...");
-    const adminPassword = await bcryptjs_1.default.hash("admin123", 10);
-    const clientPassword = await bcryptjs_1.default.hash("cliente123", 10);
-    const collabPassword = await bcryptjs_1.default.hash("colaborador123", 10);
+    function genPassword(len = 12) {
+        // base64 -> strip non-alnum -> slice to requested length
+        return (0, crypto_1.randomBytes)(Math.ceil(len * 3 / 4))
+            .toString("base64")
+            .replace(/[^a-zA-Z0-9]/g, "A")
+            .slice(0, len);
+    }
+    const adminPlain = process.env.SEED_ADMIN_PASSWORD || genPassword();
+    const clientPlain = process.env.SEED_CLIENT_PASSWORD || genPassword();
+    const collabPlain = process.env.SEED_COLLAB_PASSWORD || genPassword();
+    const adminPassword = await bcrypt_1.default.hash(adminPlain, 10);
+    const clientPassword = await bcrypt_1.default.hash(clientPlain, 10);
+    const collabPassword = await bcrypt_1.default.hash(collabPlain, 10);
     const adminUser = await prisma_1.prisma.user.upsert({
         where: { email: "admin@xproducoes.com" },
         update: {},
@@ -648,6 +659,12 @@ async function main() {
     console.log("   - 3 avaliações de clientes");
     console.log("   - 4 perguntas frequentes");
     console.log("   - 2 mensagens de contato");
+    // Exibir credenciais geradas (apenas em ambiente de seed controlado)
+    console.log("");
+    console.log("🔐 Credenciais de seed (use variáveis de ambiente para controlar):");
+    console.log("   Admin:", "admin@xproducoes.com", "/", process.env.SEED_ADMIN_PASSWORD ? "(from SEED_ADMIN_PASSWORD)" : adminPlain);
+    console.log("   Clientes (senha compartilhada):", process.env.SEED_CLIENT_PASSWORD ? "(from SEED_CLIENT_PASSWORD)" : clientPlain);
+    console.log("   Colaboradores (senha compartilhada):", process.env.SEED_COLLAB_PASSWORD ? "(from SEED_COLLAB_PASSWORD)" : collabPlain);
 }
 main()
     .catch((e) => {

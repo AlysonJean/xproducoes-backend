@@ -32,9 +32,14 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
+const prisma_1 = require("../config/prisma");
 const userService = __importStar(require("./userService"));
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 class AuthService {
     async register(data) {
         return userService.register({
@@ -79,19 +84,18 @@ class AuthService {
         return this.register(data);
     }
     async findUserByEmail(email) {
-        // Implementação simples usando userService
-        const users = await userService.getAllUsers({ page: 1, limit: 1000 });
-        return users.users.find(user => user.email === email);
+        // Busca direta e eficiente via prisma
+        const user = await prisma_1.prisma.user.findUnique({ where: { email } });
+        return user ? { id: user.id, email: user.email, name: user.name, role: user.role } : null;
     }
     async loginById(userId) {
-        const user = await userService.getUserById(Number(userId));
-        if (!user) {
+        const user = await prisma_1.prisma.user.findUnique({ where: { id: userId } });
+        if (!user)
             throw new Error('Usuário não encontrado');
-        }
-        // Simula login por ID
+        const token = jsonwebtoken_1.default.sign({ userId: user.id, role: user.role }, process.env.JWT_SECRET || 'dev', { expiresIn: '7d' });
         return {
-            user,
-            token: `mock_token_${userId}_${Date.now()}`
+            user: { id: user.id, name: user.name, email: user.email, role: user.role },
+            token,
         };
     }
 }

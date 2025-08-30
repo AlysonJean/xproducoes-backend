@@ -6,6 +6,7 @@ import * as dotenv from "dotenv";
 import { dynamicCors } from "./config/cors";
 import apiV1 from "./api/v1";
 import cepRoutes from './routes/cepRoutes';
+import { securityMonitoringMiddleware } from "./config/securityMonitor";
 
 dotenv.config();
 
@@ -25,6 +26,9 @@ app.use(
     max: Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
   }),
 );
+
+// Monitoramento de segurança
+app.use(securityMonitoringMiddleware);
 
 // Servir arquivos estáticos para manifest e service worker (produção)
 if (process.env.NODE_ENV === "production") {

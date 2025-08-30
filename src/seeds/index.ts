@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
+import bcrypt from "bcrypt";
 import { prisma } from "../config/prisma";
+import { randomBytes } from "crypto";
 
 async function main() {
   console.log("🌱 Iniciando seed do banco de dados...");
@@ -15,9 +16,21 @@ async function main() {
   // ========== USUÁRIOS ==========
   console.log("👥 Criando usuários...");
   
-  const adminPassword = await bcrypt.hash("admin123", 10);
-  const clientPassword = await bcrypt.hash("cliente123", 10);
-  const collabPassword = await bcrypt.hash("colaborador123", 10);
+  function genPassword(len = 12) {
+    // base64 -> strip non-alnum -> slice to requested length
+    return randomBytes(Math.ceil(len * 3 / 4))
+      .toString("base64")
+      .replace(/[^a-zA-Z0-9]/g, "A")
+      .slice(0, len);
+  }
+
+  const adminPlain = process.env.SEED_ADMIN_PASSWORD || genPassword();
+  const clientPlain = process.env.SEED_CLIENT_PASSWORD || genPassword();
+  const collabPlain = process.env.SEED_COLLAB_PASSWORD || genPassword();
+
+  const adminPassword = await bcrypt.hash(adminPlain, 10);
+  const clientPassword = await bcrypt.hash(clientPlain, 10);
+  const collabPassword = await bcrypt.hash(collabPlain, 10);
 
   const adminUser = await prisma.user.upsert({
     where: { email: "admin@xproducoes.com" },
@@ -695,6 +708,13 @@ async function main() {
   console.log("   - 3 avaliações de clientes");
   console.log("   - 4 perguntas frequentes");
   console.log("   - 2 mensagens de contato");
+
+  // Exibir credenciais geradas (apenas em ambiente de seed controlado)
+  console.log("");
+  console.log("🔐 Credenciais de seed (use variáveis de ambiente para controlar):");
+  console.log("   Admin:", "admin@xproducoes.com", "/", process.env.SEED_ADMIN_PASSWORD ? "(from SEED_ADMIN_PASSWORD)" : adminPlain);
+  console.log("   Clientes (senha compartilhada):", process.env.SEED_CLIENT_PASSWORD ? "(from SEED_CLIENT_PASSWORD)" : clientPlain);
+  console.log("   Colaboradores (senha compartilhada):", process.env.SEED_COLLAB_PASSWORD ? "(from SEED_COLLAB_PASSWORD)" : collabPlain);
 }
 
 main()

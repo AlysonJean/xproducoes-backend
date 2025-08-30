@@ -15,6 +15,10 @@ export class AuthController {
   ): Promise<void> => {
     try {
       const { name, email, password, role, phone, companyName } = req.body;
+      if (!name || !email || !password) {
+        res.status(400).json({ message: 'Nome, e-mail e senha são obrigatórios' });
+        return;
+      }
       const result = await this.authService.register({
         name,
         email,
@@ -44,12 +48,16 @@ export class AuthController {
       try {
         const result = await this.authService.login({ email, password });
         res.status(200).json(result);
-      } catch (error) {
-        if (
-          error instanceof Error &&
-          error.message === "Credenciais inválidas."
-        ) {
-          res.status(401).json({ message: error.message });
+      } catch (error: any) {
+        if (error?.code === 'EMAIL_NOT_VERIFIED') {
+          res.status(403).json({
+            message: 'E-mail não verificado. Verifique sua caixa de entrada.',
+            code: 'EMAIL_NOT_VERIFIED',
+          });
+          return;
+        }
+        if (error instanceof Error && (error.message === "Credenciais inválidas." || error.message === 'Usuário não encontrado' || error.message === 'Senha inválida')) {
+          res.status(401).json({ message: 'Credenciais inválidas.' });
           return;
         }
         throw error;
@@ -221,13 +229,21 @@ export class AuthController {
     try {
       const { userData } = req.body;
 
-      if (!userData?.email) {
+      // Validações de tipo para evitar usos inseguros (ex: userData.email.split)
+      if (!userData || typeof userData !== 'object') {
         res.status(400).json({ message: "Dados de utilizador inválidos" });
         return;
       }
 
-      // Por enquanto, implementação simplificada
-      // Em produção, seria necessário validar o token com a API do provedor
+      const email = (userData.email && typeof userData.email === 'string') ? userData.email : null;
+      if (!email) {
+        res.status(400).json({ message: "Dados de utilizador inválidos" });
+        return;
+      }
+
+  // Implementação simplificada
+  // TODO Enterprise: validar o id_token/authorization_code com o provedor (Google, Facebook, etc.)
+  // e estabelecer verificação de domínio/appId, uso de PKCE e state anti-CSRF no frontend.
 
       try {
         // Buscar usuário pelo email
@@ -240,9 +256,20 @@ export class AuthController {
         } else {
           // Se não existe, criar novo utilizador
           const randomPassword = Math.random().toString(36).slice(-8);
+          // Calcular nome seguro: priorizar userData.name quando for string válida
+          let safeName: string;
+          if (userData.name && typeof userData.name === 'string' && userData.name.trim()) {
+            safeName = userData.name.trim();
+          } else if (email.includes('@')) {
+            // dividir apenas em string já validada
+            safeName = email.split('@')[0];
+          } else {
+            safeName = email;
+          }
+
           const result = await this.authService.register({
-            name: userData.name || userData.email.split("@")[0],
-            email: userData.email,
+            name: safeName,
+            email: email,
             password: randomPassword,
             role: "CLIENT",
           });
@@ -259,6 +286,94 @@ export class AuthController {
       }
     } catch (error) {
       console.error("Erro no processamento de login social:", error);
+      next(error);
+    }
+  };
+
+  // helper para construir redirectUri do backend
+  private getBackendRedirect(req: Request, provider: 'google' | 'facebook') {
+    const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol;
+    const host = (req.headers['x-forwarded-host'] as string) || req.get('host');
+    return `${proto}://${host}/api/auth/oauth/${provider}/callback`;
+  }
+
+  // OAuth: iniciar autorização Google (gera URL com PKCE e state)
+  googleAuthorize = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const redirectUri = (process.env.GOOGLE_REDIRECT_URI || this.getBackendRedirect(req, 'google')).toString();
+      const svc = await import('../services/oauthService');
+      const { url } = await svc.getGoogleAuthorizationUrl({ redirectUri });
+      res.json({ url });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // OAuth: callback do Google
+  googleCallback = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+  const { code, state } = req.query as any;
+  const redirectUri = (process.env.GOOGLE_REDIRECT_URI || this.getBackendRedirect(req, 'google')).toString();
+      const svc = await import('../services/oauthService');
+      const result = await svc.handleGoogleCallback({ code, state, redirectUri });
+      // If browser requested (HTML), redirect to frontend with token in fragment
+      const accept = (req.headers['accept'] as string) || '';
+      const frontend = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+      if (accept.includes('text/html')) {
+        const redirect = `${frontend}/auth/oauth-complete#token=${encodeURIComponent(result.token)}`;
+        res.redirect(302, redirect);
+        return;
+      }
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // OAuth: iniciar autorização Facebook
+  facebookAuthorize = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const redirectUri = (process.env.FACEBOOK_REDIRECT_URI || this.getBackendRedirect(req, 'facebook')).toString();
+      const svc = await import('../services/oauthService');
+      const { url } = await svc.getFacebookAuthorizationUrl({ redirectUri });
+      res.json({ url });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // OAuth: callback do Facebook
+  facebookCallback = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+  const { code, state } = req.query as any;
+  const redirectUri = (process.env.FACEBOOK_REDIRECT_URI || this.getBackendRedirect(req, 'facebook')).toString();
+      const svc = await import('../services/oauthService');
+      const result = await svc.handleFacebookCallback({ code, state, redirectUri });
+      const accept = (req.headers['accept'] as string) || '';
+      const frontend = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+      if (accept.includes('text/html')) {
+        const redirect = `${frontend}/auth/oauth-complete#token=${encodeURIComponent(result.token)}`;
+        res.redirect(302, redirect);
+        return;
+      }
+      res.json(result);
+    } catch (error) {
       next(error);
     }
   };

@@ -91,4 +91,8 @@ router.get("/health/detailed", (req, res) => {
   });
 });
 
+// Endpoint público para demonstração das métricas de segurança (remover em produção)
+// REMOVIDO: Este endpoint foi usado apenas para demonstração e testes
+// As métricas reais estão disponíveis apenas para administradores em /api/admin/security/*
+
 export default router;

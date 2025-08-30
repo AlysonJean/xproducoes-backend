@@ -4,7 +4,7 @@
  * DDoS, força bruta e uso excessivo da API
  */
 
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { Request, Response } from "express";
 
 // ✅ CONFIGURAÇÕES DE RATE LIMITING POR TIPO DE ENDPOINT
@@ -14,7 +14,7 @@ import { Request, Response } from "express";
  */
 export const authRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 5, // Máximo 5 tentativas por IP
+  max: 20, // Máximo 20 tentativas por IP (aumentado para desenvolvimento)
   message: {
     error: "Muitas tentativas de login. Tente novamente em 15 minutos.",
     retryAfter: "15 minutos",
@@ -106,10 +106,12 @@ export const passwordResetRateLimit = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  // Aplicar por email além do IP
-  keyGenerator: (req: Request) => {
-    return req.body.email || req.ip;
-  },
+  // Aplicar por email além do IP com fallback IPv6-safe
+  keyGenerator: (req: Request) => req.body?.email || ipKeyGenerator({
+    // express-rate-limit types accept a minimal shape containing ip
+    // cast to any to satisfy helper signature across versions
+    ip: (req as any).ip,
+  } as any),
 });
 
 /**
@@ -147,14 +149,15 @@ export const criticalEndpointRateLimit = rateLimit({
   legacyHeaders: false,
   // Handler customizado para logging
   handler: (req: Request, res: Response) => {
+    // Log seguro: nunca use dados do usuário como string de formato
+    const logData = {
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+      timestamp: new Date().toISOString(),
+      path: req.path,
+    };
     console.warn(
-      `Rate limit atingido para endpoint crítico: ${req.path} - IP: ${req.ip}`,
-      {
-        ip: req.ip,
-        userAgent: req.headers["user-agent"],
-        timestamp: new Date().toISOString(),
-        path: req.path,
-      },
+      "[RATE LIMIT] Endpoint crítico atingido", logData
     );
 
     res.status(429).json({
@@ -174,16 +177,14 @@ export const rateLimitLogger = (req: Request, res: Response, next: any) => {
 
   if (remaining && limit && remaining < limit * 0.1) {
     // Menos de 10% restante
-    console.warn(
-      `Rate limit próximo do limite: ${req.ip} - ${remaining}/${limit} restantes`,
-      {
-        ip: req.ip,
-        path: req.path,
-        remaining,
-        limit,
-        timestamp: new Date().toISOString(),
-      },
-    );
+    const logData = {
+      ip: req.ip,
+      path: req.path,
+      remaining,
+      limit,
+      timestamp: new Date().toISOString(),
+    };
+    console.warn("[RATE LIMIT] Próximo do limite", logData);
   }
 
   next();

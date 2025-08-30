@@ -24,6 +24,8 @@ import { EquipmentService } from "../services/equipmentService";
 import logger from "../config/logger";
 import { UploadService } from "../services/uploadService";
 import EmailService from "../services/emailService";
+import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 
 const bookingService = new BookingService();
 const equipmentService = new EquipmentService();
@@ -76,8 +78,6 @@ export class AdminController {
       }
 
       // Criação atômica: se enviar user data, cria user e client em transação
-      const bcrypt = require('bcryptjs');
-      const crypto = require('crypto');
       let tempPassword: string | undefined;
       let inviteToken: string | undefined;
 
@@ -452,7 +452,6 @@ export class AdminController {
       if (!user) return res.status(404).json({ message: 'Usuário não encontrado' });
       if (user.verified) return res.status(400).json({ message: 'E-mail já verificado' });
 
-      const crypto = require('crypto');
       const token = crypto.randomBytes(20).toString('hex');
 
       const updated = await prisma.user.update({

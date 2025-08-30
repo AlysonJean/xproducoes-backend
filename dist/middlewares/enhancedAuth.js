@@ -11,7 +11,11 @@ const environment_1 = require("../config/environment");
 function enhancedAuthMiddleware(req, res, next) {
     const authHeader = req.headers.authorization;
     if (!authHeader) {
-        console.log(`401: No Authorization header for ${req.method} ${req.path}`);
+        console.warn('[AUTH] No Authorization header', {
+            method: req.method,
+            path: req.path,
+            ip: req.ip,
+        });
         return res.status(401).json({
             success: false,
             message: "Token de autorização não fornecido",
@@ -21,7 +25,11 @@ function enhancedAuthMiddleware(req, res, next) {
     }
     const [bearer, token] = authHeader.split(" ");
     if (bearer !== "Bearer" || !token) {
-        console.log(`401: Invalid token format for ${req.method} ${req.path}`);
+        console.warn('[AUTH] Invalid token format', {
+            method: req.method,
+            path: req.path,
+            ip: req.ip,
+        });
         return res.status(401).json({
             success: false,
             message: "Formato de token inválido",
@@ -34,7 +42,12 @@ function enhancedAuthMiddleware(req, res, next) {
         // Check token expiration
         const now = Math.floor(Date.now() / 1000);
         if (decoded.exp && decoded.exp < now) {
-            console.log(`401: Token expired for ${req.method} ${req.path}`);
+            console.warn('[AUTH] Token expired', {
+                method: req.method,
+                path: req.path,
+                ip: req.ip,
+                expiredAt: new Date(decoded.exp * 1000).toISOString(),
+            });
             return res.status(401).json({
                 success: false,
                 message: "Token expirado",
@@ -45,11 +58,23 @@ function enhancedAuthMiddleware(req, res, next) {
         req.authUser = decoded;
         req.userId = decoded.userId;
         req.userRole = decoded.role;
-        console.log(`200: Authenticated ${req.method} ${req.path} for user ${decoded.userId}`);
+        console.info('[AUTH] Authenticated request', {
+            method: req.method,
+            path: req.path,
+            userId: decoded.userId,
+            role: decoded.role,
+            ip: req.ip,
+        });
         return next();
     }
     catch (error) {
-        console.log(`401: JWT verification failed for ${req.method} ${req.path}`, error);
+        // Log seguro: não usar o erro inteiro como string de formato
+        console.warn('[AUTH] JWT verification failed', {
+            method: req.method,
+            path: req.path,
+            ip: req.ip,
+            message: error instanceof Error ? error.message : String(error),
+        });
         if (error instanceof jsonwebtoken_1.default.TokenExpiredError) {
             return res.status(401).json({
                 success: false,
