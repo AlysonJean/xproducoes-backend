@@ -8,6 +8,8 @@ module.exports = {
   transform: {
     ...tsJestTransformCfg,
   },
+  setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
+  testTimeout: 20000,
   // Evita rodar testes compilados em dist/ e duplicidades
   testPathIgnorePatterns: ["/node_modules/", "/dist/"],
 };

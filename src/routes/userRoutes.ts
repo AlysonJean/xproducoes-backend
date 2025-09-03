@@ -31,6 +31,9 @@ userRoutes.get("/favorites", authMiddleware, (req, res) => {
 // Rota para estatísticas do usuário
 userRoutes.get("/stats", authMiddleware, userController.getStats);
 
+// Endpoint para promover usuário a VIP (verificação server-side)
+userRoutes.post("/promote-vip", authMiddleware, userController.promoteVip);
+
 // Rota para alterar senha
 userRoutes.post("/change-password", authMiddleware, async (req, res) => {
   try {

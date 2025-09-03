@@ -19,17 +19,23 @@ function genPassword(len = 12) {
 		.slice(0, len);
 }
 
+let seedAdminPassword: string | null = null;
+
 async function ensureAdminUser() {
 	const email = process.env.SEED_ADMIN_EMAIL || 'admin@xproducoes.local';
 	const name = process.env.SEED_ADMIN_NAME || 'Administrador';
-	const passwordPlain = process.env.SEED_ADMIN_PASSWORD || genPassword();
+	// Default explicit password for convenience in local dev — overridable via SEED_ADMIN_PASSWORD
+	const passwordPlain = process.env.SEED_ADMIN_PASSWORD || 'admin123';
 
-	const existing = await prisma.user.findUnique({ where: { email } });
-	if (existing) return existing;
+	// store to show at the end of the seed
+	seedAdminPassword = passwordPlain;
 
 	const passwordHash = await bcrypt.hash(passwordPlain, 10);
-	const created = await prisma.user.create({
-		data: {
+
+	// Use upsert to ensure password is set/updated even if user exists
+	const upserted = await prisma.user.upsert({
+		where: { email },
+		create: {
 			name,
 			email,
 			passwordHash,
@@ -37,13 +43,22 @@ async function ensureAdminUser() {
 			verified: true,
 			isActive: true,
 		},
+		update: {
+			name,
+			passwordHash,
+			role: UserRole.ADMIN,
+			verified: true,
+			isActive: true,
+		},
 	});
-	// show generated password if it wasn't provided via env
+
+	// show generated/default password when not provided via env
 	if (!process.env.SEED_ADMIN_PASSWORD) {
 		// eslint-disable-next-line no-console
-		console.log('[seed] Admin password generated:', passwordPlain);
+		console.log('[seed] Admin password set to (default):', passwordPlain);
 	}
-	return created;
+
+	return upserted;
 }
 
 async function ensureFaqs() {
@@ -314,7 +329,7 @@ async function main() {
 	console.log('[seed] Reviews criadas');
 
 	console.log('[seed] Seed completo. Credenciais de teste:');
-	console.log('  Admin: admin@xproducoes.local / admin123');
+	console.log('  Admin: admin@xproducoes.local /', seedAdminPassword || '(set via SEED_ADMIN_PASSWORD)');
 	console.log('  Cliente: cliente.teste@exemplo.com / cliente123');
 	console.log('  Colaborador: colaborador.teste@exemplo.com / collab123');
 }
