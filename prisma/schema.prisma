@@ -61,6 +61,7 @@ location                 String?
   emailVerificationToken   String?
   emailVerificationTokenExpiry DateTime?
   profileSettings          Json?
+  isVip                   Boolean           @default(false)
   isActive                 Boolean           @default(true)
   createdAt                DateTime          @default(now())
   updatedAt                DateTime          @updatedAt
@@ -453,6 +454,19 @@ model CollaboratorAvailability {
   @@index([date])
   @@index([status])
   @@map("collaborator_availabilities")
+}
+
+model InviteToken {
+  id         String   @id @default(cuid())
+  token      String   @unique
+  email      String
+  invitedBy  String?
+  used       Boolean  @default(false)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([email])
+  @@map("invite_tokens")
 }
 
 model CollaboratorPayment {

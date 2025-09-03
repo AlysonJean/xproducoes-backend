@@ -1,6 +1,7 @@
 import { Router, type Router as RouterType } from "express";
 import {
   createCollaborator,
+  // ...existing exports
   getAllCollaborators,
   getCollaboratorById,
   updateCollaborator,
@@ -20,6 +21,7 @@ import {
   deleteAvailability,
   getCollaboratorAvailabilities,
 } from "../controllers/collaboratorController";
+import { sendInvite } from '../controllers/inviteController';
 import { authMiddleware, adminOrCollaborator } from "../middlewares/authMiddleware";
 import { ensureAdmin } from "../config/ensureAdmin";
 
@@ -30,6 +32,8 @@ router.use(authMiddleware);
 
 // Rotas de CRUD de Colaboradores (apenas admin)
 router.post("/", ensureAdmin, createCollaborator);
+// Rota para enviar convite por email
+router.post('/invite', ensureAdmin, sendInvite);
 router.get("/", getAllCollaborators);
 router.get("/search", searchCollaborators);
 router.get("/available", getAvailableCollaborators);

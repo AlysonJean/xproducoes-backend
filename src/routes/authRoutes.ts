@@ -4,6 +4,7 @@ import { authMiddleware, adminOnly } from "../middlewares/authMiddleware";
 import { authRateLimit, passwordResetRateLimit } from "../middlewares/rateLimitMiddleware";
 import { z } from 'zod';
 import { userRegisterSchema, userLoginSchema } from '../validators/userSchema';
+import { registerFromInvite } from '../controllers/inviteController';
 
 // Middleware simples de validação com Zod
 const validate = (schema: z.ZodSchema<any>) => (req: any, res: any, next: any) => {
@@ -26,6 +27,8 @@ const authController = new AuthController();
 // Rotas públicas
 authRoutes.post("/register", authRateLimit, validate(userRegisterSchema), authController.register);
 authRoutes.post("/login", authRateLimit, validate(userLoginSchema), authController.login);
+// Registro público a partir de convite
+authRoutes.post('/register-from-invite', registerFromInvite);
 authRoutes.get('/verify-email', authController.verifyEmail);
 authRoutes.post('/resend-verification', authRateLimit, authController.resendVerificationPublic);
 // Alias para compatibilidade REST/testes

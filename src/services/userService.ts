@@ -15,7 +15,7 @@ export async function deleteUser(userId: string | number) {
 export async function getUserById(id: number) {
   return prisma.user.findUnique({ 
     where: { id: String(id) },
-    select: { id: true, name: true, email: true, role: true, createdAt: true }
+  select: { id: true, name: true, email: true, role: true, createdAt: true, isVip: true }
   });
 }
 
@@ -101,14 +101,14 @@ export async function requestPasswordReset(email: string) {
 export async function generateEmailVerificationToken(userId: string) {
   const token = crypto.randomBytes(32).toString('hex');
   const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  await (prisma as any).user.update({ where: { id: userId }, data: { emailVerificationToken: token, emailVerificationTokenExpiry: expiry } });
+  await prisma.user.update({ where: { id: userId }, data: { emailVerificationToken: token, emailVerificationTokenExpiry: expiry } });
   return token;
 }
 
 export async function verifyEmailByToken(token: string) {
-  const user = await (prisma as any).user.findFirst({ where: { emailVerificationToken: token, emailVerificationTokenExpiry: { gte: new Date() } } });
+  const user = await prisma.user.findFirst({ where: { emailVerificationToken: token, emailVerificationTokenExpiry: { gte: new Date() } } });
   if (!user) throw new Error('Token inválido ou expirado');
-  await (prisma as any).user.update({ where: { id: user.id }, data: { verified: true, emailVerificationToken: null, emailVerificationTokenExpiry: null } });
+  await prisma.user.update({ where: { id: user.id }, data: { verified: true, emailVerificationToken: null, emailVerificationTokenExpiry: null } });
   return true;
 }
 
@@ -245,7 +245,8 @@ export async function getProfile(userId: string) {
       name: true,
       email: true,
       role: true,
-      avatarUrl: true,
+  avatarUrl: true,
+  isVip: true,
       createdAt: true,
     },
   });
@@ -293,7 +294,8 @@ export async function updateProfile(
         name: true,
         email: true,
         role: true,
-        avatarUrl: true,
+  avatarUrl: true,
+  isVip: true,
         createdAt: true,
       },
     });
@@ -308,7 +310,7 @@ export async function updateProfile(
 
 export async function listUsers() {
   return prisma.user.findMany({
-    select: { id: true, name: true, email: true, role: true, createdAt: true },
+  select: { id: true, name: true, email: true, role: true, createdAt: true, isVip: true },
   });
 }
 
@@ -401,4 +403,27 @@ export async function getUserStats(userId: string) {
       recentBookings: 0
     };
   }
+}
+
+// Promove usuário para VIP de forma segura: valida total de reservas do cliente
+export async function promoteToVip(userId: string) {
+  // Verificar existência do usuário e perfil de cliente
+  const user = await prisma.user.findUnique({ where: { id: userId }, include: { clientProfile: true } });
+  if (!user) throw new Error('Usuário não encontrado');
+
+  // Se não tem clientProfile, não promovemos automaticamente
+  if (!user.clientProfile) throw new Error('Perfil de cliente não encontrado');
+
+  // Recalcular total de reservas para evitar confiar no cliente
+  const totalBookings = await prisma.booking.count({ where: { clientId: user.clientProfile.id } });
+
+  if (totalBookings < 5) {
+    // Não promover se a regra de negócio não for satisfeita
+    throw new Error('Regra de promoção para VIP não satisfeita');
+  }
+
+  // Atualizar campo isVip no usuário
+  await prisma.user.update({ where: { id: userId }, data: { isVip: true } });
+
+  return true;
 }

@@ -38,12 +38,30 @@ class SecurityMonitor {
 
   private readonly MAX_RECENT_EVENTS = 1000;
   private readonly CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutos
+  private cleanupTimer?: NodeJS.Timeout;
 
   constructor() {
     // Limpar eventos antigos periodicamente
-    setInterval(() => {
+    this.cleanupTimer = setInterval(() => {
       this.cleanupOldEvents();
     }, this.CLEANUP_INTERVAL);
+
+    // Não deixe este timer manter o event loop ativo (útil para testes)
+    try {
+      if (this.cleanupTimer && typeof (this.cleanupTimer as any).unref === 'function') {
+        (this.cleanupTimer as any).unref();
+      }
+    } catch (e) {
+      // ignore - fall back to default behaviour
+    }
+  }
+
+  // Permite que testes ou o processo limpem explicitamente o timer
+  stop() {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer as any);
+      this.cleanupTimer = undefined;
+    }
   }
 
   recordInvalidToken(ip: string, userAgent: string, endpoint: string, details?: any) {

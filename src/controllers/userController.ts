@@ -108,3 +108,15 @@ export async function getStats(req: Request, res: Response) {
     return res.status(500).json({ error: error.message });
   }
 }
+
+export async function promoteVip(req: Request, res: Response) {
+  try {
+    await userService.promoteToVip(req.userId!);
+    return res.json({ success: true, message: 'Usuário promovido a VIP' });
+  } catch (error: any) {
+    if (error.message && error.message.includes('Regra de promoção')) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
