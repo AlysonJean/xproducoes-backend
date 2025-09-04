@@ -1,0 +1,24 @@
+# Exemplo de render.yaml para deploy no Render (opcional)
+services:
+  - type: web
+    name: backend
+    env: node
+    plan: starter
+    region: oregon
+    repo: https://github.com/SEU_USUARIO/SEU_REPO
+    branch: main
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:prod
+    envVars:
+      - key: DATABASE_URL
+        sync: true
+      - key: JWT_SECRET
+        sync: true
+      - key: CLOUDINARY_URL
+        sync: true
+      - key: SMTP_HOST
+        sync: true
+      - key: SMTP_USER
+        sync: true
+      - key: SMTP_PASS
+        sync: true
