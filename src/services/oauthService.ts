@@ -190,10 +190,9 @@ export async function handleFacebookCallback(params: { code?: string; state?: st
     code,
     code_verifier: codeVerifier,
   } as any);
-  const tokenRes = await fetch('https://graph.facebook.com/v19.0/oauth/access_token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: tokenParams.toString(),
+  const tokenRes = await (await import('../utils/safeFetch')).safeFetch('https://graph.facebook.com/v19.0/oauth/access_token', {
+    allowedHosts: new Set(['graph.facebook.com']),
+    init: { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: tokenParams.toString() }
   });
   const tokenJson: any = await tokenRes.json();
   if (!tokenRes.ok || !tokenJson.access_token) {
@@ -202,7 +201,7 @@ export async function handleFacebookCallback(params: { code?: string; state?: st
   const accessToken = tokenJson.access_token as string;
 
   // Buscar perfil básico
-  const meRes = await fetch(`https://graph.facebook.com/v19.0/me?fields=id,name,email&access_token=${encodeURIComponent(accessToken)}`);
+  const meRes = await (await import('../utils/safeFetch')).safeFetch(`https://graph.facebook.com/v19.0/me?fields=id,name,email&access_token=${encodeURIComponent(accessToken)}`, { allowedHosts: new Set(['graph.facebook.com']) });
   const me: any = await meRes.json();
   if (!meRes.ok || !me?.id) {
     throw new Error(`Falha ao obter perfil do Facebook: ${me?.error?.message || meRes.statusText}`);

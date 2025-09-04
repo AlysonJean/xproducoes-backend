@@ -2,6 +2,7 @@ import { Router } from "express";
 import * as userController from "../controllers/userController";
 import { authMiddleware } from "../middlewares/authMiddleware";
 import { uploadSingle } from "../middlewares/upload";
+import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
 
 const userRoutes = Router();
 
@@ -12,7 +13,7 @@ userRoutes.get("/profile", authMiddleware, userController.getProfile);
 userRoutes.put(
   "/profile",
   authMiddleware,
-  uploadSingle("avatar"),
+  uploadRateLimit, uploadSingle("avatar"),
   require("../middlewares/upload").processUpload,
   userController.updateProfile,
 );

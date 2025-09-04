@@ -5,6 +5,7 @@ import { cacheMiddleware } from "../middlewares/cacheMiddleware";
 import { uploadSingle } from "../middlewares/upload";
 
 const equipmentRoutes: Router = Router();
+import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
 const equipmentController = new EquipmentController();
 
 // --- Rotas Públicas (com cache otimizado) ---
@@ -26,14 +27,14 @@ equipmentRoutes.get("/equipments/:id", cacheMiddleware, equipmentController.find
 equipmentRoutes.post(
   "/",
   authMiddleware,
-  uploadSingle("image"),
+  uploadRateLimit, uploadSingle("image"),
   require("../middlewares/upload").processUpload,
   equipmentController.create,
 );
 equipmentRoutes.put(
   "/:id",
   authMiddleware,
-  uploadSingle("image"),
+  uploadRateLimit, uploadSingle("image"),
   require("../middlewares/upload").processUpload,
   equipmentController.update,
 );

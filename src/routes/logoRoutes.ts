@@ -1,9 +1,9 @@
 import { Router, Request, Response } from 'express';
-import fetch from 'node-fetch';
 import dns from 'dns';
 import { promisify } from 'util';
 import net from 'net';
 import { uploadSingle } from '../middlewares/upload';
+import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
 import { uploadLogo } from '../controllers/logoController';
 import { safeFetch } from '../utils/safeFetch';
 // Import jsdom/dompurify dinamicamente dentro do handler to avoid startup errors
@@ -11,10 +11,10 @@ import { safeFetch } from '../utils/safeFetch';
 const router = Router();
 
 // Faz apenas um upload: multer -> controller (Cloudinary)
-router.post('/', uploadSingle('logo'), uploadLogo);
+router.post('/', uploadRateLimit, uploadSingle('logo'), uploadLogo);
 
 // Proxy seguro para SVG (ex.: Cloudinary) com CORS habilitado
-router.get('/svg-proxy', async (req: Request, res: Response) => {
+router.get('/svg-proxy', uploadRateLimit, async (req: Request, res: Response) => {
 	// Validação e proteção do parâmetro `url` e do conteúdo upstream
 	try {
 		const url = (req.query.url as string) || '';

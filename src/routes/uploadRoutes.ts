@@ -1,6 +1,7 @@
 import { Router, type Router as RouterType } from "express";
 import { UploadController } from "../controllers/uploadController";
 import { uploadSingle } from "../middlewares/upload";
+import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
 import { authMiddleware } from "../middlewares/authMiddleware";
 
 const uploadRoutes: Router = Router();
@@ -11,7 +12,7 @@ const uploadController = new UploadController();
 uploadRoutes.post(
   "/avatar",
   authMiddleware,
-  uploadSingle("avatar"),
+  uploadRateLimit, uploadSingle("avatar"),
   require("../middlewares/upload").processUpload,
   uploadController.uploadAvatar,
 );
@@ -20,7 +21,7 @@ uploadRoutes.post(
 uploadRoutes.post(
   "/image",
   authMiddleware,
-  uploadSingle("image"),
+  uploadRateLimit, uploadSingle("image"),
   require("../middlewares/upload").processUpload,
   uploadController.uploadImage,
 );

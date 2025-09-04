@@ -3,6 +3,7 @@ import { PortfolioController } from "../controllers/portfolioController";
 import { authMiddleware } from "../middlewares/authMiddleware";
 import { roleMiddleware } from "../middlewares/roleMiddleware";
 import { uploadSingle } from "../middlewares/upload";
+import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
 
 const portfolioRoutes: Router = Router();
 const portfolioController = new PortfolioController();
@@ -17,7 +18,7 @@ portfolioRoutes.post(
   "/",
   authMiddleware,
   roleMiddleware(["ADMIN"]),
-  uploadSingle("image"),
+  uploadRateLimit, uploadSingle("image"),
   require("../middlewares/upload").processUpload,
   portfolioController.create,
 );
@@ -25,7 +26,7 @@ portfolioRoutes.put(
   "/:id",
   authMiddleware,
   roleMiddleware(["ADMIN"]),
-  uploadSingle("image"),
+  uploadRateLimit, uploadSingle("image"),
   require("../middlewares/upload").processUpload,
   portfolioController.update,
 );

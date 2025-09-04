@@ -9,6 +9,7 @@ export type SafeFetchOptions = {
 	maxRedirects?: number;
 	timeoutMs?: number;
 	allowedHosts?: Set<string>;
+	init?: RequestInit;
 };
 
 export async function safeFetch(inputUrl: string, options: SafeFetchOptions = {}) {
@@ -60,7 +61,39 @@ export async function safeFetch(inputUrl: string, options: SafeFetchOptions = {}
 		let currentUrl = new URL(parsed.protocol + '//' + parsed.hostname + (parsed.port ? ':' + parsed.port : '') + parsed.pathname + parsed.search);
 
 		for (let i = 0; i <= maxRedirects; i++) {
-			const resp = await fetch(currentUrl.toString(), { signal: controller.signal, redirect: 'manual' as any, headers: { accept: '*/*' } });
+				// Merge headers safely: default accept plus any provided init.headers
+				const defaultHeaders: any = { accept: '*/*' };
+				const providedInit = options.init || {};
+				let providedHeaders: any = {};
+					if (providedInit.headers) {
+						// headers can be Headers, array or plain object
+						const h = providedInit.headers as any;
+						if (typeof h === 'object' && typeof h.forEach === 'function') {
+							// Headers-like
+							try {
+								// @ts-ignore
+								h.forEach((value: any, key: any) => (providedHeaders[key] = value));
+							} catch {
+								// fallback to entries
+								try {
+									for (const [k, v] of h.entries()) providedHeaders[k] = v;
+								} catch {
+									// give up, leave providedHeaders empty
+								}
+							}
+						} else if (Array.isArray(h)) {
+							for (const [k, v] of h) providedHeaders[k] = v as any;
+						} else {
+							providedHeaders = h as any;
+						}
+					}
+				const mergedHeaders = { ...defaultHeaders, ...providedHeaders };
+
+				// Normalize providedInit: avoid null body
+				const normalizedInit: any = { ...providedInit };
+				if (normalizedInit.body === null) normalizedInit.body = undefined;
+
+				const resp = await fetch(currentUrl.toString(), { signal: controller.signal, redirect: 'manual' as any, headers: mergedHeaders, ...normalizedInit });
 			if (resp.status >= 300 && resp.status < 400) {
 				const loc = resp.headers.get('location');
 				if (!loc) throw new Error('Redirect without location');

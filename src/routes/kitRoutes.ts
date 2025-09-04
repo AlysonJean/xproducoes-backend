@@ -3,6 +3,7 @@ import { KitController } from "../controllers/kitController";
 import { authMiddleware } from "../middlewares/authMiddleware";
 import { ensureAdmin } from "../config/ensureAdmin";
 import { uploadSingle } from "../middlewares/upload";
+import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
 
 const kitRoutes: Router = Router();
 const kitController = new KitController();
@@ -20,7 +21,7 @@ kitRoutes.post(
   "/",
   authMiddleware,
   ensureAdmin,
-  uploadSingle("image"),
+  uploadRateLimit, uploadSingle("image"),
   require("../middlewares/upload").processUpload,
   kitController.create,
 );
@@ -28,7 +29,7 @@ kitRoutes.put(
   "/:id",
   authMiddleware,
   ensureAdmin,
-  uploadSingle("image"),
+  uploadRateLimit, uploadSingle("image"),
   require("../middlewares/upload").processUpload,
   kitController.update,
 );
