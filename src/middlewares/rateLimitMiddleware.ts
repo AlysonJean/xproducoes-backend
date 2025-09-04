@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { Request, Response } from 'express';
 
 // Rate limiting para autenticação - Mais restritivo
@@ -52,7 +52,18 @@ export const passwordResetRateLimit = rateLimit({
   max: 3,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: Request) => req.body?.email || req.ip,
+  keyGenerator: (req: Request) => {
+    // prefer per-email rate limiting, fall back to normalized IP key
+    // use express-rate-limit's helper to correctly handle IPv6 formats
+    // (e.g. ::ffff:127.0.0.1)
+    try {
+      // ipKeyGenerator expects a Request-like object
+      const ipKey = ipKeyGenerator(req as any);
+      return (req.body && req.body.email) ? req.body.email : ipKey;
+    } catch {
+      return req.body?.email || (req.ip as string);
+    }
+  },
 });
 
 export const dynamicRateLimit = rateLimit({

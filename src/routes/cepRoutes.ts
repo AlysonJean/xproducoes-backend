@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import fetch from 'node-fetch';
+import { safeFetch } from '../utils/safeFetch';
 
 const router = Router();
 
@@ -11,8 +11,8 @@ router.get('/:cep', async (req, res) => {
   }
   try {
     const viaCepUrl = `https://viacep.com.br/ws/${cep}/json/`;
-    const response = await fetch(viaCepUrl);
-    const data = await response.json();
+  const response = await safeFetch(viaCepUrl, { allowedHosts: new Set(['viacep.com.br']) });
+  const data = await response.json();
     res.json(data);
   } catch (err) {
     res.status(500).json({ erro: true, message: 'Erro ao buscar CEP' });

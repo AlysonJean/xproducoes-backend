@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+import { safeFetch } from '../utils/safeFetch';
 import { prisma } from '../config/prisma';
 import logger from '../config/logger';
 // use runtime UUID generation to avoid requiring new deps at build time
@@ -42,10 +42,11 @@ class WebhookService {
     const backoffMs = Math.pow(2, attempt) * 1000;
 
     try {
-      const res = await fetch(this.webhookUrl, {
+      const res = await safeFetch(this.webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        allowedHosts: new Set([new URL(this.webhookUrl).hostname]),
       });
       const text = await res.text();
 
