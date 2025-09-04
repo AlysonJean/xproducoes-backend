@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { safeFetch } from '../utils/safeFetch';
+import { apiRateLimit } from '../middlewares/rateLimitMiddleware';
 
 const router = Router();
 
 // Proxy para ViaCEP
-router.get('/:cep', async (req, res) => {
+router.get('/:cep', apiRateLimit, async (req, res) => {
   const { cep } = req.params;
   if (!cep || cep.length !== 8) {
     return res.status(400).json({ erro: true, message: 'CEP inválido' });
