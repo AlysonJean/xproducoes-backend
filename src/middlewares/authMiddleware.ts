@@ -144,3 +144,17 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
 
   next();
 }
+
+// Opções padrão seguras para cookies de sessão/token
+export const defaultCookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as 'lax' | 'strict' | 'none',
+  maxAge: 1000 * 60 * 60 * 24 * 7, // 7 dias
+};
+
+// Helper para setar cookies de sessão com opções seguras
+export function setSessionCookie(res: Response, name: string, token: string, opts = {}) {
+  const options = { ...defaultCookieOptions, ...opts } as any;
+  res.cookie(name, token, options);
+}
