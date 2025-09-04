@@ -17,6 +17,15 @@ app.use(dynamicCors);
 
 // Segurança
 app.use(helmet());
+// Cabeçalhos de segurança adicionais (CSP gerido aqui para maior controle)
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' https:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=()');
+  next();
+});
 // Logs
 app.use(morgan("dev"));
 // Rate limiting

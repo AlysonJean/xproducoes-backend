@@ -39,8 +39,8 @@ export class UploadService {
         folder: `x-producoes/${folder}`,
         resource_type: 'image',
         use_filename: true,
-        unique_filename: false,
-        overwrite: true,
+        unique_filename: true,
+        overwrite: false,
       };
 
       // Para SVG: não aplicar transformações que forcem rasterização ou conversão
@@ -59,6 +59,27 @@ export class UploadService {
           { fetch_format: 'auto' },
         ],
       };
+
+      // Prepare buffer for upload; sanitize SVGs synchronously before creating stream
+      let bufferToSend = file.buffer;
+      if (isSvg) {
+        try {
+          // dynamic import but executed before upload stream and using promise chain
+          const jsdomMod = require('jsdom');
+          const dompurifyMod = require('dompurify');
+          const JSDOM = jsdomMod.JSDOM;
+          const createDOMPurify = dompurifyMod.default || dompurifyMod;
+          const window = new JSDOM('').window;
+          const DOMPurify = createDOMPurify(window);
+          const svgText = file.buffer.toString('utf8');
+          const clean = DOMPurify.sanitize(svgText, { WHOLE_DOCUMENT: true, USE_PROFILES: { svg: true } });
+          bufferToSend = Buffer.from(clean, 'utf8');
+        } catch (sanErr) {
+          console.error('SVG sanitization failed before upload:', sanErr);
+          reject(new Error('SVG sanitization failed'));
+          return;
+        }
+      }
 
       const uploadStream = cloudinary.uploader.upload_stream(
         isSvg ? svgOptions : rasterOptions,
@@ -83,7 +104,8 @@ export class UploadService {
           resolve(result.secure_url);
         },
       );
-      uploadStream.end(file.buffer);
+
+      uploadStream.end(bufferToSend);
     });
   }
 

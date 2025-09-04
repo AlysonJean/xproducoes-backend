@@ -5,6 +5,7 @@ import { promisify } from 'util';
 import net from 'net';
 import { uploadSingle } from '../middlewares/upload';
 import { uploadLogo } from '../controllers/logoController';
+import { safeFetch } from '../utils/safeFetch';
 // Import jsdom/dompurify dinamicamente dentro do handler to avoid startup errors
 
 const router = Router();
@@ -72,21 +73,26 @@ router.get('/svg-proxy', async (req: Request, res: Response) => {
 			return res.status(400).send('DNS lookup failed');
 		}
 
-		// Usar AbortController para timeout do fetch
-		const controller = new AbortController();
-		const timeout = setTimeout(() => controller.abort(), 10000); // 10s
-		let upstream;
-		try {
-			upstream = await fetch(url, { signal: controller.signal });
-		} catch (fetchErr: any) {
-			if (fetchErr.name === 'AbortError') {
-				return res.status(504).send('Upstream request timed out');
-			}
-			console.error('Fetch error in svg-proxy:', fetchErr);
-			return res.status(502).send('Bad Gateway');
-		} finally {
-			clearTimeout(timeout);
+		// Require a token for this proxy endpoint (mutual auth / simple token)
+		const token = process.env.SVG_PROXY_TOKEN;
+		const provided = req.header('x-svg-proxy-token') || '';
+		if (token && (!provided || provided !== token)) {
+			return res.status(401).send('Unauthorized');
 		}
+
+		let upstreamResp;
+		try {
+			upstreamResp = await safeFetch(url, { allowedHosts: allowedHosts });
+		} catch (err: any) {
+			if (err.message === 'Host not allowed' || err.message === 'Host resolves to internal address' || err.message === 'Redirect to unsupported protocol' || err.message === 'URL contains credentials which are not allowed' || err.message === 'Only https protocol allowed') {
+				console.warn('[SSRF] Rejected request in svg-proxy:', err.message);
+				return res.status(400).send(err.message);
+			}
+			if (err.name === 'AbortError') return res.status(504).send('Upstream request timed out');
+			console.error('Fetch error in svg-proxy:', err);
+			return res.status(502).send('Bad Gateway');
+		}
+		const upstream = upstreamResp;
 		if (!upstream.ok) {
 			return res.status(upstream.status).send(`Upstream error: ${upstream.statusText}`);
 		}
