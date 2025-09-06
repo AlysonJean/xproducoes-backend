@@ -17,7 +17,7 @@
     "check-forbidden": "node ../scripts/check_forbidden_files.js",
     "scan-history-secrets": "node ../scripts/scan_history_secrets.js",
     "config-hooks": "git config core.hooksPath .githooks || true",
-    "postinstall": "patch-package"
+  "postinstall": "patch-package && npm run build"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

@@ -43,10 +43,12 @@ class WebhookService {
 
     try {
       const res = await safeFetch(this.webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
         allowedHosts: new Set([new URL(this.webhookUrl).hostname]),
+        init: {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
       });
       const text = await res.text();
 

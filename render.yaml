@@ -5,7 +5,7 @@ services:
     env: node
     plan: starter
     region: oregon
-    repo: https://github.com/SEU_USUARIO/SEU_REPO
+    repo: https://github.com/AlysonJean/xproducoes-backend
     branch: main
     buildCommand: npm ci && npm run build
     startCommand: npm run start:prod
