@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+logs/
+uploads/
+.env*
+*.log
+*.patch
+*.md
+*.json
+*.sqlite
+prisma/
+tests/
+scripts/
+docs/
+patches/

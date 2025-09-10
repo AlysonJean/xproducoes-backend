@@ -1,4 +1,3 @@
-// ...código existente...
 import { Prisma, BookingStatus, DeliveryStatus, UserRole } from "@prisma/client";
 import { BookingCreateInput, BookingUpdateInput, BookingFilters } from "../validators/bookingSchema";
 import { 
@@ -306,7 +305,16 @@ export class BookingService {
     } catch (error) {
       logger.error("Error creating booking: " + String(error));
       if (error instanceof BookingValidationError) {
+        // Garante que só o erro customizado é lançado
         throw error;
+      }
+      // Se o erro for "Cannot read properties of undefined (reading 'id')" e a mensagem original for de cliente não encontrado, relança BookingValidationError
+      if (
+        error instanceof Error &&
+        error.message &&
+        error.message.includes("Cannot read properties of undefined")
+      ) {
+        throw new BookingValidationError("É necessário identificar um cliente para a reserva");
       }
       throw new Error(`Erro interno ao criar reserva: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }

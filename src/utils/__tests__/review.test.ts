@@ -1,5 +1,5 @@
 import request from "supertest";
-import app from "../app";
+import app from "../../app";
 
 describe("Review", () => {
   it("deve listar avaliações públicas", async () => {

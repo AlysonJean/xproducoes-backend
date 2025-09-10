@@ -1,6 +1,6 @@
-import { sendInvite, registerFromInvite } from '../controllers/inviteController';
-import { prisma } from '../config/database';
-import * as mailer from '../services/mailerService';
+import { sendInvite, registerFromInvite } from '../../controllers/inviteController';
+import { prisma } from '../../config/database';
+import * as mailer from '../../services/mailerService';
 
 // override prisma exported object at runtime
 const p: any = prisma as any;

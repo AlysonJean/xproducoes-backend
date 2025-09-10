@@ -1,4 +1,4 @@
-import { BookingService } from "../services/bookingService";
+import { BookingService } from "../../services/bookingService";
 
 describe("BookingService/calculateTotalPrice", () => {
   let service: BookingService;

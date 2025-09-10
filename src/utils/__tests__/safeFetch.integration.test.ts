@@ -1,4 +1,4 @@
-import { safeFetch } from '../utils/safeFetch';
+import { safeFetch } from '../safeFetch';
 import fetch from 'node-fetch';
 import dns from 'dns';
 

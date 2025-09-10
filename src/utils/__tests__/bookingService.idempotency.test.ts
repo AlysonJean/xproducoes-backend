@@ -1,6 +1,6 @@
-import { BookingService } from '../services/bookingService';
+import { BookingService } from '../../services/bookingService';
 
-jest.mock('../config/prisma', () => {
+jest.mock('../../config/prisma', () => {
   return {
     prisma: {
       booking: {
@@ -24,7 +24,7 @@ jest.mock('../config/prisma', () => {
   };
 });
 
-const { prisma } = require('../config/prisma');
+const { prisma } = require('../../config/prisma');
 
 describe('BookingService idempotency', () => {
   const service = new BookingService();

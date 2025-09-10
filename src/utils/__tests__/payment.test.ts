@@ -1,11 +1,11 @@
-import { EmailService } from "../services/emailService";
+import { EmailService } from "../../services/emailService";
 import { BookingStatus, DeliveryStatus, UserRole } from '@prisma/client';
 import { Decimal } from "@prisma/client/runtime/library";
 // nodemailer mocked for EmailService unit tests
 jest.mock("nodemailer");
 
-// Mock email service locally for integration parts of this test to avoid SMTP
-jest.mock("../services/emailService", () => {
+// Mock email service locally for integration parts of this test to avoid SMTP    
+jest.mock("../../services/emailService", () => {
   class EmailService {
     async init() {}
     async sendVerificationEmail() { return true; }
@@ -20,7 +20,7 @@ jest.mock("../services/emailService", () => {
 });
 
 const request = require("supertest");
-const app = require("../app").default;
+const app = require("../../app").default;
 
 // Teste do serviço de e-mail
 describe("EmailService", () => {
