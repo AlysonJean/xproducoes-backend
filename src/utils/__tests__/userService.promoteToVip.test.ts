@@ -1,8 +1,8 @@
 import { jest } from '@jest/globals';
-import { promoteToVip } from '../services/userService';
-import { prisma } from '../config/prisma';
+import { promoteToVip } from '../../services/userService';
+import { prisma } from '../../config/prisma';
 
-jest.mock('../config/prisma', () => ({
+jest.mock('../../config/prisma', () => ({
   prisma: {
     user: {
       findUnique: jest.fn(),

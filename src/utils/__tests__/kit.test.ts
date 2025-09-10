@@ -1,5 +1,5 @@
 // Mock email service locally to avoid real SMTP calls during user registration in tests
-jest.mock("../services/emailService", () => ({
+jest.mock("../../services/emailService", () => ({
   default: {
     init: async () => {},
     sendVerificationEmail: async () => true,
@@ -10,7 +10,7 @@ jest.mock("../services/emailService", () => ({
 }));
 
 import request from "supertest";
-import app from "../app";
+import app from "../../app";
 
 describe("Kit", () => {
   let token: string;

@@ -1,4 +1,4 @@
-import { EmailService } from "../services/emailService";
+import { EmailService } from "../../services/emailService";
 import { BookingStatus, DeliveryStatus, UserRole } from '@prisma/client';
 import { Decimal } from "@prisma/client/runtime/library";
 

@@ -1,5 +1,5 @@
 import request from "supertest";
-import app from "../app";
+import app from "../../app";
 
 describe("Dashboard", () => {
   it("deve retornar estatísticas do dashboard", async () => {
