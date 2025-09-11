@@ -30,10 +30,10 @@ if (process.env.NODE_ENV === "production") {
   prisma = global.__prisma;
 }
 
-// Conectar explicitamente ao banco
+// Conectar explicitamente ao banco (apenas tentar, não sair do processo)
 prisma.$connect().catch((error) => {
   console.error('Erro ao conectar com o banco de dados:', error);
-  process.exit(1);
+  console.warn('Continuando sem conexão com banco - algumas funcionalidades podem não funcionar');
 });
 
 // Handle graceful shutdown

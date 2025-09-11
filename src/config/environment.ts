@@ -33,22 +33,34 @@ export const config = {
   },
 };
 
-// Verificações rápidas de variáveis críticas (falhar em produção)
+// Verificações rápidas de variáveis críticas (falhar em produção apenas para essenciais)
 function validateCritical() {
   const missing: string[] = [];
+  const criticalMissing: string[] = [];
+
+  // Verificar apenas variáveis realmente críticas
+  if (!config.databaseUrl) criticalMissing.push('DATABASE_URL');
+  if (!config.jwtSecret) criticalMissing.push('JWT_SECRET');
+
+  // Outras variáveis são recomendadas mas não críticas
   if (!config.cloudinary.cloudName || !config.cloudinary.apiKey || !config.cloudinary.apiSecret) {
-    missing.push('CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET');
+    missing.push('CLOUDINARY_* (recomendado para upload de imagens)');
   }
   if (!config.smtp.host || !config.smtp.user || !config.smtp.pass) {
-    missing.push('SMTP_HOST, SMTP_USER, SMTP_PASS');
+    missing.push('SMTP_* (recomendado para envio de emails)');
   }
-  if (!config.jwtSecret) missing.push('JWT_SECRET');
-  if (process.env.NODE_ENV === 'production' && missing.length > 0) {
-    console.error('FATAL: Missing critical environment variables:', missing.join('; '));
+
+  if (process.env.NODE_ENV === 'production' && criticalMissing.length > 0) {
+    console.error('FATAL: Missing critical environment variables:', criticalMissing.join('; '));
     process.exit(1);
   }
+
   if (missing.length > 0) {
     console.warn('WARN: Missing recommended environment variables:', missing.join('; '));
+  }
+
+  if (criticalMissing.length > 0) {
+    console.warn('WARN: Missing critical environment variables (development mode):', criticalMissing.join('; '));
   }
 }
 
