@@ -4,6 +4,7 @@ import {
   categoryCreateSchema,
   categoryUpdateSchema,
 } from "../validators/categorySchema";
+import { cacheService, CacheService } from "../services/cacheService.js";
 
 export class CategoryController {
   create = async (req: Request, res: Response, next: NextFunction) => {
@@ -14,6 +15,10 @@ export class CategoryController {
       categoryCreateSchema.parse(req.body);
       const { name } = req.body;
       const category = await categoryService.create({ name });
+
+      // Invalidar cache após criar categoria
+      await cacheService.deletePattern("category:*");
+
       return res.status(201).json(category);
     } catch (error) {
       return next(error);
@@ -22,7 +27,12 @@ export class CategoryController {
 
   findAll = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const categories = await categoryService.findAll();
+      const cacheKey = "category:all";
+      const categories = await cacheService.getOrSet(
+        cacheKey,
+        () => categoryService.findAll(),
+        CacheService.TTL.MEDIUM
+      );
       return res.json(categories);
     } catch (error) {
       return next(error);
@@ -45,6 +55,10 @@ export class CategoryController {
       }
 
       const category = await categoryService.update(id, { name });
+
+      // Invalidar cache após atualizar categoria
+      await cacheService.deletePattern("category:*");
+
       return res.json(category);
     } catch (error) {
       return next(error);
@@ -65,6 +79,10 @@ export class CategoryController {
       }
 
       await categoryService.deleteCategory(id);
+
+      // Invalidar cache após deletar categoria
+      await cacheService.deletePattern("category:*");
+
       return res.status(204).send();
     } catch (error) {
       return next(error);
@@ -93,7 +111,12 @@ export class CategoryController {
 
   getWithEquipmentCount = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const categories = await categoryService.findAllWithEquipmentCount();
+      const cacheKey = "category:withCounts";
+      const categories = await cacheService.getOrSet(
+        cacheKey,
+        () => categoryService.findAllWithEquipmentCount(),
+        CacheService.TTL.MEDIUM
+      );
       return res.json(categories);
     } catch (error) {
       return next(error);

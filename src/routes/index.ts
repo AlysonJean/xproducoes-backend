@@ -19,6 +19,7 @@ import quoteRoutes from "./quoteRoutes";
 import geminiRoutes from "./geminiRoutes";
 import collaboratorRoutes from "./collaboratorRoutes";
 import collaboratorPaymentRoutes from "./collaboratorPaymentRoutes";
+import { cacheService } from "../services/cacheService.js";
 
 const router: RouterType = Router();
 
@@ -89,6 +90,32 @@ router.get("/health/detailed", (req, res) => {
       external: Math.round((memoryUsage.external / 1024 / 1024) * 100) / 100,
     },
   });
+});
+
+// Cache health endpoint
+router.get("/health/cache", async (req, res) => {
+  try {
+    const cacheHealth = await cacheService.healthCheck();
+    const cacheStats = await cacheService.getStats();
+
+    res.json({
+      status: cacheHealth.status,
+      timestamp: new Date().toISOString(),
+      cache: {
+        ...cacheHealth,
+        stats: cacheStats,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      timestamp: new Date().toISOString(),
+      cache: {
+        status: "error",
+        error: String(error),
+      },
+    });
+  }
 });
 
 // Endpoint público para demonstração das métricas de segurança (remover em produção)

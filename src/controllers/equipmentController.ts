@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { EquipmentService } from "../services/equipmentService";
 import { equipmentCreateSchema } from "../validators/equipmentSchema";
+import { cacheService, CacheService } from "../services/cacheService.js";
 
 const equipmentService = new EquipmentService();
 
@@ -32,7 +33,7 @@ export class EquipmentController {
       const equipment = await equipmentService.create(data, req.file);
 
       // Invalidar cache após criar equipamento
-      // invalidateCache.onEquipmentChange(); // Função removida/inexistente
+      await cacheService.invalidateEquipmentCaches();
 
       return res
         .status(201)
@@ -66,7 +67,9 @@ export class EquipmentController {
       const equipment = await equipmentService.update(id, data, req.file);
 
       // Invalidar cache após atualizar equipamento
-      // invalidateCache.onEquipmentChange(); // Função removida/inexistente
+      if (equipment) {
+        await cacheService.invalidateEquipmentCaches(equipment.id);
+      }
 
       return res.json(equipment);
     } catch (error) {
@@ -80,7 +83,12 @@ export class EquipmentController {
     next: NextFunction,
   ): Promise<any> => {
     try {
-      const equipments = await equipmentService.findAll();
+      const cacheKey = "equipment:all";
+      const equipments = await cacheService.getOrSet(
+        cacheKey,
+        () => equipmentService.findAll(),
+        CacheService.TTL.MEDIUM
+      );
       return res.json(equipments);
     } catch (error) {
       return next(error);
@@ -100,7 +108,13 @@ export class EquipmentController {
           .json({ message: "ID do equipamento é obrigatório." });
       }
 
-      const equipment = await equipmentService.findOne(id);
+      const cacheKey = CacheService.KEYS.EQUIPMENT(id);
+      const equipment = await cacheService.getOrSet(
+        cacheKey,
+        () => equipmentService.findOne(id),
+        CacheService.TTL.MEDIUM
+      );
+
       if (!equipment) {
         return res.status(404).json({ message: "Equipamento não encontrado." });
       }
@@ -128,6 +142,10 @@ export class EquipmentController {
       }
 
       await equipmentService.delete(id);
+
+      // Invalidar cache após deletar equipamento
+      await cacheService.invalidateEquipmentCaches(id);
+
       return res.status(204).send();
     } catch (error) {
       return next(error);

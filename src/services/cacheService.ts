@@ -1,20 +1,32 @@
 /**
- * ✅ MEMORY CACHE SERVICE - ENTERPRISE PERFORMANCE
- * Sistema de cache em memória para otimização de queries
- * Para produção, substituir por Redis
+ * ✅ ENTERPRISE CACHE SERVICE - REDIS + MEMORY FALLBACK
+ * Sistema de cache híbrido para máxima performance e confiabilidade
+ * Redis para produção + Memory cache como fallback
  */
+
+import Redis from 'ioredis';
+import logger from '../config/logger.js';
 
 interface CacheItem {
   data: any;
   expires: number;
 }
 
+interface CacheConfig {
+  ttl: number;
+  prefix?: string;
+}
+
 export class CacheService {
   private static instance: CacheService;
+  private redis: Redis | null = null;
   private memoryStore = new Map<string, CacheItem>();
+  private isRedisConnected = false;
   private cleanupInterval: NodeJS.Timeout;
+  private readonly keyPrefix = 'xproducoes:';
 
   private constructor() {
+    this.initializeRedis();
     // Limpeza automática a cada 5 minutos
     this.cleanupInterval = setInterval(
       () => {
@@ -32,7 +44,47 @@ export class CacheService {
   }
 
   /**
-   * ✅ CLEANUP EXPIRED ITEMS
+   * ✅ INITIALIZE REDIS CONNECTION
+   */
+  private async initializeRedis() {
+    try {
+      const redisUrl = process.env.REDIS_URL || process.env.UPSTASH_REDIS_REST_URL;
+
+      if (!redisUrl) {
+        logger.warn('Redis URL não configurada. Usando cache em memória como fallback.');
+        return;
+      }
+
+      this.redis = new Redis(redisUrl, {
+        maxRetriesPerRequest: 3,
+        enableReadyCheck: false,
+        lazyConnect: true,
+        connectTimeout: 5000,
+        commandTimeout: 3000,
+      });
+
+      this.redis.on('connect', () => {
+        this.isRedisConnected = true;
+        logger.info('✅ Cache Redis conectado com sucesso');
+      });
+
+      this.redis.on('error', (error: any) => {
+        this.isRedisConnected = false;
+        logger.error(`❌ Erro na conexão Redis: ${error.message || String(error)}`);
+      });
+
+      this.redis.on('close', () => {
+        this.isRedisConnected = false;
+        logger.warn('⚠️ Conexão Redis fechada');
+      });
+
+    } catch (error) {
+      logger.error(`❌ Falha ao inicializar Redis: ${String(error)}`);
+    }
+  }
+
+  /**
+   * ✅ CLEANUP EXPIRED ITEMS (Memory Cache)
    */
   private cleanup() {
     const now = Date.now();
@@ -44,15 +96,49 @@ export class CacheService {
   }
 
   /**
-   * ✅ GET CACHED DATA
+   * ✅ GENERATE CACHE KEY
+   */
+  private generateKey(namespace: string, key: string): string {
+    return `${this.keyPrefix}${namespace}:${key}`;
+  }
+
+  /**
+   * ✅ CHECK REDIS AVAILABILITY
+   */
+  private isRedisAvailable(): boolean {
+    return this.redis !== null && this.isRedisConnected;
+  }
+
+  /**
+   * ✅ GET CACHED DATA (Redis first, then Memory)
    */
   async get<T>(key: string): Promise<T | null> {
-    const item = this.memoryStore.get(key);
-    if (!item || Date.now() > item.expires) {
+    try {
+      // Tenta Redis primeiro
+      if (this.isRedisAvailable()) {
+        const cached = await this.redis!.get(key);
+        if (cached) {
+          logger.debug(`🔴 Redis HIT: ${key}`);
+          return JSON.parse(cached);
+        }
+      }
+
+      // Fallback para cache em memória
+      const item = this.memoryStore.get(key);
+      if (item && Date.now() <= item.expires) {
+        logger.debug(`🟡 Memory HIT: ${key}`);
+        return item.data;
+      }
+
+      // Cache miss
       this.memoryStore.delete(key);
+      logger.debug(`⚫ Cache MISS: ${key}`);
+      return null;
+
+    } catch (error) {
+      logger.error(`❌ Erro ao buscar cache ${key}: ${String(error)}`);
       return null;
     }
-    return item.data;
   }
 
   /**
@@ -63,35 +149,88 @@ export class CacheService {
     data: any,
     ttlSeconds: number = 300,
   ): Promise<boolean> {
-    this.memoryStore.set(key, {
-      data,
-      expires: Date.now() + ttlSeconds * 1000,
-    });
-    return true;
+    try {
+      // Salva no Redis se disponível
+      if (this.isRedisAvailable()) {
+        const serialized = JSON.stringify(data);
+        await this.redis!.setex(key, ttlSeconds, serialized);
+        logger.debug(`🔴 Redis SET: ${key} (TTL: ${ttlSeconds}s)`);
+      }
+
+      // Sempre salva na memória como backup
+      this.memoryStore.set(key, {
+        data,
+        expires: Date.now() + ttlSeconds * 1000,
+      });
+
+      return true;
+
+    } catch (error) {
+      logger.error(`❌ Erro ao salvar cache ${key}: ${String(error)}`);
+      return false;
+    }
   }
 
   /**
    * ✅ DELETE CACHE KEY
    */
   async delete(key: string): Promise<boolean> {
-    return this.memoryStore.delete(key);
+    try {
+      let deleted = false;
+
+      // Remove do Redis
+      if (this.isRedisAvailable()) {
+        await this.redis!.del(key);
+        deleted = true;
+      }
+
+      // Remove da memória
+      deleted = this.memoryStore.delete(key) || deleted;
+
+      if (deleted) {
+        logger.debug(`🗑️ Cache DELETE: ${key}`);
+      }
+
+      return deleted;
+
+    } catch (error) {
+      logger.error(`❌ Erro ao deletar cache ${key}: ${String(error)}`);
+      return false;
+    }
   }
 
   /**
    * ✅ DELETE CACHE PATTERN
    */
   async deletePattern(pattern: string): Promise<boolean> {
-    const regex = new RegExp(pattern.replace(/\*/g, ".*"));
-    let deleted = false;
+    try {
+      let deleted = false;
 
-    for (const key of this.memoryStore.keys()) {
-      if (regex.test(key)) {
-        this.memoryStore.delete(key);
-        deleted = true;
+      // Remove do Redis
+      if (this.isRedisAvailable()) {
+        const keys = await this.redis!.keys(pattern);
+        if (keys.length > 0) {
+          await this.redis!.del(...keys);
+          deleted = true;
+          logger.debug(`🗑️ Redis DELETE pattern: ${pattern} (${keys.length} keys)`);
+        }
       }
-    }
 
-    return deleted;
+      // Remove da memória
+      const regex = new RegExp(pattern.replace(/\*/g, ".*"));
+      for (const key of this.memoryStore.keys()) {
+        if (regex.test(key)) {
+          this.memoryStore.delete(key);
+          deleted = true;
+        }
+      }
+
+      return deleted;
+
+    } catch (error) {
+      logger.error(`❌ Erro ao deletar pattern ${pattern}: ${String(error)}`);
+      return false;
+    }
   }
 
   /**
@@ -183,31 +322,96 @@ export class CacheService {
    */
   async healthCheck(): Promise<{
     status: string;
-    connected: boolean;
-    itemCount: number;
+    redisConnected: boolean;
+    memoryConnected: boolean;
+    redisItemCount?: number;
+    memoryItemCount: number;
   }> {
-    return {
+    const result: {
+      status: string;
+      redisConnected: boolean;
+      memoryConnected: boolean;
+      redisItemCount?: number;
+      memoryItemCount: number;
+    } = {
       status: "healthy",
-      connected: true,
-      itemCount: this.memoryStore.size,
+      redisConnected: this.isRedisConnected,
+      memoryConnected: true,
+      memoryItemCount: this.memoryStore.size,
     };
+
+    if (this.isRedisAvailable()) {
+      try {
+        const redisKeys = await this.redis!.dbsize();
+        result.redisItemCount = redisKeys;
+      } catch (error) {
+        result.status = "degraded";
+        logger.error(`Erro ao verificar Redis: ${String(error)}`);
+      }
+    }
+
+    return result;
   }
 
   /**
    * ✅ CLEAR ALL CACHE
    */
   async clear(): Promise<void> {
-    this.memoryStore.clear();
+    try {
+      // Limpa Redis
+      if (this.isRedisAvailable()) {
+        await this.redis!.flushdb();
+        logger.info('🧹 Redis cache limpo');
+      }
+
+      // Limpa memória
+      this.memoryStore.clear();
+      logger.info('🧹 Memory cache limpo');
+
+    } catch (error) {
+      logger.error(`❌ Erro ao limpar cache: ${String(error)}`);
+    }
   }
 
   /**
    * ✅ GET CACHE STATS
    */
-  async getStats(): Promise<{ size: number; keys: string[] }> {
-    return {
-      size: this.memoryStore.size,
-      keys: Array.from(this.memoryStore.keys()),
+  async getStats(): Promise<{
+    redis: { size?: number; keys?: string[] };
+    memory: { size: number; keys: string[] };
+  }> {
+    const stats = {
+      redis: {} as any,
+      memory: {
+        size: this.memoryStore.size,
+        keys: Array.from(this.memoryStore.keys()),
+      },
     };
+
+    if (this.isRedisAvailable()) {
+      try {
+        const [size, keys] = await Promise.all([
+          this.redis!.dbsize(),
+          this.redis!.keys('*')
+        ]);
+        stats.redis = { size, keys };
+      } catch (error) {
+        logger.error(`Erro ao obter stats Redis: ${String(error)}`);
+      }
+    }
+
+    return stats;
+  }
+
+  /**
+   * ✅ CLOSE REDIS CONNECTION
+   */
+  async close(): Promise<void> {
+    if (this.redis) {
+      await this.redis.quit();
+      this.isRedisConnected = false;
+      logger.info('🔌 Conexão Redis fechada');
+    }
   }
 
   /**
@@ -218,6 +422,7 @@ export class CacheService {
       clearInterval(this.cleanupInterval);
     }
     this.memoryStore.clear();
+    this.close();
   }
 }
 
