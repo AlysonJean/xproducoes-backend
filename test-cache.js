@@ -1,26 +1,42 @@
 /**
- * 🧪 TESTE RÁPIDO DO REDIS
- * Verifica se a conexão Redis está funcionando
+ * 🧪 TESTE DO SISTEMA DE CACHE
+ * Verifica se o cache está funcionando corretamente
  */
 
 import 'dotenv/config'; // Carregar variáveis de ambiente
 import Redis from 'ioredis';
 
-async function testRedisConnection() {
-  console.log('🚀 Testando conexão Redis...\n');
+async function testCacheSystem() {
+  console.log('🚀 Testando sistema de cache...\n');
+
+  // Verificar ambiente
+  const isProduction = process.env.NODE_ENV === 'production';
+  console.log('🌍 Ambiente:', isProduction ? '🟢 PRODUÇÃO' : '🟡 DESENVOLVIMENTO');
 
   // Verificar se as variáveis estão carregadas
-  console.log('🔍 Verificando variáveis de ambiente...');
+  console.log('\n🔍 Verificando variáveis de ambiente...');
   console.log('UPSTASH_REDIS_REST_URL:', process.env.UPSTASH_REDIS_REST_URL ? '✅ Configurada' : '❌ Não encontrada');
   console.log('UPSTASH_REDIS_REST_TOKEN:', process.env.UPSTASH_REDIS_REST_TOKEN ? '✅ Configurada' : '❌ Não encontrada');
+
+  if (!isProduction) {
+    console.log('\n🏠 MODO DESENVOLVIMENTO DETECTADO');
+    console.log('💡 Redis será desabilitado para economia de recursos');
+    console.log('📊 Usando apenas cache em memória local');
+    console.log('\n✅ Teste concluído - cache em memória ativo');
+    console.log('\n💰 Economia: Não gasta recursos Redis em desenvolvimento');
+    console.log('⚡ Performance: Cache em memória é suficiente para dev');
+    return;
+  }
+
+  console.log('\n🏭 MODO PRODUÇÃO DETECTADO');
+  console.log('🚀 Ativando cache Redis...');
 
   const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
 
   if (!redisUrl) {
     console.log('\n❌ UPSTASH_REDIS_REST_URL não encontrada!');
-    console.log('💡 Verifique se o arquivo .env existe e contém:');
-    console.log('   UPSTASH_REDIS_REST_URL=https://internal-lab-40877.upstash.io');
-    console.log('   UPSTASH_REDIS_REST_TOKEN=AZ-tAAIncDE1ZGRjY2E4ZTI0ODg0N2ViOWUwOWIyMTc1NDU5Yzk5ZXAxNDA4Nzc');
+    console.log('💡 Configure a URL do Redis no arquivo .env para produção');
+    console.log('🔄 Sistema usará cache em memória como fallback');
     return;
   }
 
@@ -28,22 +44,21 @@ async function testRedisConnection() {
   console.log('URL:', redisUrl.replace(/https:\/\/([^.]+)\..*/, 'https://$1...')); // Ocultar parte da URL por segurança
 
   try {
-    // Para Upstash Redis, vamos tentar uma configuração mais simples primeiro
     const redis = new Redis(redisUrl, {
       maxRetriesPerRequest: 3,
       enableReadyCheck: false,
       lazyConnect: true,
-      connectTimeout: 15000, // Aumentar timeout
+      connectTimeout: 15000,
       commandTimeout: 10000,
       retryDelayOnFailover: 100,
       maxRetriesPerRequest: 3,
-      family: 4, // IPv4
+      family: 4,
       tls: {
         rejectUnauthorized: true
       }
     });
 
-    // Adicionar mais logs de debug
+    // Adicionar logs de debug
     redis.on('ready', () => {
       console.log('🔄 Redis ready event');
     });
@@ -60,7 +75,6 @@ async function testRedisConnection() {
       console.log('🔌 Redis close event');
     });
 
-    // Tentar conectar manualmente
     console.log('⏳ Tentando conectar...');
     await redis.connect();
 
@@ -87,7 +101,7 @@ async function testRedisConnection() {
 
   } catch (error) {
     console.log('\n❌ Falha na conexão Redis:', error.message);
-    console.log('\n� Possíveis soluções:');
+    console.log('\n🔧 Possíveis soluções:');
     console.log('1. Verifique se a URL está correta');
     console.log('2. Teste a conexão no dashboard Upstash');
     console.log('3. Verifique se a região está acessível');
@@ -95,4 +109,4 @@ async function testRedisConnection() {
   }
 }
 
-testRedisConnection().catch(console.error);
+testCacheSystem().catch(console.error);

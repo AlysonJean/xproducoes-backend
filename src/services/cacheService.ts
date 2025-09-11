@@ -48,12 +48,25 @@ export class CacheService {
    */
   private async initializeRedis() {
     try {
+      // Verificar se estamos em produção
+      const isProduction = process.env.NODE_ENV === 'production';
+
+      if (!isProduction) {
+        logger.info('🏠 Ambiente de desenvolvimento detectado - usando apenas cache em memória');
+        logger.info('💡 Redis será ativado apenas em produção para economia de recursos');
+        return;
+      }
+
       const redisUrl = process.env.REDIS_URL || process.env.UPSTASH_REDIS_REST_URL;
 
       if (!redisUrl) {
-        logger.warn('Redis URL não configurada. Usando cache em memória como fallback.');
+        logger.warn('⚠️ Ambiente de produção mas Redis URL não configurada');
+        logger.warn('💡 Configure UPSTASH_REDIS_REST_URL para cache Redis em produção');
+        logger.info('🔄 Usando cache em memória como fallback');
         return;
       }
+
+      logger.info('🚀 Inicializando Redis para produção...');
 
       this.redis = new Redis(redisUrl, {
         maxRetriesPerRequest: 3,
@@ -65,21 +78,23 @@ export class CacheService {
 
       this.redis.on('connect', () => {
         this.isRedisConnected = true;
-        logger.info('✅ Cache Redis conectado com sucesso');
+        logger.info('✅ Cache Redis conectado com sucesso em produção');
       });
 
       this.redis.on('error', (error: any) => {
         this.isRedisConnected = false;
-        logger.error(`❌ Erro na conexão Redis: ${error.message || String(error)}`);
+        logger.error(`❌ Erro na conexão Redis (produção): ${error.message || String(error)}`);
+        logger.warn('🔄 Continuando com cache em memória');
       });
 
       this.redis.on('close', () => {
         this.isRedisConnected = false;
-        logger.warn('⚠️ Conexão Redis fechada');
+        logger.warn('⚠️ Conexão Redis fechada (produção)');
       });
 
     } catch (error) {
       logger.error(`❌ Falha ao inicializar Redis: ${String(error)}`);
+      logger.info('🔄 Usando cache em memória como fallback');
     }
   }
 
@@ -322,19 +337,28 @@ export class CacheService {
    */
   async healthCheck(): Promise<{
     status: string;
+    environment: string;
+    redisEnabled: boolean;
     redisConnected: boolean;
     memoryConnected: boolean;
     redisItemCount?: number;
     memoryItemCount: number;
   }> {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const redisEnabled = isProduction && !!(process.env.REDIS_URL || process.env.UPSTASH_REDIS_REST_URL);
+
     const result: {
       status: string;
+      environment: string;
+      redisEnabled: boolean;
       redisConnected: boolean;
       memoryConnected: boolean;
       redisItemCount?: number;
       memoryItemCount: number;
     } = {
       status: "healthy",
+      environment: isProduction ? "production" : "development",
+      redisEnabled,
       redisConnected: this.isRedisConnected,
       memoryConnected: true,
       memoryItemCount: this.memoryStore.size,
