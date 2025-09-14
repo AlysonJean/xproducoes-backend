@@ -51,7 +51,7 @@
     "nodemailer": "^7.0.5",
     "pino": "^9.7.0",
     "socket.io": "^4.8.1",
-    "zod": "^4.0.14",
+    "zod": "^4.1.0",
     "patch-package": "^8.0.0"
   },
   "devDependencies": {
