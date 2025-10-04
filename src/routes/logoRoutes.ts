@@ -24,8 +24,29 @@ router.get('/svg-proxy', uploadRateLimit, async (req: Request, res: Response) =>
 		let parsed: URL;
 		try {
 			parsed = new URL(url);
-		} catch (err) {
+		} catch {
 			return res.status(400).send('Invalid URL');
+		}
+
+		// Validações adicionais de segurança contra SSRF
+		if (parsed.username || parsed.password) {
+			return res.status(400).send('URL contains credentials which are not allowed');
+		}
+
+		// Bloquear esquemas perigosos
+		const dangerousSchemes = ['file:', 'dict:', 'ftp:', 'gopher:', 'ldap:', 'ldaps:', 'data:', 'javascript:'];
+		if (dangerousSchemes.includes(parsed.protocol)) {
+			return res.status(400).send('Dangerous URL scheme not allowed');
+		}
+
+		// Validar porta se especificada
+		if (parsed.port) {
+			const port = parseInt(parsed.port, 10);
+			// Bloquear portas suspeitas/comuns para serviços internos
+			const suspiciousPorts = [22, 23, 25, 53, 110, 143, 993, 995, 3306, 5432, 6379, 27017];
+			if (suspiciousPorts.includes(port)) {
+				return res.status(400).send('Suspicious port not allowed');
+			}
 		}
 
 		const allowedHosts = new Set([
@@ -48,6 +69,9 @@ router.get('/svg-proxy', uploadRateLimit, async (req: Request, res: Response) =>
 					if (parts[0] === 169 && parts[1] === 254) return true; // 169.254.0.0/16
 					if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true; // 172.16.0.0/12
 					if (parts[0] === 192 && parts[1] === 168) return true; // 192.168.0.0/16
+					// Adicionar ranges adicionais de IPs privados/reservados
+					if (parts[0] === 0) return true; // 0.0.0.0/8
+					if (parts[0] >= 224) return true; // 224.0.0.0/4 (multicast)
 					return false;
 				}
 				if (net.isIP(addr) === 6) {
@@ -56,6 +80,7 @@ router.get('/svg-proxy', uploadRateLimit, async (req: Request, res: Response) =>
 					const lower = addr.toLowerCase();
 					if (lower.startsWith('fe80') || lower.startsWith('fe80:')) return true;
 					if (lower.startsWith('fc') || lower.startsWith('fd')) return true; // fc00/7
+					if (lower.startsWith('::ffff:')) return true; // IPv4 mapped
 					return false;
 				}
 				return false;
@@ -133,7 +158,7 @@ router.get('/svg-proxy', uploadRateLimit, async (req: Request, res: Response) =>
 				const createDOMPurify = dompurifyMod.default || dompurifyMod;
 				const window = new JSDOM('').window as any;
 				const DOMPurify = createDOMPurify(window as any);
-				const clean = DOMPurify.sanitize(svgText, { WHOLE_DOCUMENT: true, USE_PROFILES: { svg: true } });
+				const clean = DOMPurify.sanitize(svgText, { USE_PROFILES: { svg: true } });
 
 				// CSP de defesa em profundidade (não permite scripts/styles)
 				res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; script-src 'none'; style-src 'none';");

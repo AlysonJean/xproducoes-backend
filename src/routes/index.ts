@@ -19,9 +19,18 @@ import quoteRoutes from "./quoteRoutes";
 import geminiRoutes from "./geminiRoutes";
 import collaboratorRoutes from "./collaboratorRoutes";
 import collaboratorPaymentRoutes from "./collaboratorPaymentRoutes";
-import { cacheService } from "../services/cacheService.js";
+import collaboratorMessagesRoutes from "./collaboratorMessagesRoutes";
+import enterpriseMonitoringRoutes from "./enterpriseMonitoringRoutes";
+import { cacheService } from "../services/cacheService";
+import { performanceMonitoringMiddleware } from "../middlewares/performanceMonitoring";
+import collaboratorProfileRoutes from "./collaboratorProfileRoutes";
+import checklistRoutes from "./checklistRoutes";
+import settingsRoutes from "./settingsRoutes";
 
 const router: RouterType = Router();
+
+// Performance monitoring middleware
+router.use(performanceMonitoringMiddleware);
 
 // Core routes
 router.use("/equipment", equipmentRoutes);
@@ -57,11 +66,17 @@ router.use('/logo', require('./logoRoutes').default);
 // Admin routes
 router.use("/admin", adminRoutes);
 
+// Enterprise Monitoring routes (Admin only)
+router.use("/monitoring", enterpriseMonitoringRoutes);
+
 // Upload routes (Cloudinary uploads)
 // Expose both /upload and /uploads for compatibility with frontend expectations
 router.use('/upload', uploadRoutes);
 router.use('/uploads', uploadRoutes);
 router.use('/collaborator-payments', collaboratorPaymentRoutes);
+router.use('/collaborator/messages', collaboratorMessagesRoutes);
+router.use('/collaborator/checklists', checklistRoutes);
+router.use('/settings', settingsRoutes);
 
 // Health endpoint
 router.get("/health", (req, res) => {

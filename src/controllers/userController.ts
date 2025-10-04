@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import { UserRole } from "@prisma/client";
 import * as userService from "../services/userService";
 import {

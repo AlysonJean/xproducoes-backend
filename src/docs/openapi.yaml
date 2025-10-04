@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: X Produções - API Backend
+  title: X Produçoes e Eventos - API Backend
   version: 1.0.0
   description: >
     API REST para sistema de locação de equipamentos audiovisuais, eventos e gestão de usuários.

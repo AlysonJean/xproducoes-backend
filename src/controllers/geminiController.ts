@@ -3,9 +3,6 @@
 import { Request, Response, NextFunction } from "express";
 import { GeminiService } from "../services/geminiService";
 
-// Presumindo que você tenha um middleware 'isAdmin' como sugerido
-import { ensureAdmin } from "../config/ensureAdmin";
-
 const geminiService = new GeminiService();
 
 export class GeminiController {

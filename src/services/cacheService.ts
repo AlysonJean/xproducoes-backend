@@ -5,16 +5,11 @@
  */
 
 import Redis from 'ioredis';
-import logger from '../config/logger.js';
+import logger from '../config/logger';
 
 interface CacheItem {
   data: any;
   expires: number;
-}
-
-interface CacheConfig {
-  ttl: number;
-  prefix?: string;
 }
 
 export class CacheService {

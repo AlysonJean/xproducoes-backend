@@ -14,6 +14,8 @@ import {
   searchCollaborators,
   getCollaboratorStats,
   getMyDashboard,
+  getMyProfile,
+  updateMyProfile,
   getAvailableCollaborators,
   getAllAvailabilities,
   createAvailability,
@@ -46,6 +48,9 @@ router.get("/:id/stats", getCollaboratorStats);
 router.get("/:collaboratorId/events", getCollaboratorEvents);
 // Dashboard do colaborador (me)
 router.get('/me/dashboard', adminOrCollaborator, getMyDashboard);
+// Perfil do colaborador (me)
+router.get('/me/profile', adminOrCollaborator, getMyProfile);
+router.put('/me/profile', adminOrCollaborator, updateMyProfile);
 
 // Rotas de gestão de eventos
 router.post("/event-assignments", ensureAdmin, assignCollaboratorToEvent);

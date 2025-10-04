@@ -1,18 +1,55 @@
 import { z } from "zod";
-// Esquema de validação para atualização de perfil de cliente (reutilizado)
+
+// ✅ Schemas Zod para validação completa
+// (Preparados para uso futuro em endpoints específicos)
+/* eslint-disable @typescript-eslint/no-unused-vars */
 const clientProfileSchema = z.object({
-  companyName: z.string().optional(),
-  industry: z.string().optional(),
-  companySize: z.string().optional(),
-  phone: z.string().optional(),
-  address: z.any().optional(),
-  jobTitle: z.string().optional(),
-  department: z.string().optional(),
-  budget: z.any().optional(),
+  companyName: z.string().max(200).optional(),
+  industry: z.string().max(100).optional(),
+  companySize: z.enum(['1-10', '11-50', '51-200', '201-500', '500+']).optional(),
+  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/).optional(), // E.164 format
+  address: z.object({
+    street: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    zipCode: z.string().optional(),
+    country: z.string().optional(),
+  }).optional(),
+  jobTitle: z.string().max(100).optional(),
+  department: z.string().max(100).optional(),
+  budget: z.number().positive().optional(),
   preferredCategories: z.array(z.string()).optional(),
   eventTypes: z.array(z.string()).optional(),
-  communicationPrefs: z.any().optional(),
-});
+  communicationPrefs: z.object({
+    email: z.boolean().optional(),
+    sms: z.boolean().optional(),
+    whatsapp: z.boolean().optional(),
+  }).optional(),
+}).strict();
+
+const userProfileSchema = z.object({
+  name: z.string().min(1).max(120).optional(),
+  email: z.string().email().optional(),
+  bio: z.string().max(500).optional(),
+  location: z.string().max(200).optional(),
+  avatarUrl: z.string().url().optional(),
+  isActive: z.boolean().optional(),
+}).strict();
+/* eslint-enable @typescript-eslint/no-unused-vars */
+
+const createClientSchema = z.object({
+  name: z.string().min(1).max(120).optional(),
+  email: z.string().email().optional(),
+  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/).optional(),
+  bio: z.string().max(500).optional(),
+  location: z.string().max(200).optional(),
+  companyName: z.string().max(200).optional(),
+  industry: z.string().max(100).optional(),
+  companySize: z.enum(['1-10', '11-50', '51-200', '201-500', '500+']).optional(),
+  status: z.enum(['ACTIVE','INACTIVE','SUSPENDED']).optional(),
+  password: z.string().min(8).optional(),
+  userId: z.string().uuid().optional(),
+}).strict();
 // Caminho: backend/src/controllers/adminController.ts
 
 import { Request, Response, NextFunction } from "express";
@@ -30,37 +67,47 @@ import crypto from 'crypto';
 const bookingService = new BookingService();
 const equipmentService = new EquipmentService();
 
+// ✅ Helper function para mapear cliente (elimina duplicação)
+function mapClientResponse(client: any) {
+  const user = client.user;
+  return {
+    id: client.id,
+    userId: client.userId,
+    name: user?.name ?? client.companyName ?? '',
+    email: user?.email ?? '',
+    role: user?.role ?? 'CLIENT',
+    bio: user?.bio ?? '',
+    location: user?.location ?? '',
+    phone: client.phone ?? '',
+    avatar: user?.avatarUrl ?? '',
+    isActive: user?.isActive ?? true,
+    createdAt: client.createdAt,
+    updatedAt: client.updatedAt,
+    status: user?.isActive === false ? 'INACTIVE' : 'ACTIVE',
+    totalBookings: client.totalBookings ?? 0,
+    totalSpent: client.totalSpent ?? 0,
+    companyName: client.companyName,
+    industry: client.industry,
+    companySize: client.companySize,
+    address: client.address,
+    jobTitle: client.jobTitle,
+    department: client.department,
+    budget: client.budget,
+    preferredCategories: client.preferredCategories,
+    eventTypes: client.eventTypes,
+    communicationPrefs: client.communicationPrefs,
+  };
+}
+
 export class AdminController {
 
   // Criar novo cliente (validação, checagem de duplicata, upload avatar, transação)
   createClient = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Schema mínimo de criação (Zod)
-      const createSchema = z.object({
-        name: z.string().min(1).max(120).optional(),
-        email: z.string().email().optional(),
-        phone: z.string().optional(),
-        bio: z.string().optional(),
-        location: z.string().optional(),
-        companyName: z.string().optional(),
-        industry: z.string().optional(),
-        companySize: z.string().optional(),
-        status: z.enum(['ACTIVE','INACTIVE','SUSPENDED']).optional(),
-        password: z.string().optional(),
-        userId: z.string().optional(),
-        metadata: z.any().optional(),
-      });
+      // ✅ Usar schema validado
+      const payload = await createClientSchema.parseAsync(req.body || {});
 
-      const payload = await createSchema.parseAsync(req.body || {});
-
-      // Se email informado, checar duplicata
-      if (payload.email) {
-        const existingUser = await prisma.user.findUnique({ where: { email: payload.email } });
-        if (existingUser) {
-          return res.status(409).json({ code: 'EMAIL_EXISTS', message: 'Email já cadastrado', existingUserId: existingUser.id });
-        }
-      }
-
+      // ✅ NÃO fazer check-then-act - deixar unique constraint tratar
       // Preparar dados
       const userData: any = {};
       if (payload.email) userData.email = payload.email.toLowerCase().trim();
@@ -131,18 +178,36 @@ export class AdminController {
       }
 
       // Envia e-mail de convite se configurado
+      let emailSent = false;
       try {
-        if (inviteUrl && client?.user?.email) {
+        if (inviteUrl && client?.user?.email && tempPassword) {
           await EmailService.sendInviteEmail(client.user.email, inviteUrl, tempPassword);
+          emailSent = true;
         }
       } catch (e) {
         logger.warn('Falha ao enviar email de convite: ' + String(e));
       }
 
-      return res.status(201).json({ client, tempPassword, inviteUrl });
+      // ✅ NUNCA retornar senha temporária na resposta HTTP
+      return res.status(201).json({ 
+        client, 
+        inviteUrl,
+        message: emailSent 
+          ? 'Cliente criado com sucesso. Email de convite enviado.'
+          : 'Cliente criado com sucesso. Atenção: não foi possível enviar o email de convite.',
+        emailSent
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Validação falhou', issues: error.issues });
+      }
+      // ✅ Tratar unique constraint violation (email duplicado)
+      if ((error as any)?.code === 'P2002') {
+        return res.status(409).json({ 
+          code: 'EMAIL_EXISTS', 
+          message: 'Email já cadastrado. Use outro endereço de email.',
+          field: (error as any)?.meta?.target?.[0] || 'email'
+        });
       }
       return next(error);
     }
@@ -187,37 +252,8 @@ export class AdminController {
       if (!client) {
         return res.status(404).json({ error: "Cliente não encontrado" });
       }
-      // Mapeia o retorno para o formato esperado pelo frontend
-      const user = client.user;
-      const mapped = {
-        id: client.id,
-        userId: client.userId,
-        name: user?.name ?? client.companyName ?? '',
-        email: user?.email ?? '',
-        role: user?.role ?? 'CLIENT',
-        bio: user?.bio ?? '',
-        location: user?.location ?? '',
-        phone: client.phone ?? '',
-        avatar: user?.avatarUrl ?? '',
-        isActive: user?.isActive ?? true,
-        createdAt: client.createdAt,
-        updatedAt: client.updatedAt,
-        status: user?.isActive === false ? 'INACTIVE' : 'ACTIVE',
-        totalBookings: client.totalBookings ?? 0,
-        totalSpent: client.totalSpent ?? 0,
-        companyName: client.companyName,
-        industry: client.industry,
-        companySize: client.companySize,
-        address: client.address,
-        jobTitle: client.jobTitle,
-        department: client.department,
-        budget: client.budget,
-        preferredCategories: client.preferredCategories,
-        eventTypes: client.eventTypes,
-        communicationPrefs: client.communicationPrefs,
-        // Adicione outros campos do client se necessário
-      };
-      return res.json(mapped);
+      // ✅ Usar helper function
+      return res.json(mapClientResponse(client));
     } catch (error) {
       return next(error);
     }
@@ -246,52 +282,40 @@ export class AdminController {
         if (userFields.includes(key)) userData[key] = req.body[key];
       }
 
-      let updatedClient = null;
-      if (Object.keys(clientData).length > 0) {
-        updatedClient = await prisma.client.update({
-          where: { id },
-          data: clientData,
-        });
-      }
+      // ✅ Usar transação atômica para garantir consistência
+      await prisma.$transaction(async (tx) => {
+        let updatedClient = null;
+        
+        // Atualizar dados do cliente
+        if (Object.keys(clientData).length > 0) {
+          updatedClient = await tx.client.update({
+            where: { id },
+            data: clientData,
+          });
+        } else {
+          updatedClient = await tx.client.findUnique({ where: { id } });
+        }
 
-      // Se houver dados de usuário, atualiza também
-      if (Object.keys(userData).length > 0 && updatedClient && updatedClient.userId) {
-        await userService.updateProfile(updatedClient.userId, userData, req.file);
-      }
-      // Retorna o cliente atualizado
+        if (!updatedClient) {
+          throw new Error('Cliente não encontrado');
+        }
+
+        // Se houver dados de usuário, atualiza também
+        if (Object.keys(userData).length > 0 && updatedClient.userId) {
+          await tx.user.update({
+            where: { id: updatedClient.userId },
+            data: userData
+          });
+        }
+      });
+      
+      // Retorna o cliente atualizado com dados do usuário
       const client = await clientService.getClientById(id);
       if (!client) {
         return res.status(404).json({ error: "Cliente não encontrado" });
       }
-      const user = client.user;
-      const mapped = {
-        id: client.id,
-        userId: client.userId,
-        name: user?.name ?? client.companyName ?? '',
-        email: user?.email ?? '',
-        role: user?.role ?? 'CLIENT',
-        bio: user?.bio ?? '',
-        location: user?.location ?? '',
-        phone: client.phone ?? '',
-        avatar: user?.avatarUrl ?? '',
-        isActive: user?.isActive ?? true,
-        createdAt: client.createdAt,
-        updatedAt: client.updatedAt,
-        status: user?.isActive === false ? 'INACTIVE' : 'ACTIVE',
-        totalBookings: client.totalBookings ?? 0,
-        totalSpent: client.totalSpent ?? 0,
-        companyName: client.companyName,
-        industry: client.industry,
-        companySize: client.companySize,
-        address: client.address,
-        jobTitle: client.jobTitle,
-        department: client.department,
-        budget: client.budget,
-        preferredCategories: client.preferredCategories,
-        eventTypes: client.eventTypes,
-        communicationPrefs: client.communicationPrefs,
-      };
-      return res.json(mapped);
+      // ✅ Usar helper function
+      return res.json(mapClientResponse(client));
     } catch (error) {
       return next(error);
     }
@@ -397,13 +421,34 @@ export class AdminController {
   // Gerenciamento de reservas
   async getAllBookings(req: Request, res: Response, next: NextFunction) {
     try {
-      const { page = 1, limit = 10, status, startDate, endDate } = req.query;
-      const bookings = await bookingService.getAllBookings({
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+      const { status, startDate, endDate } = req.query;
+      
+      const filters = {
         status: status as any,
         eventDateFrom: startDate ? new Date(startDate as string) : undefined,
         eventDateTo: endDate ? new Date(endDate as string) : undefined,
+      };
+      
+      const [bookings, total] = await Promise.all([
+        bookingService.getAllBookings(filters),
+        bookingService.countBookings(filters)
+      ]);
+      
+      // Aplicar paginação manualmente (idealmente seria no service)
+      const start = (page - 1) * limit;
+      const paginatedBookings = bookings.slice(start, start + limit);
+      
+      res.json({
+        data: paginatedBookings,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit)
+        }
       });
-      res.json(bookings);
     } catch (error) {
       logger.error('Erro ao buscar reservas: ' + String(error));
       next(error);
@@ -413,7 +458,7 @@ export class AdminController {
   async updateBookingStatus(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const { status, adminNotes } = req.body;
+      const { status } = req.body;
       
       const booking = await bookingService.updateBookingStatus(id, status);
       res.json(booking);

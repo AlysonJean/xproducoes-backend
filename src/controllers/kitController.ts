@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from "express";
 import * as kitService from "../services/kitService";
-import { kitCreateSchema } from "../validators/kitSchema";
 
 export class KitController {
   create = async (req: Request, res: Response, next: NextFunction) => {

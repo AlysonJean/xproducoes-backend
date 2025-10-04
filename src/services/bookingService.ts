@@ -1,11 +1,8 @@
-import { Prisma, BookingStatus, DeliveryStatus, UserRole } from "@prisma/client";
+import { Prisma, BookingStatus, DeliveryStatus } from "@prisma/client";
 import { BookingCreateInput, BookingUpdateInput, BookingFilters } from "../validators/bookingSchema";
 import { 
   BookingValidationError, 
-  BookingNotFoundError, 
-  BookingConflictError,
-  BookingPermissionError,
-  BookingBusinessLogicError
+  BookingNotFoundError
 } from "../utils/bookingErrors";
 import logger from "../config/logger";
 import { prisma } from "../config/prisma";
@@ -433,6 +430,53 @@ export class BookingService {
   }
 
   /**
+   * Conta o total de reservas com filtros (para paginação)
+   */
+  async countBookings(filters: BookingFilters = {}): Promise<number> {
+    try {
+      const where: Prisma.BookingWhereInput = {};
+
+      if (filters.status) {
+        where.status = filters.status;
+      }
+
+      if (filters.deliveryStatus) {
+        where.deliveryStatus = filters.deliveryStatus;
+      }
+
+      if (filters.clientId) {
+        where.clientId = filters.clientId;
+      }
+
+      if (filters.creatorId) {
+        where.creatorId = filters.creatorId;
+      }
+
+      if (filters.assigneeId) {
+        where.assigneeId = filters.assigneeId;
+      }
+
+      if (filters.kitId) {
+        where.kitId = filters.kitId;
+      }
+
+      if (filters.eventDateFrom || filters.eventDateTo) {
+        where.eventDate = {};
+        if (filters.eventDateFrom) {
+          where.eventDate.gte = filters.eventDateFrom;
+        }
+        if (filters.eventDateTo) {
+          where.eventDate.lte = filters.eventDateTo;
+        }
+      }
+
+      return await this.prisma.booking.count({ where });
+    } catch (error) {
+      throw new Error(`Erro ao contar reservas: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+    }
+  }
+
+  /**
    * Busca reservas por cliente
    */
   async getBookingsByClient(clientId: string): Promise<any[]> {
@@ -448,7 +492,8 @@ export class BookingService {
    */
   async updateBooking(id: string, data: BookingUpdateInput): Promise<any> {
     try {
-      const existingBooking = await this.getBookingById(id);
+      // Valida se booking existe (throws se não existir)
+      await this.getBookingById(id);
 
       const updateData: Prisma.BookingUpdateInput = {};
 
@@ -502,7 +547,8 @@ export class BookingService {
    */
   async updateBookingStatus(id: string, status: BookingStatus): Promise<any> {
     try {
-      const booking = await this.getBookingById(id);
+      // Valida se a reserva existe
+      await this.getBookingById(id);
 
       const updatedBooking = await this.prisma.booking.update({
         where: { id },
@@ -526,7 +572,8 @@ export class BookingService {
    */
   async updateDeliveryStatus(id: string, deliveryStatus: DeliveryStatus): Promise<any> {
     try {
-      const booking = await this.getBookingById(id);
+      // Valida se a reserva existe
+      await this.getBookingById(id);
 
       const updatedBooking = await this.prisma.booking.update({
         where: { id },
@@ -550,7 +597,8 @@ export class BookingService {
    */
   async deleteBooking(id: string): Promise<void> {
     try {
-      const booking = await this.getBookingById(id);
+      // Valida se a reserva existe
+      await this.getBookingById(id);
 
       await this.prisma.booking.delete({
         where: { id }
@@ -602,16 +650,14 @@ export class BookingService {
    */
   async confirmWithDetails(id: string, details: { totalPrice?: number; collaborators?: Array<any> }): Promise<any> {
     try {
-      const booking = await this.getBookingById(id);
+      // Valida se a reserva existe
+      await this.getBookingById(id);
 
       const data: any = { status: BookingStatus.CONFIRMED };
       if (details.totalPrice !== undefined) data.totalPrice = details.totalPrice;
 
-      // Atualiza reserva com preço e status primeiro
-      const updated = await this.prisma.booking.update({ where: { id }, data, include: this.bookingInclude });
-
-      // Se colaboradores forem passados, criar eventCollaborator entries
-      if (Array.isArray(details.collaborators) && details.collaborators.length > 0) {
+      // Se colaboradores forem passados, criar eventCollaborator entries primeiro
+      if (details.collaborators && Array.isArray(details.collaborators) && details.collaborators.length > 0) {
         for (const c of details.collaborators) {
           try {
             await this.prisma.eventCollaborator.create({
@@ -635,6 +681,9 @@ export class BookingService {
           }
         }
       }
+
+      // Atualiza reserva com preço e status por último
+      return await this.prisma.booking.update({ where: { id }, data, include: this.bookingInclude });
 
       // Disparar notificações: email para o cliente e webhook externo (se configurado)
       try {
@@ -742,33 +791,113 @@ export class BookingService {
   /**
    * Busca eventos do calendário
    */
-  async getCalendar(month: number, year: number): Promise<any[]> {
+  async getCalendar(month?: number, year?: number): Promise<any[]> {
     try {
-      const startDate = new Date(year, month - 1, 1);
-      const endDate = new Date(year, month, 0);
-
-      const bookings = await this.prisma.booking.findMany({
-        where: {
+      // Se mês e ano forem fornecidos, filtra por período
+      // Caso contrário, busca todas as reservas
+      let dateFilter = {};
+      if (month && year) {
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 0);
+        dateFilter = {
           eventDate: {
             gte: startDate,
             lte: endDate
-          },
+          }
+        };
+      }
+
+      const bookings = await this.prisma.booking.findMany({
+        where: {
+          ...dateFilter,
           status: { not: BookingStatus.CANCELLED }
         },
-        include: this.bookingInclude,
+        // Para o calendário, precisamos de dados mais ricos (client name/phone, equipamentos, kit e colaboradores)
+        include: {
+          ...this.bookingInclude,
+          eventCollaborators: {
+            include: {
+              collaborator: {
+                include: {
+                  user: {
+                    select: { id: true, name: true, email: true, avatarUrl: true }
+                  }
+                }
+              }
+            }
+          }
+        },
         orderBy: { eventDate: "asc" }
       });
 
-      return bookings.map(booking => ({
-        id: booking.id,
-        title: booking.eventTitle,
-        start: booking.eventDate,
-        end: booking.eventEndDate,
-        status: booking.status,
-        deliveryStatus: booking.deliveryStatus,
-        client: booking.client,
-        location: booking.location
-      }));
+      // Normalizamos a resposta para o formato esperado no frontend (CalendarBooking)
+      return bookings.map((booking: any) => {
+        const eventDate = booking.eventDate;
+        const eventEndDate = booking.eventEndDate;
+        const durationHours = eventDate && eventEndDate
+          ? Math.max(1, Math.round((new Date(eventEndDate).getTime() - new Date(eventDate).getTime()) / 3600000))
+          : (booking.eventDuration || 4);
+
+        // Client simplificado
+        const client = booking.client
+          ? {
+              name: booking.client.user?.name || booking.clientName || undefined,
+              phone: booking.client.phone || booking.clientContact || undefined,
+            }
+          : (booking.clientName || booking.clientContact
+              ? { name: booking.clientName, phone: booking.clientContact }
+              : undefined);
+
+        // Venue normalizado
+        const venue = (booking.street || booking.city || booking.zipCode)
+          ? {
+              street: booking.street || undefined,
+              city: booking.city || undefined,
+              postalCode: booking.zipCode || undefined,
+            }
+          : undefined;
+
+        // Equipamentos já vêm como array simples pelo include
+        const equipments = Array.isArray(booking.equipments) ? booking.equipments : [];
+
+        // Mapear kit singular para array kits
+        const kits = booking.kit ? [booking.kit] : [];
+
+        // Colaboradores do evento (se existirem)
+        const collaborators = Array.isArray(booking.eventCollaborators)
+          ? booking.eventCollaborators.map((ec: any) => ({
+              collaboratorId: ec.collaboratorId,
+              role: ec.role,
+              collaborator: ec.collaborator
+                ? {
+                    id: ec.collaborator.id,
+                    name: ec.collaborator.user?.name || ec.collaborator.name,
+                    email: ec.collaborator.user?.email || ec.collaborator.email,
+                    avatar: ec.collaborator.user?.avatarUrl || ec.collaborator.avatar,
+                  }
+                : undefined,
+            }))
+          : undefined;
+
+        return {
+          id: booking.id,
+          // Campos esperados pelo frontend
+          eventDate: booking.eventDate,
+          eventEndDate: booking.eventEndDate,
+          duration: durationHours,
+          status: booking.status,
+          deliveryStatus: booking.deliveryStatus,
+          client,
+          venue,
+          equipments,
+          kits,
+          collaborators,
+          internalNotes: booking.notes,
+          // Campos adicionais úteis ao tooltip
+          serviceValue: booking.serviceValue,
+          totalPrice: booking.totalPrice,
+        };
+      });
     } catch (error) {
       throw new Error(`Erro ao buscar calendário: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }

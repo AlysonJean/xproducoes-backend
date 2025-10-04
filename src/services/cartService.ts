@@ -1,5 +1,4 @@
 import { CartRepository } from "../repositories/cartRepository";
-import { Booking } from "@prisma/client";
 
 export class CartService {
   private repo = new CartRepository();

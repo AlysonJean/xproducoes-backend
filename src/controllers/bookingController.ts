@@ -76,6 +76,11 @@ export class BookingController {
       const userId = req.query.userId as string | undefined;
       const creatorId = req.query.creatorId as string | undefined;
 
+      // ✅ Adicionar paginação padrão
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100); // Max 100 por página
+      const skip = (page - 1) * limit;
+
       // Parse dates if provided
       const startDate = req.query.startDate
         ? new Date(req.query.startDate as string)
@@ -89,14 +94,32 @@ export class BookingController {
         eventDateFrom: startDate,
         eventDateTo: endDate,
         clientId: userId,
-        creatorId
+        creatorId,
+        skip,
+        take: limit
       };
 
       const bookings = await bookingService.getAllBookings(filters);
       
+      // Buscar total para meta
+      const total = await bookingService.countBookings({
+        status,
+        eventDateFrom: startDate,
+        eventDateTo: endDate,
+        clientId: userId,
+        creatorId
+      });
+      
       res.json({
         success: true,
-        data: bookings
+        data: bookings,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+          hasMore: page * limit < total
+        }
       });
     } catch (error) {
       console.error("Erro no controller findAll:", error);
@@ -205,15 +228,11 @@ export class BookingController {
     try {
       const { month, year } = req.query;
       
-      if (!month || !year) {
-        res.status(400).json({ 
-          success: false,
-          message: "Mês e ano são obrigatórios." 
-        });
-        return;
-      }
+      // Parâmetros são opcionais agora
+      const monthNum = month ? Number(month) : undefined;
+      const yearNum = year ? Number(year) : undefined;
       
-      const events = await bookingService.getCalendar(Number(month), Number(year));
+      const events = await bookingService.getCalendar(monthNum, yearNum);
       
       res.json({
         success: true,
@@ -244,14 +263,24 @@ export class BookingController {
         return;
       }
 
-      // Verificar permissões
+      // Verificar permissões usando clientId
       if (req.userRole !== "ADMIN") {
-        // Cliente só pode ver suas próprias reservas
-        const booking = await bookingService.getBookingById(id);
-        if (booking.clientId !== req.userId && booking.creatorId !== req.userId) {
+        // Buscar client vinculado ao userId autenticado
+        const client = await prisma.client.findFirst({ where: { userId: req.userId } });
+        if (!client) {
           res.status(403).json({ 
             success: false,
-            message: "Acesso negado." 
+            message: "Acesso negado. Cliente não encontrado." 
+          });
+          return;
+        }
+
+        // Verificar se a booking pertence ao cliente
+        const booking = await bookingService.getBookingById(id);
+        if (booking.clientId !== client.id) {
+          res.status(403).json({ 
+            success: false,
+            message: "Acesso negado. Esta reserva não pertence a você." 
           });
           return;
         }
@@ -288,20 +317,31 @@ export class BookingController {
         return;
       }
 
-      // Verificar permissões
+      // Verificar permissões usando clientId
       if (req.userRole !== "ADMIN") {
-        const booking = await bookingService.getBookingById(id);
-        if (booking.clientId !== req.userId && booking.creatorId !== req.userId) {
+        const client = await prisma.client.findFirst({ where: { userId: req.userId } });
+        if (!client) {
           res.status(403).json({ 
             success: false,
-            message: "Acesso negado." 
+            message: "Acesso negado. Cliente não encontrado." 
+          });
+          return;
+        }
+
+        const booking = await bookingService.getBookingById(id);
+        if (booking.clientId !== client.id) {
+          res.status(403).json({ 
+            success: false,
+            message: "Acesso negado. Esta reserva não pertence a você." 
           });
           return;
         }
       }
 
+      // LOG: Mostra o payload recebido na atualização
+      console.log("[BOOKING UPDATE] Payload recebido:", JSON.stringify(req.body, null, 2));
+
       const updatedBooking = await bookingService.updateBooking(id, req.body);
-      
       res.json({
         success: true,
         message: "Reserva atualizada com sucesso",
@@ -329,11 +369,17 @@ export class BookingController {
         return;
       }
 
-      // Apenas admin ou criador/cliente podem anexar
+      // Apenas admin ou cliente podem anexar
       if (req.userRole !== 'ADMIN') {
+        const client = await prisma.client.findFirst({ where: { userId: req.userId } });
+        if (!client) {
+          res.status(403).json({ success: false, message: 'Acesso negado. Cliente não encontrado.' });
+          return;
+        }
+
         const booking = await bookingService.getBookingById(id);
-        if (booking.clientId !== req.userId && booking.creatorId !== req.userId) {
-          res.status(403).json({ success: false, message: 'Acesso negado.' });
+        if (booking.clientId !== client.id) {
+          res.status(403).json({ success: false, message: 'Acesso negado. Esta reserva não pertence a você.' });
           return;
         }
       }
@@ -363,11 +409,17 @@ export class BookingController {
         return;
       }
 
-      // Autorização: apenas admin, criador ou cliente
+      // Autorização: apenas admin ou cliente
       if (req.userRole !== 'ADMIN') {
+        const client = await prisma.client.findFirst({ where: { userId: req.userId } });
+        if (!client) {
+          res.status(403).json({ success: false, message: 'Acesso negado. Cliente não encontrado.' });
+          return;
+        }
+
         const booking = await bookingService.getBookingById(id);
-        if (booking.clientId !== req.userId && booking.creatorId !== req.userId) {
-          res.status(403).json({ success: false, message: 'Acesso negado.' });
+        if (booking.clientId !== client.id) {
+          res.status(403).json({ success: false, message: 'Acesso negado. Esta reserva não pertence a você.' });
           return;
         }
       }
@@ -394,13 +446,22 @@ export class BookingController {
         return;
       }
 
-      // Verificar permissões
+      // Verificar permissões usando clientId
       if (req.userRole !== "ADMIN") {
-        const booking = await bookingService.getBookingById(id);
-        if (booking.clientId !== req.userId && booking.creatorId !== req.userId) {
+        const client = await prisma.client.findFirst({ where: { userId: req.userId } });
+        if (!client) {
           res.status(403).json({ 
             success: false,
-            message: "Acesso negado." 
+            message: "Acesso negado. Cliente não encontrado." 
+          });
+          return;
+        }
+
+        const booking = await bookingService.getBookingById(id);
+        if (booking.clientId !== client.id) {
+          res.status(403).json({ 
+            success: false,
+            message: "Acesso negado. Esta reserva não pertence a você." 
           });
           return;
         }
@@ -586,15 +647,11 @@ export class BookingController {
     try {
       const { month, year } = req.query;
       
-      if (!month || !year) {
-        res.status(400).json({ 
-          success: false,
-          message: "Mês e ano são obrigatórios." 
-        });
-        return;
-      }
-
-      const calendar = await bookingService.getCalendar(Number(month), Number(year));
+      // Parâmetros são opcionais agora
+      const monthNum = month ? Number(month) : undefined;
+      const yearNum = year ? Number(year) : undefined;
+      
+      const calendar = await bookingService.getCalendar(monthNum, yearNum);
       
       res.json({
         success: true,

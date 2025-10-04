@@ -4,7 +4,7 @@ import {
   categoryCreateSchema,
   categoryUpdateSchema,
 } from "../validators/categorySchema";
-import { cacheService, CacheService } from "../services/cacheService.js";
+import { cacheService, CacheService } from "../services/cacheService";
 
 export class CategoryController {
   create = async (req: Request, res: Response, next: NextFunction) => {

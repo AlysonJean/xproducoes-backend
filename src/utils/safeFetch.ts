@@ -19,8 +19,27 @@ export async function safeFetch(inputUrl: string, options: SafeFetchOptions = {}
 	if (parsed.username || parsed.password) throw new Error('URL contains credentials which are not allowed');
 	if (parsed.protocol !== 'https:') throw new Error('Only https protocol allowed');
 
+	// Validações adicionais de segurança
+	const dangerousSchemes = ['file:', 'dict:', 'ftp:', 'gopher:', 'ldap:', 'ldaps:', 'data:', 'javascript:'];
+	if (dangerousSchemes.includes(parsed.protocol)) {
+		throw new Error('Dangerous URL scheme not allowed');
+	}
+
+	// Validar porta se especificada
+	if (parsed.port) {
+		const port = parseInt(parsed.port, 10);
+		// Bloquear portas suspeitas/comuns para serviços internos
+		const suspiciousPorts = [22, 23, 25, 53, 110, 143, 993, 995, 3306, 5432, 6379, 27017];
+		if (suspiciousPorts.includes(port)) {
+			throw new Error('Suspicious port not allowed');
+		}
+	}
+
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+	// Lista de portas suspeitas
+	const suspiciousPorts = [22, 23, 25, 53, 110, 143, 993, 995, 3306, 5432, 6379, 27017];
 
 		const isAddrPrivate = (addr: string) => {
 			try {
@@ -41,7 +60,7 @@ export async function safeFetch(inputUrl: string, options: SafeFetchOptions = {}
 						if ((ip as any).match([range, bits])) return true;
 					}
 				}
-			} catch (err) {
+			} catch {
 				// not an IP literal, treat as not private here — DNS lookup will resolve
 			}
 			return false;
@@ -97,8 +116,34 @@ export async function safeFetch(inputUrl: string, options: SafeFetchOptions = {}
 			if (resp.status >= 300 && resp.status < 400) {
 				const loc = resp.headers.get('location');
 				if (!loc) throw new Error('Redirect without location');
-				const nextUrl = new URL(loc, currentUrl);
-				if (nextUrl.protocol !== 'https:') throw new Error('Redirect to unsupported protocol');
+
+				// Validar URL de redirecionamento
+				let nextUrl: URL;
+				try {
+					nextUrl = new URL(loc, currentUrl);
+				} catch {
+					throw new Error('Invalid redirect URL');
+				}
+
+				// Bloquear esquemas perigosos no redirecionamento
+				if (dangerousSchemes.includes(nextUrl.protocol)) {
+					throw new Error('Redirect to dangerous protocol');
+				}
+
+				// Garantir que o redirecionamento seja HTTPS
+				if (nextUrl.protocol !== 'https:') {
+					throw new Error('Redirect to unsupported protocol');
+				}
+
+				// Validar porta no redirecionamento
+				if (nextUrl.port) {
+					const port = parseInt(nextUrl.port, 10);
+					if (suspiciousPorts.includes(port)) {
+						throw new Error('Redirect to suspicious port');
+					}
+				}
+
+				// Validar hostname do redirecionamento
 				await validateHost(nextUrl.hostname);
 				currentUrl = nextUrl;
 				continue;

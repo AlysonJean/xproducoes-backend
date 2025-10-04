@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import multer from "multer";
 import { UploadService } from '../services/uploadService';
 
 const uploadService = new UploadService();
@@ -8,7 +9,44 @@ export const uploadSingle = (fieldName: string = 'image') => {
   // Sempre usar Cloudinary
   const multerConfig = uploadService.getCloudinaryMulterConfig();
   
-  return multerConfig.single(fieldName);
+  const middleware = multerConfig.single(fieldName);
+  
+  return (req: Request, res: Response, next: NextFunction) => {
+    console.log(`[UploadMiddleware] Processing ${fieldName} upload`);
+    console.log('[UploadMiddleware] Request headers:', {
+      'content-type': req.headers['content-type'],
+      'content-length': req.headers['content-length']
+    });
+    
+    middleware(req, res, (err: any) => {
+      if (err) {
+        console.error('[UploadMiddleware] Multer error:', {
+          name: err.name,
+          message: err.message,
+          code: err.code
+        });
+        
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: 'Arquivo muito grande. Máximo: 5MB.' });
+          }
+          return res.status(400).json({ error: `Erro no upload: ${err.message}` });
+        }
+        
+        // Erro de validação de tipo de arquivo
+        return res.status(400).json({ error: err.message || 'Tipo de arquivo não permitido.' });
+      }
+      
+      console.log('[UploadMiddleware] File processed successfully:', {
+        fieldname: req.file?.fieldname,
+        originalname: req.file?.originalname,
+        mimetype: req.file?.mimetype,
+        size: req.file?.size
+      });
+      
+      next();
+    });
+  };
 };
 
 // Middleware para upload de múltiplas imagens

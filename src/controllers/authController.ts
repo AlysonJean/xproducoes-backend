@@ -409,4 +409,63 @@ export class AuthController {
       next(error);
     }
   };
+
+  refresh = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const { refreshToken } = req.body;
+      if (!refreshToken) {
+        res.status(400).json({ message: 'Refresh token é obrigatório' });
+        return;
+      }
+
+      // Verificar se o refresh token é válido
+      const jwt = require('jsonwebtoken');
+      const config = require('../config/environment').config;
+
+      try {
+        const decoded = jwt.verify(refreshToken, config.jwtSecret) as any;
+
+        // Buscar usuário para confirmar que ainda existe
+        const user = await this.authService.getProfile(decoded.userId);
+        if (!user) {
+          res.status(401).json({ message: 'Usuário não encontrado' });
+          return;
+        }
+
+        // Gerar novo access token
+        const newToken = jwt.sign(
+          { userId: user.id, role: user.role },
+          config.jwtSecret,
+          { expiresIn: '15m' }
+        );
+
+        // Gerar novo refresh token
+        const newRefreshToken = jwt.sign(
+          { userId: user.id, role: user.role },
+          config.jwtSecret,
+          { expiresIn: '7d' }
+        );
+
+        res.status(200).json({
+          accessToken: newToken,
+          refreshToken: newRefreshToken,
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role
+          }
+        });
+      } catch (tokenError) {
+        res.status(401).json({ message: 'Refresh token inválido' });
+        return;
+      }
+    } catch (error) {
+      next(error);
+    }
+  };
 }

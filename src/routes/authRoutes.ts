@@ -1,4 +1,4 @@
-import { Router, type Router as RouterType } from "express";
+import { Router } from "express";
 import { AuthController } from "../controllers/authController";
 import { authMiddleware, adminOnly } from "../middlewares/authMiddleware";
 import { authRateLimit, passwordResetRateLimit } from "../middlewares/rateLimitMiddleware";
@@ -37,6 +37,7 @@ authRoutes.post("/auth/login", authRateLimit, validate(userLoginSchema), authCon
 authRoutes.post("/request-password-reset", passwordResetRateLimit, validate(resetSchema.pick({ email: true })), authController.requestPasswordReset);
 authRoutes.post("/reset-password", passwordResetRateLimit, validate(resetSchema.pick({ token: true, password: true })), authController.resetPassword);
 authRoutes.post("/complete-registration", authController.completeRegistration);
+authRoutes.post("/refresh", authController.refresh);
 
 // Autenticação social
 authRoutes.post("/social/google", authRateLimit, authController.socialLogin);

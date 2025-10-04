@@ -118,6 +118,27 @@ export class CollaboratorRepository {
     } as CollaboratorWithUser;
   }
 
+  async findByUserId(userId: string): Promise<NullableCollaboratorWithUser> {
+    const collaborator = await prisma.collaborator.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true,
+            avatarUrl: true,
+            bio: true,
+            location: true,
+            website: true,
+          },
+        },
+      },
+    });
+
+    if (!collaborator) return null;
+    return collaborator as CollaboratorWithUser;
+  }
+
   async update(id: string, data: Partial<Collaborator>): Promise<Collaborator> {
     return prisma.collaborator.update({
       where: { id },
@@ -545,45 +566,176 @@ export class CollaboratorRepository {
 
   // Dashboard de colaboradores (queries otimizadas)
   async getCollaboratorDashboard(collaboratorId?: string) {
-    const where: Partial<EventCollaborator> = collaboratorId
-      ? { collaboratorId }
-      : {};
+    if (!collaboratorId) {
+      throw new Error('ID do colaborador é obrigatório para dashboard');
+    }
 
-    const [totalCollaborators, activeCollaborators, eventStats, topPerformers] =
-      await Promise.all([
-        prisma.collaborator.count(),
-        prisma.collaborator.count({ where: { status: "ACTIVE" } }),
-        prisma.eventCollaborator.groupBy({
-          by: ["status"],
-          where,
-          _count: { id: true },
-        }),
-        prisma.collaborator.findMany({
+    // Buscar dados específicos do colaborador
+    const collaborator = await prisma.collaborator.findUnique({
+      where: { id: collaboratorId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatarUrl: true,
+            location: true,
+            bio: true,
+          },
+        },
+        eventAssignments: {
           include: {
-            user: {
-              select: { id: true, name: true, avatarUrl: true },
-            },
-            _count: {
-              select: { eventAssignments: true },
+            booking: {
+              select: {
+                id: true,
+                eventTitle: true,
+                eventDate: true,
+                status: true,
+                totalPrice: true,
+                serviceValue: true,
+                location: true,
+              },
             },
           },
-          orderBy: { averageRating: "desc" },
-          take: 5,
-        }),
-      ]);
+          where: {
+            booking: {
+              status: { notIn: ['CANCELLED', 'DRAFT'] },
+            },
+          },
+        },
+      },
+    });
+
+    if (!collaborator) {
+      throw new Error('Colaborador não encontrado');
+    }
+
+    // Calcular estatísticas
+    const now = new Date();
+    const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    // Eventos do mês atual
+    const currentMonthEvents = collaborator.eventAssignments.filter(
+      (assignment) => {
+        const eventDate = new Date(assignment.booking.eventDate);
+        return eventDate >= currentMonth && eventDate < nextMonth;
+      }
+    );
+
+    // Próximos eventos (próximos 30 dias)
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+    const upcomingEvents = collaborator.eventAssignments
+      .filter((assignment) => {
+        const eventDate = new Date(assignment.booking.eventDate);
+        return eventDate >= now && eventDate <= thirtyDaysFromNow;
+      })
+      .sort((a, b) => new Date(a.booking.eventDate).getTime() - new Date(b.booking.eventDate).getTime())
+      .slice(0, 5);
+
+    // Calcular ganhos totais
+    const totalEarnings = collaborator.eventAssignments
+      .filter((assignment) => assignment.booking.status === 'COMPLETED')
+      .reduce((total, assignment) => {
+        const payment = assignment.totalPayment || 0;
+        return total + Number(payment);
+      }, 0);
+
+    // Eventos por status
+    const eventsByStatus = collaborator.eventAssignments.reduce(
+      (acc, assignment) => {
+        const status = assignment.booking.status;
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    // Atividades recentes (últimos 10 dias)
+    const tenDaysAgo = new Date();
+    tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+
+    const recentActivities = collaborator.eventAssignments
+      .filter((assignment) => {
+        const eventDate = new Date(assignment.booking.eventDate);
+        return eventDate >= tenDaysAgo;
+      })
+      .sort((a, b) => new Date(b.booking.eventDate).getTime() - new Date(a.booking.eventDate).getTime())
+      .slice(0, 10)
+      .map((assignment) => ({
+        id: assignment.id,
+        type: assignment.booking.status === 'COMPLETED' ? 'payment' : 'event',
+        title:
+          assignment.booking.status === 'COMPLETED'
+            ? 'Pagamento Recebido'
+            : assignment.booking.status === 'CONFIRMED'
+            ? 'Evento Confirmado'
+            : 'Novo Evento Atribuído',
+        description:
+          assignment.booking.status === 'COMPLETED'
+            ? `Pagamento do evento "${assignment.booking.eventTitle}" foi confirmado`
+            : `Você foi atribuído ao evento "${assignment.booking.eventTitle}"`,
+        timestamp: assignment.booking.eventDate,
+        amount: assignment.totalPayment ? Number(assignment.totalPayment) : 0,
+      }));
 
     return {
-      totalCollaborators,
-      activeCollaborators,
-      eventStats: eventStats.reduce(
-        (acc, stat) => {
-          acc[stat.status] = stat._count.id;
-          return acc;
-        },
-        {} as Record<string, number>,
-      ),
-      topPerformers,
+      collaborator: {
+        id: collaborator.id,
+        name: collaborator.user.name,
+        email: collaborator.user.email,
+        avatarUrl: collaborator.user.avatarUrl,
+        location: collaborator.user.location,
+        bio: collaborator.user.bio,
+        role: collaborator.collaboratorRole,
+        hourlyRate: collaborator.hourlyRate,
+        workingRadius: collaborator.workingRadius,
+        specialties: collaborator.specialties,
+        equipment: collaborator.equipment,
+        languages: collaborator.languages,
+        status: collaborator.status,
+      },
+      stats: {
+        totalEvents: collaborator.eventAssignments.length,
+        completedEvents: eventsByStatus.COMPLETED || 0,
+        confirmedEvents: eventsByStatus.CONFIRMED || 0,
+        pendingEvents: eventsByStatus.PENDING || 0,
+        totalEarnings,
+        currentMonthEvents: currentMonthEvents.length,
+        averageEventValue: collaborator.eventAssignments.length > 0
+          ? totalEarnings / collaborator.eventAssignments.length
+          : 0,
+      },
+      upcomingEvents: upcomingEvents.map((assignment) => ({
+        id: assignment.booking.id,
+        title: assignment.booking.eventTitle,
+        startTime: assignment.booking.eventDate,
+        location: assignment.booking.location || 'Local não definido',
+        totalPayment: assignment.totalPayment ? Number(assignment.totalPayment) : 0,
+        status: assignment.booking.status,
+      })),
+      recentActivities,
+      monthlyData: {
+        // Dados para gráficos mensais (últimos 6 meses) - simplificado
+        revenue: {},
+        events: {},
+      },
     };
+  }
+
+  // Método auxiliar para buscar receita mensal
+  private async getMonthlyRevenue(collaboratorId: string) {
+    // Implementação simplificada - retorna dados vazios por enquanto
+    return {};
+  }
+
+  // Método auxiliar para buscar eventos mensais
+  private async getMonthlyEvents(collaboratorId: string) {
+    // Implementação simplificada - retorna dados vazios por enquanto
+    return {};
   }
 
   // Availability check otimizado para múltiplos colaboradores

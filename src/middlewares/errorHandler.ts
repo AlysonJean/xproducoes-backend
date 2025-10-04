@@ -9,7 +9,7 @@ export function errorHandler(
   err: unknown,
   req: Request,
   res: Response,
-  next: NextFunction,
+  _next: NextFunction,
 ) {
   // Log detalhado do erro
   // Verificamos se 'err' é um objeto do tipo Error para acessar 'message' e 'stack'

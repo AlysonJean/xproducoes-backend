@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noImplicitAny": false,
+    "composite": true
+  },
+  "include": [
+    "src/utils/__tests__/**/*.ts",
+    "src/**/*.test.ts",
+    "src/**/__tests__/**/*.ts"
+  ]
+}

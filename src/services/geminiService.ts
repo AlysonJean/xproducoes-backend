@@ -91,7 +91,7 @@ export class GeminiService {
             console.error('Gemini API retornou API_KEY_INVALID. Verifique se GEMINI_API_KEY está correta e ativa no console do Google Cloud.');
           }
         }
-      } catch (e) {
+      } catch {
         // ignore parsing errors
       }
 

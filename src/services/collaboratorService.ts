@@ -98,6 +98,10 @@ export class CollaboratorService {
     return getCollaboratorById(id);
   }
 
+  async findByUserId(userId: string) {
+    return repo.findByUserId(userId);
+  }
+
   async update(id: string, data: any) {
     return updateCollaborator(id, data);
   }

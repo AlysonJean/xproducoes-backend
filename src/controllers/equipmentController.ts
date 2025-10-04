@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { EquipmentService } from "../services/equipmentService";
 import { equipmentCreateSchema } from "../validators/equipmentSchema";
-import { cacheService, CacheService } from "../services/cacheService.js";
+import { cacheService, CacheService } from "../services/cacheService";
 
 const equipmentService = new EquipmentService();
 

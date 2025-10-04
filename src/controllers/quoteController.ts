@@ -116,7 +116,7 @@ export class QuoteController {
         id,
         name: "João Silva",
         email: "joao@example.com",
-        phone: "(11) 99999-9999",
+        phone: "(31) 98925-2272",
         company: "Empresa XYZ",
         eventType: "Casamento",
         eventDate: "2024-06-15",

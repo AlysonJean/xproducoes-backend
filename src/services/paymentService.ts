@@ -68,7 +68,7 @@ export async function refund(paymentId: string, amount?: number) {
   };
 }
 
-export async function getHistory(userId: string) {
+export async function getHistory(_userId: string) {
   // Simulação de histórico de pagamentos do usuário
   return [
     {
@@ -152,9 +152,6 @@ export async function getAllPayments(filters?: any) {
 
 export async function getPaymentStats() {
   // Simulação de estatísticas de pagamento
-  const now = new Date();
-  const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
   return {
     totalRevenue: 125000, // R$ 1.250,00

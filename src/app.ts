@@ -76,10 +76,10 @@ app.use((req, res) => {
     res.header("Access-Control-Allow-Origin", origin);
     res.header("Access-Control-Allow-Credentials", "true");
     res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
-    res.header(
-  "Access-Control-Allow-Headers",
-  "Origin, X-Requested-With, Content-Type, Accept, Authorization, Idempotency-Key, X-Idempotency-Key",
-    );
+     res.header(
+       "Access-Control-Allow-Headers",
+       "Origin, X-Requested-With, Content-Type, Accept, Authorization, Idempotency-Key, X-Idempotency-Key, x-svg-proxy-token",
+     );
   }
   res.status(404).json({
     success: false,
@@ -91,16 +91,16 @@ app.use((req, res) => {
 
 // Error handler global
 import { Request, Response, NextFunction } from "express";
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   const origin = req.headers.origin;
   if (origin && allowedOrigins.includes(origin)) {
     res.header("Access-Control-Allow-Origin", origin);
     res.header("Access-Control-Allow-Credentials", "true");
     res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
-    res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization, Idempotency-Key, X-Idempotency-Key",
-    );
+     res.header(
+       "Access-Control-Allow-Headers",
+       "Origin, X-Requested-With, Content-Type, Accept, Authorization, Idempotency-Key, X-Idempotency-Key, x-svg-proxy-token",
+     );
   }
   console.error("Erro global:", err);
   res.status(500).json({

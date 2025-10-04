@@ -74,6 +74,13 @@ location                 String?
   sentMessages             Message[]         @relation("MessageSender")
   notifications            Notification[]
   reviews                  Review[]
+  chatParticipants         ChatParticipant[]
+  sentChatMessages         ChatMessage[]
+  chatMessageReads         ChatMessageRead[]
+  createdChecklists        Checklist[]           @relation("ChecklistCreator")
+  completedChecklistItems  ChecklistItem[]       @relation("ChecklistItemCompleter")
+  assignedChecklists       ChecklistAssignment[] @relation("ChecklistAssignee")
+  assignedByChecklists     ChecklistAssignment[] @relation("ChecklistAssigner")
 
   @@index([email])
   @@index([role])
@@ -625,4 +632,221 @@ enum NotificationType {
   MESSAGE_RECEIVED
   SYSTEM_ALERT
   MAINTENANCE_SCHEDULED
+}
+
+// ================================
+// MODELOS DE CHAT E COMUNICAÇÃO
+// ================================
+
+model Chat {
+  id            String            @id @default(cuid())
+  name          String?           // Nome do chat (opcional para chats individuais)
+  type          ChatType          @default(PRIVATE)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  lastMessageAt DateTime?
+
+  // Relacionamentos
+  participants  ChatParticipant[]
+  messages      ChatMessage[]
+
+  @@map("chats")
+}
+
+model ChatParticipant {
+  id        String            @id @default(cuid())
+  chatId    String
+  userId    String
+  role      ChatRole          @default(MEMBER)
+  joinedAt  DateTime          @default(now())
+  lastReadAt DateTime?
+
+  // Relacionamentos
+  chat      Chat              @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@map("chat_participants")
+}
+
+model ChatMessage {
+  id          String            @id @default(cuid())
+  chatId      String
+  senderId    String
+  content     String
+  messageType MessageType       @default(TEXT)
+  fileUrl     String?
+  fileName    String?
+  fileSize    Int?
+  createdAt   DateTime          @default(now())
+
+  // Relacionamentos
+  chat        Chat              @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender      User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  reads       ChatMessageRead[]
+
+  @@map("chat_messages")
+}
+
+model ChatMessageRead {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  chatId    String
+  readAt    DateTime @default(now())
+
+  // Relacionamentos
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@map("chat_message_reads")
+}
+
+// ================================
+// MODELOS DE NOTIFICAÇÕES
+// ================================
+
+// Modelo Notification já existe no arquivo, então removemos a duplicata
+
+// ================================
+// ENUMS ADICIONAIS
+// ================================
+
+enum ChatType {
+  PRIVATE     // Chat individual
+  GROUP       // Chat em grupo
+  EVENT       // Chat relacionado a um evento
+  SUPPORT     // Chat de suporte
+}
+
+enum ChatRole {
+  ADMIN       // Administrador do chat
+  MODERATOR   // Moderador
+  MEMBER      // Membro comum
+}
+
+// ================================
+// MODELOS DE CHECKLIST
+// ================================
+
+model Checklist {
+  id          String               @id @default(cuid())
+  title       String
+  description String?
+  type        ChecklistType        @default(GENERAL)
+  status      ChecklistStatus      @default(ACTIVE)
+  isTemplate  Boolean              @default(false)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  createdById String
+  createdBy   User                 @relation("ChecklistCreator", fields: [createdById], references: [id])
+
+  // Relacionamentos
+  items       ChecklistItem[]
+  assignments ChecklistAssignment[]
+
+  @@map("checklists")
+}
+
+model ChecklistItem {
+  id          String            @id @default(cuid())
+  checklistId String
+  title       String
+  description String?
+  order       Int               @default(0)
+  isRequired  Boolean           @default(false)
+  status      ChecklistItemStatus @default(PENDING)
+  completedAt DateTime?
+  completedById String?
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // Relacionamentos
+  checklist   Checklist          @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  completedBy User?              @relation("ChecklistItemCompleter", fields: [completedById], references: [id])
+
+  @@map("checklist_items")
+}
+
+model ChecklistAssignment {
+  id            String                @id @default(cuid())
+  checklistId   String
+  assignedToId  String
+  assignedById  String
+  dueDate       DateTime?
+  priority      ChecklistPriority     @default(MEDIUM)
+  status        ChecklistAssignmentStatus @default(PENDING)
+  notes         String?
+  completedAt   DateTime?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  // Relacionamentos
+  checklist     Checklist             @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  assignedTo    User                  @relation("ChecklistAssignee", fields: [assignedToId], references: [id])
+  assignedBy    User                  @relation("ChecklistAssigner", fields: [assignedById], references: [id])
+
+  @@unique([checklistId, assignedToId])
+  @@map("checklist_assignments")
+}
+
+// ================================
+// ENUMS DE CHECKLIST
+// ================================
+
+enum ChecklistType {
+  GENERAL       // Checklist geral
+  EVENT_SETUP   // Configuração de evento
+  EVENT_BREAKDOWN // Desmontagem de evento
+  MAINTENANCE   // Manutenção de equipamento
+  CLIENT_MEETING // Reunião com cliente
+  DELIVERY      // Entrega de equipamento
+  PICKUP        // Retirada de equipamento
+  OTHER         // Outro tipo
+}
+
+enum ChecklistStatus {
+  ACTIVE        // Ativo
+  COMPLETED     // Concluído
+  ARCHIVED      // Arquivado
+  CANCELLED     // Cancelado
+}
+
+enum ChecklistItemStatus {
+  PENDING       // Pendente
+  IN_PROGRESS   // Em andamento
+  COMPLETED     // Concluído
+  SKIPPED       // Pulado
+  CANCELLED     // Cancelado
+}
+
+enum ChecklistPriority {
+  LOW           // Baixa
+  MEDIUM        // Média
+  HIGH          // Alta
+  URGENT        // Urgente
+}
+
+enum ChecklistAssignmentStatus {
+  PENDING       // Pendente
+  IN_PROGRESS   // Em andamento
+  COMPLETED     // Concluído
+  OVERDUE       // Atrasado
+  CANCELLED     // Cancelado
+}
+
+// ================================
+// MODELO DE CONFIGURAÇÕES DA APLICAÇÃO
+// ================================
+
+model AppSettings {
+  id          String   @id @default(cuid())
+  logoUrl     String?
+  companyName String   @default("X Produçoes e Eventos")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("app_settings")
 }

@@ -1,7 +1,5 @@
 import multer from "multer";
 import cloudinary from "../config/cloudinary";
-import path from "path";
-import fs from "fs";
 
 export class UploadService {
   
@@ -10,15 +8,37 @@ export class UploadService {
     return multer({
       storage: multer.memoryStorage(),
       fileFilter: this.imageFilter,
-      limits: { fileSize: 5 * 1024 * 1024 } // 5MB
+      limits: { 
+        fileSize: 5 * 1024 * 1024, // 5MB
+        files: 1
+      }
     });
   }
 
   private imageFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-    if (file.mimetype.startsWith("image/")) {
+    console.log('[ImageFilter] Checking file:', {
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    });
+    
+    const isValidImage = file.mimetype.startsWith("image/") || 
+                        file.originalname.toLowerCase().endsWith('.svg') ||
+                        file.mimetype === 'text/xml' ||
+                        file.mimetype === 'application/xml' ||
+                        file.mimetype === 'application/svg+xml';
+    
+    console.log('[ImageFilter] File validation result:', {
+      isValidImage,
+      mimetype: file.mimetype,
+      originalname: file.originalname
+    });
+    
+    if (isValidImage) {
       cb(null, true);
     } else {
-      cb(new Error("Apenas arquivos de imagem são permitidos"));
+      console.error('[ImageFilter] File rejected:', file.mimetype);
+      cb(new Error("Apenas arquivos de imagem são permitidos (PNG, JPEG, SVG)"));
     }
   };
 
@@ -33,6 +53,13 @@ export class UploadService {
       const isSvg =
         file.mimetype === 'image/svg+xml' ||
         (file.originalname && file.originalname.toLowerCase().endsWith('.svg'));
+
+      console.log('[UploadService] File info:', {
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
+        isSvg: isSvg
+      });
 
       // Base options
       const baseOptions: any = {
@@ -63,6 +90,7 @@ export class UploadService {
       // Prepare buffer for upload; sanitize SVGs synchronously before creating stream
       let bufferToSend = file.buffer;
       if (isSvg) {
+        console.log('[UploadService] Processing SVG file');
         try {
           // dynamic import but executed before upload stream and using promise chain
           const jsdomMod = require('jsdom');
@@ -72,14 +100,18 @@ export class UploadService {
           const window = new JSDOM('').window;
           const DOMPurify = createDOMPurify(window);
           const svgText = file.buffer.toString('utf8');
-          const clean = DOMPurify.sanitize(svgText, { WHOLE_DOCUMENT: true, USE_PROFILES: { svg: true } });
+          console.log('[UploadService] Original SVG length:', svgText.length);
+          const clean = DOMPurify.sanitize(svgText, { USE_PROFILES: { svg: true } });
+          console.log('[UploadService] Sanitized SVG length:', clean.length);
           bufferToSend = Buffer.from(clean, 'utf8');
         } catch (sanErr) {
-          console.error('SVG sanitization failed before upload:', sanErr);
+          console.error('[UploadService] SVG sanitization failed:', sanErr);
           reject(new Error('SVG sanitization failed'));
           return;
         }
       }
+
+      console.log('[UploadService] Starting Cloudinary upload with options:', isSvg ? svgOptions : rasterOptions);
 
       const uploadStream = cloudinary.uploader.upload_stream(
         isSvg ? svgOptions : rasterOptions,
@@ -101,6 +133,7 @@ export class UploadService {
             reject(new Error('Falha ao obter URL segura do Cloudinary'));
             return;
           }
+          console.log('[UploadService] Upload successful:', result.secure_url);
           resolve(result.secure_url);
         },
       );

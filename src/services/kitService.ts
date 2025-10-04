@@ -2,7 +2,7 @@ import { KitRepository } from "../repositories/kitRepository";
 
 const repo = new KitRepository();
 
-export async function create(data: any, file?: Express.Multer.File) {
+export async function create(data: any, _file?: Express.Multer.File) {
   const kitData = { ...data };
   // imageUrl deve vir do middleware do Cloudinary
   if (data.imageUrl) {
@@ -22,7 +22,7 @@ export async function create(data: any, file?: Express.Multer.File) {
 export async function update(
   id: string,
   data: any,
-  file?: Express.Multer.File,
+  _file?: Express.Multer.File,
 ) {
   const kitData = { ...data };
   // imageUrl deve vir do middleware do Cloudinary

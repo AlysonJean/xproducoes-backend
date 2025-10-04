@@ -104,10 +104,10 @@ export const authenticateToken = async (
 
 const hasPermission = (
   userRole: UserRole,
-  resource: string,
-  action: string,
-  user?: any,
-  resourceId?: string,
+  _resource: string,
+  _action: string,
+  _user?: any,
+  _resourceId?: string,
 ): boolean => {
   if (userRole === "ADMIN") return true;
   return false;

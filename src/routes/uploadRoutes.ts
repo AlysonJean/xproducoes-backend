@@ -1,4 +1,4 @@
-import { Router, type Router as RouterType } from "express";
+import { Router } from "express";
 import { UploadController } from "../controllers/uploadController";
 import { uploadSingle } from "../middlewares/upload";
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';

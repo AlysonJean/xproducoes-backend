@@ -25,8 +25,8 @@ export function dynamicCors(req: Request, res: Response, next: NextFunction) {
   // Sempre definir os cabeçalhos CORS
   res.header("Access-Control-Allow-Methods", "GET,PUT,POST,PATCH,DELETE,OPTIONS");
   res.header(
-  "Access-Control-Allow-Headers",
-  "Origin, X-Requested-With, Content-Type, Accept, Authorization, Idempotency-Key, X-Idempotency-Key"
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization, Idempotency-Key, X-Idempotency-Key, x-svg-proxy-token"
   );
   res.header("Access-Control-Allow-Credentials", "true");
   res.header("Vary", "Origin");

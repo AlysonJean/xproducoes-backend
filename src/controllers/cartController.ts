@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import { CartService } from "../services/cartService";
 
 const cartService = new CartService();

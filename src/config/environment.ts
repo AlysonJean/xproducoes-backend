@@ -31,6 +31,13 @@ export const config = {
     user: process.env.SMTP_USER || undefined,
     pass: process.env.SMTP_PASS || undefined,
   },
+  ssl: {
+    enabled: process.env.HTTPS_ENABLED === 'true' || process.env.NODE_ENV === 'production',
+    keyPath: process.env.SSL_KEY_PATH || undefined,
+    certPath: process.env.SSL_CERT_PATH || undefined,
+    caPath: process.env.SSL_CA_PATH || undefined,
+    passphrase: process.env.SSL_PASSPHRASE || undefined,
+  },
 };
 
 // Verificações rápidas de variáveis críticas (falhar em produção apenas para essenciais)
@@ -41,6 +48,13 @@ function validateCritical() {
   // Verificar apenas variáveis realmente críticas
   if (!config.databaseUrl) criticalMissing.push('DATABASE_URL');
   if (!config.jwtSecret) criticalMissing.push('JWT_SECRET');
+
+  // Verificar SSL em produção
+  if (process.env.NODE_ENV === 'production' && config.ssl.enabled) {
+    if (!config.ssl.certPath || !config.ssl.keyPath) {
+      criticalMissing.push('SSL_CERT_PATH and SSL_KEY_PATH (required for HTTPS in production)');
+    }
+  }
 
   // Outras variáveis são recomendadas mas não críticas
   if (!config.cloudinary.cloudName || !config.cloudinary.apiKey || !config.cloudinary.apiSecret) {
@@ -65,3 +79,41 @@ function validateCritical() {
 }
 
 validateCritical();
+
+// Função para gerar certificados auto-assinados para desenvolvimento
+export function generateSelfSignedCert() {
+  const crypto = require('crypto');
+  const { execSync } = require('child_process');
+
+  try {
+    // Gerar chave privada
+    const key = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: {
+        type: 'spki',
+        format: 'pem'
+      },
+      privateKeyEncoding: {
+        type: 'pkcs8',
+        format: 'pem'
+      }
+    });
+
+    // Gerar certificado auto-assinado
+    const cert = execSync(`
+      openssl req -new -x509 -days 365 -nodes -key /dev/stdin -subj "/C=BR/ST=SP/L=Sao Paulo/O=X Produçoes/CN=localhost" -out /dev/stdout
+    `, {
+      input: key.privateKey,
+      encoding: 'utf8'
+    });
+
+    return {
+      key: key.privateKey,
+      cert: cert
+    };
+  } catch {
+    console.warn('WARN: Falha ao gerar certificado auto-assinado. Usando HTTP apenas.');
+    console.warn('Para desenvolvimento com HTTPS, instale OpenSSL ou forneça certificados válidos.');
+    return null;
+  }
+}

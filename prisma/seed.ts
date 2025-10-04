@@ -306,7 +306,7 @@ async function main() {
 	const clientPassword = 'cliente123';
 	const clientUser = await createUserIfNotExists('cliente.teste@exemplo.com', 'Cliente Teste', clientPassword);
 	console.log('[seed] Cliente criado:', clientUser.email);
-	const clientProfile = await createClientProfileForUser(clientUser.id, { companyName: 'Empresa Teste' });
+	const clientProfile = await createClientProfileForUser(clientUser.id, { companyName: 'X Produçoes e Eventos' });
 
 	const collabPassword = 'collab123';
 	const collabUser = await createUserIfNotExists('colaborador.teste@exemplo.com', 'Colaborador Teste', collabPassword, UserRole.COLLABORATOR);

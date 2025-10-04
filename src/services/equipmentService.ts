@@ -2,7 +2,7 @@ import { prisma } from "../config/prisma";
 import type { Equipment } from "@prisma/client";
 
 export class EquipmentService {
-  async create(data: any, file?: Express.Multer.File): Promise<Equipment> {
+  async create(data: any, _file?: Express.Multer.File): Promise<Equipment> {
     // imageUrl deve vir do middleware do Cloudinary
     const imageUrl = data.imageUrl || "";
     
@@ -19,7 +19,7 @@ export class EquipmentService {
   async update(
     id: string,
     data: any,
-    file?: Express.Multer.File,
+    _file?: Express.Multer.File,
   ): Promise<Equipment | null> {
     // imageUrl deve vir do middleware do Cloudinary (se fornecido)
     const imageUrl = data.imageUrl;

@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import { CollaboratorService } from "../services/collaboratorService";
 import { z } from "zod";
 
@@ -306,7 +306,6 @@ export class CollaboratorController {
   async updateEventCollaborator(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const updateData = req.body;
 
       if (!id) {
         return res.status(400).json({
@@ -413,20 +412,95 @@ export class CollaboratorController {
   // Dashboard pessoal do colaborador (ou admin vendo um colaborador específico)
   async getMyDashboard(req: Request, res: Response) {
     try {
-      // Obter ID do colaborador a partir do usuário autenticado
-      const collaboratorId = req.userId as string;
+      // Obter ID do usuário autenticado
+      const userId = req.userId as string;
 
-      if (!collaboratorId) {
+      if (!userId) {
         return res.status(400).json({ success: false, message: 'Usuário não autenticado' });
       }
 
+      // Buscar o colaborador pelo userId
+      const collaborator = await collaboratorService.findByUserId(userId);
+      
+      if (!collaborator) {
+        return res.status(404).json({ success: false, message: 'Colaborador não encontrado' });
+      }
+
       // Reutiliza o service para agregar os dados do dashboard
-      const stats = await collaboratorService.getCollaboratorDashboard(collaboratorId);
+      const stats = await collaboratorService.getCollaboratorDashboard(collaborator.id);
 
       return res.json({ success: true, data: stats });
     } catch (error) {
       console.error('Erro ao buscar dashboard do colaborador:', error);
       return res.status(500).json({ success: false, message: 'Erro ao buscar dashboard do colaborador' });
+    }
+  }
+
+  // Perfil pessoal do colaborador
+  async getMyProfile(req: Request, res: Response) {
+    try {
+      // Obter ID do usuário autenticado
+      const userId = req.userId as string;
+
+      if (!userId) {
+        return res.status(400).json({ success: false, message: 'Usuário não autenticado' });
+      }
+
+      // Buscar o colaborador pelo userId
+      const collaborator = await collaboratorService.findByUserId(userId);
+      
+      if (!collaborator) {
+        return res.status(404).json({ success: false, message: 'Colaborador não encontrado' });
+      }
+
+      return res.json({ success: true, data: collaborator });
+    } catch (error) {
+      console.error('Erro ao buscar perfil do colaborador:', error);
+      return res.status(500).json({ success: false, message: 'Erro ao buscar perfil do colaborador' });
+    }
+  }
+
+  // Atualizar perfil do colaborador
+  async updateMyProfile(req: Request, res: Response) {
+    try {
+      const userId = req.userId as string;
+
+      if (!userId) {
+        return res.status(400).json({ success: false, message: 'Usuário não autenticado' });
+      }
+
+      const collaborator = await collaboratorService.findByUserId(userId);
+      
+      if (!collaborator) {
+        return res.status(404).json({ success: false, message: 'Colaborador não encontrado' });
+      }
+
+      const {
+        phone,
+        experience,
+        hourlyRate,
+        workingRadius,
+        languages,
+        specialties,
+        equipment,
+        certifications,
+      } = req.body;
+
+      const updatedCollaborator = await collaboratorService.update(collaborator.id, {
+        phone,
+        experience,
+        hourlyRate: hourlyRate ? parseFloat(hourlyRate) : undefined,
+        workingRadius: workingRadius ? parseInt(workingRadius) : undefined,
+        languages: languages || [],
+        specialties: specialties || [],
+        equipment: equipment || [],
+        certifications: certifications || [],
+      });
+
+      return res.json({ success: true, data: updatedCollaborator });
+    } catch (error) {
+      console.error('Erro ao atualizar perfil do colaborador:', error);
+      return res.status(500).json({ success: false, message: 'Erro ao atualizar perfil do colaborador' });
     }
   }
 
@@ -501,7 +575,6 @@ export class CollaboratorController {
         notes: z.string().optional(),
       });
 
-      const validatedData = availabilitySchema.parse(req.body);
       return res.status(501).json({
         success: false,
         message: "Criação de disponibilidade não implementada ainda",
@@ -794,6 +867,8 @@ export const {
   searchCollaborators,
   getCollaboratorStats,
   getMyDashboard,
+  getMyProfile,
+  updateMyProfile,
   getAvailableCollaborators,
   getAllAvailabilities,
   createAvailability,

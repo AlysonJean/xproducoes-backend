@@ -1,6 +1,4 @@
-
 import nodemailer from 'nodemailer';
-import { prisma } from '../config/prisma';
 
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : undefined;
@@ -54,7 +52,7 @@ export class EmailService {
     try {
       const url = nodemailer.getTestMessageUrl(info);
       if (url) console.info('Preview URL:', url);
-    } catch (e) {
+    } catch {
       // ignore
     }
     return info;
@@ -106,11 +104,11 @@ export class EmailService {
   async sendCollaboratorInviteEmail(email: string, name: string, inviteUrl: string) {
     const html = `
       <h1>Olá, ${name}!</h1>
-      <p>Foi convidado para se juntar à equipa da X Produções como colaborador!</p>
+      <p>Foi convidado para se juntar à equipa da X Produçoes e Eventos como colaborador!</p>
       <p>Para completar o seu registo e definir a sua senha, clique no link abaixo:</p>
       <p><a href="${inviteUrl}">Completar Registo</a></p>
     `;
-    return this.sendMail(email, 'Convite para Colaborador - X Produções', html);
+    return this.sendMail(email, 'Convite para Colaborador - X Produçoes e Eventos', html);
   }
 
   async sendVerificationEmail(email: string, verifyUrl: string) {

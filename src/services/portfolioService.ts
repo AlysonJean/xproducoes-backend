@@ -36,7 +36,7 @@ export async function create(
     if (isNaN(eventDate.getTime())) {
       throw new Error('Data inválida fornecida');
     }
-  } catch (error) {
+  } catch {
     throw new Error('Erro ao processar data do evento');
   }
 

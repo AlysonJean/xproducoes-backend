@@ -66,7 +66,7 @@ export async function requestPasswordReset(email: string) {
     // Log opcional e retorno silencioso
     try {
       console.info(`requestPasswordReset called for non-existing email: ${email}`);
-    } catch (e) {
+    } catch {
       // noop
     }
   // Não vazar resetToken via API (melhor prática)
@@ -204,7 +204,14 @@ export async function login(data: LoginInput) {
   const token = jwt.sign(
     { userId: user.id, role: user.role },
     config.jwtSecret,
-    { expiresIn: "7d" },
+    { expiresIn: "15m" }, // Access token com 15 minutos
+  );
+
+  // Gerar refresh token com expiração maior
+  const refreshToken = jwt.sign(
+    { userId: user.id, role: user.role },
+    config.jwtSecret,
+    { expiresIn: "7d" }, // Refresh token com 7 dias
   );
   
   // Adicionar rota de redirecionamento baseada no role
@@ -233,6 +240,7 @@ export async function login(data: LoginInput) {
       role: user.role 
     },
     token,
+    refreshToken,
     redirectTo: dashboardRoute
   };
 }
@@ -272,7 +280,7 @@ export type UpdateProfileInput = Partial<{
 export async function updateProfile(
   userId: string,
   data: UpdateProfileInput,
-  file?: Express.Multer.File,
+  _file?: Express.Multer.File,
 ) {
   const updateData: UpdateProfileInput = { ...data };
   // avatarUrl deve vir do middleware do Cloudinary
