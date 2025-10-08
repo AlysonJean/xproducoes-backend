@@ -16,6 +16,17 @@ const PORT = Number(process.env.PORT) || 3001;
 function configureServer(): { server: http.Server | https.Server; protocol: string; sslInfo: string } {
   const isProduction = process.env.NODE_ENV === 'production';
   const sslEnabled = config.ssl.enabled;
+  const isRender = process.env.RENDER === 'true'; // Render define essa variável automaticamente
+
+  // Em produção no Render, sempre usar HTTP (Render fornece SSL via proxy)
+  if (isProduction && isRender) {
+    const server = http.createServer(app);
+    return {
+      server,
+      protocol: 'http',
+      sslInfo: 'HTTP (produção - SSL gerenciado pelo Render)'
+    };
+  }
 
   // Em desenvolvimento, sempre usar HTTP se SSL não estiver explicitamente configurado
   if (!isProduction && !sslEnabled) {
@@ -27,7 +38,7 @@ function configureServer(): { server: http.Server | https.Server; protocol: stri
     };
   }
 
-  // Tentar configurar HTTPS
+  // Tentar configurar HTTPS (para produção self-hosted ou desenvolvimento com SSL)
   try {
     const sslOptions = configureSSLOptions();
     const server = https.createServer(sslOptions, app);
@@ -57,6 +68,7 @@ function configureServer(): { server: http.Server | https.Server; protocol: stri
  */
 function configureSSLOptions(): https.ServerOptions & { certSource: string } {
   const isProduction = process.env.NODE_ENV === 'production';
+  const isRender = process.env.RENDER === 'true';
 
   // 1. Tentar carregar certificados do sistema de arquivos
   if (config.ssl.certPath && config.ssl.keyPath) {
@@ -86,9 +98,9 @@ function configureSSLOptions(): https.ServerOptions & { certSource: string } {
     }
   }
 
-  // 2. Em produção, exigir certificados válidos
-  if (isProduction) {
-    throw new Error('Em produção, SSL_CERT_PATH e SSL_KEY_PATH devem ser fornecidos');
+  // 2. Em produção (não-Render), exigir certificados válidos
+  if (isProduction && !isRender) {
+    throw new Error('Em produção self-hosted, SSL_CERT_PATH e SSL_KEY_PATH devem ser fornecidos');
   }
 
   // 3. Em desenvolvimento, gerar certificado auto-assinado
