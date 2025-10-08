@@ -9,20 +9,29 @@ export const getAppSettings = async (req: Request, res: Response) => {
     });
 
     if (!settings) {
-      // Se não existir configurações, criar com valores padrão
-      const defaultSettings = await prisma.appSettings.create({
-        data: {
-          logoUrl: null,
-          companyName: 'X Produçoes e Eventos'
-        }
+      // Se não existir configurações, retornar valores padrão sem tentar criar
+      // (pode falhar se a tabela não existir ou não houver permissões)
+      console.warn('WARN: Configurações de app não encontradas, retornando valores padrão');
+      return res.json({
+        id: 'default',
+        logoUrl: null,
+        companyName: 'X Produçoes e Eventos',
+        createdAt: new Date(),
+        updatedAt: new Date()
       });
-      return res.json(defaultSettings);
     }
 
     res.json(settings);
   } catch (error) {
     console.error('Erro ao buscar configurações:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    // Retornar valores padrão em caso de erro
+    res.json({
+      id: 'default',
+      logoUrl: null,
+      companyName: 'X Produçoes e Eventos',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
   }
 };
 
