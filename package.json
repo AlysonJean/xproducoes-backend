@@ -11,6 +11,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
+    "prisma:sync": "ts-node sync-app-settings.ts",
     "test": "node -e \"if(process.env.NODE_ENV==='production'){console.log('❌ Testes não são executados em produção');process.exit(1);}else{require('jest').run(['--runInBand']);}\"",
     "test:dev": "jest --runInBand",
     "test:watch": "jest --watch",
