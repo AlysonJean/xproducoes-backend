@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "npx prisma generate && tsc",
+    "migrate:baseline": "npx prisma migrate resolve --applied 20250906134342_init && npx prisma migrate deploy",
     "start": "node dist/index.js",
     "start:prod": "node dist/index.js",
     "prisma:generate": "prisma generate",
@@ -24,6 +25,7 @@
     "predeploy": "npm run check-env",
     "generate-ssl": "node scripts/generate-ssl-cert.js"
   },
+  "_comment_prisma": "NOTA: A propriedade 'prisma' está deprecated no Prisma 7, mas ainda não há suporte oficial para prisma.config.ts. Migrar quando o Prisma 7 for lançado.",
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
   },
