@@ -1,8 +1,9 @@
-import nodemailer, { Transporter } from 'nodemailer';
+import nodemailer from 'nodemailer';
 import { EmailTemplates } from '../templates/emailTemplates';
 
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : undefined;
+const SMTP_SECURE = process.env.SMTP_SECURE === 'true' || SMTP_PORT === 465;
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
 const EMAIL_FROM = process.env.EMAIL_FROM || process.env.SMTP_USER;
@@ -20,7 +21,7 @@ export class EmailService {
       this.transporter = nodemailer.createTransport({
         host: SMTP_HOST,
         port: SMTP_PORT,
-        secure: SMTP_PORT === 465,
+        secure: SMTP_SECURE, // true para porta 465 (SSL), false para 587 (TLS)
         auth: { user: SMTP_USER, pass: SMTP_PASS },
       });
     }
