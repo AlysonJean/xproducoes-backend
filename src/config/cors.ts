@@ -2,14 +2,22 @@ import { Request, Response, NextFunction } from "express";
 
 
 
-// Sempre permite localhost:3000 e 3001 em dev (Vite pode usar qualquer porta)
+// Sempre permite localhost em dev
 const defaultOrigins = ["http://localhost:3000", "http://localhost:3001", "http://localhost:5173"];
+
+// Origens de produção conhecidas
+const productionOrigins = [
+  "https://xproducoeseeventos.com.br",
+  "https://www.xproducoeseeventos.com.br"
+];
+
 export const allowedOrigins = [
   ...defaultOrigins,
+  ...productionOrigins,
   ...((process.env.FRONTEND_URL || "")
     .split(",")
     .map((url) => url.trim())
-    .filter((url) => url && !defaultOrigins.includes(url))),
+    .filter((url) => url && !defaultOrigins.includes(url) && !productionOrigins.includes(url))),
 ].filter((url) => url); // Remove any empty strings
 
 export function dynamicCors(req: Request, res: Response, next: NextFunction) {
