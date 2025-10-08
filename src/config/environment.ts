@@ -32,7 +32,7 @@ export const config = {
     pass: process.env.SMTP_PASS || undefined,
   },
   ssl: {
-    enabled: process.env.HTTPS_ENABLED === 'true' || process.env.NODE_ENV === 'production',
+    enabled: (process.env.HTTPS_ENABLED === 'true' || process.env.NODE_ENV === 'production') && process.env.RENDER !== 'true',
     keyPath: process.env.SSL_KEY_PATH || undefined,
     certPath: process.env.SSL_CERT_PATH || undefined,
     caPath: process.env.SSL_CA_PATH || undefined,
@@ -49,8 +49,9 @@ function validateCritical() {
   if (!config.databaseUrl) criticalMissing.push('DATABASE_URL');
   if (!config.jwtSecret) criticalMissing.push('JWT_SECRET');
 
-  // Verificar SSL em produção
-  if (process.env.NODE_ENV === 'production' && config.ssl.enabled) {
+  // Verificar SSL em produção (exceto no Render que fornece SSL via proxy)
+  const isRender = process.env.RENDER === 'true';
+  if (process.env.NODE_ENV === 'production' && config.ssl.enabled && !isRender) {
     if (!config.ssl.certPath || !config.ssl.keyPath) {
       criticalMissing.push('SSL_CERT_PATH and SSL_KEY_PATH (required for HTTPS in production)');
     }
