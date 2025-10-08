@@ -58,7 +58,7 @@ export async function getTotalUsers() {
 }
 
 // Métodos adicionais para o authService
-export async function requestPasswordReset(email: string) {
+export async function requestPasswordReset(email: string, ipAddress?: string, userAgent?: string) {
   // Segurança: não revelar se o usuário existe. Sempre retornar sucesso para
   // evitar enumeração de contas por e-mail.
   const user = await prisma.user.findUnique({ where: { email } });
@@ -69,11 +69,11 @@ export async function requestPasswordReset(email: string) {
     } catch {
       // noop
     }
-  // Não vazar resetToken via API (melhor prática)
-  return { success: true };
+    // Não vazar resetToken via API (melhor prática)
+    return { success: true };
   }
 
-  // Gerar token de reset
+  // Gerar token de reset (mais seguro - 64 caracteres)
   const resetToken = crypto.randomBytes(32).toString("hex");
   const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hora
 
@@ -89,7 +89,13 @@ export async function requestPasswordReset(email: string) {
   try {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
     const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
-    await (await import('./emailService')).default.sendPasswordResetEmail(user.email, user.name || '', resetUrl);
+    await (await import('./emailService')).default.sendPasswordResetEmail(
+      user.email, 
+      user.name || 'Usuário', 
+      resetUrl,
+      ipAddress,
+      userAgent
+    );
   } catch (e) {
     console.warn('Falha ao enviar email de reset:', e);
   }
@@ -339,7 +345,7 @@ export async function forgotPassword(email: string) {
   return true;
 }
 
-export async function resetPassword(token: string, newPassword: string) {
+export async function resetPassword(token: string, newPassword: string, ipAddress?: string) {
   const user = await prisma.user.findFirst({
     where: {
       passwordResetToken: token,
@@ -347,6 +353,7 @@ export async function resetPassword(token: string, newPassword: string) {
     },
   });
   if (!user) throw new Error("Token inválido ou expirado");
+  
   const hash = await bcrypt.hash(newPassword, 10);
   await prisma.user.update({
     where: { id: user.id },
@@ -356,6 +363,18 @@ export async function resetPassword(token: string, newPassword: string) {
       passwordResetTokenExpiry: null,
     },
   });
+  
+  // Enviar email de confirmação de alteração de senha
+  try {
+    await (await import('./emailService')).default.sendPasswordChangedEmail(
+      user.email,
+      user.name || 'Usuário',
+      ipAddress
+    );
+  } catch (e) {
+    console.warn('Falha ao enviar email de confirmação:', e);
+  }
+  
   return true;
 }
 

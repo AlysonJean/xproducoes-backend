@@ -19,12 +19,12 @@ export class AuthService {
     });
   }
 
-  async requestPasswordReset(email: string) {
-    return userService.requestPasswordReset(email);
+  async requestPasswordReset(email: string, ipAddress?: string, userAgent?: string) {
+    return userService.requestPasswordReset(email, ipAddress, userAgent);
   }
 
-  async resetPassword(token: string, newPassword: string) {
-    return userService.resetPassword(token, newPassword);
+  async resetPassword(token: string, newPassword: string, ipAddress?: string) {
+    return userService.resetPassword(token, newPassword, ipAddress);
   }
 
   async getProfile(userId: string) {

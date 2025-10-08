@@ -1,10 +1,12 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { Transporter } from 'nodemailer';
+import { EmailTemplates } from '../templates/emailTemplates';
 
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : undefined;
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
-const FROM = process.env.EMAIL_FROM || (SMTP_USER || 'no-reply@xproducoes.local');
+const EMAIL_FROM = process.env.EMAIL_FROM || process.env.SMTP_USER;
+const FROM = EMAIL_FROM || SMTP_USER;
 
 export class EmailService {
   private transporter?: nodemailer.Transporter;
@@ -65,11 +67,31 @@ export class EmailService {
     return this.sendMail(to, subject, html, text);
   }
 
-  async sendPasswordResetEmail(email: string, name: string, resetUrl: string) {
-    const subject = 'Recuperação de Senha - X-Produções';
-    const html = `<p>Olá, ${name}!</p><p>Clique no link abaixo para criar uma nova senha:</p><p><a href="${resetUrl}">Redefinir Senha</a></p><p>Este link é válido por 1 hora.</p>`;
-    const text = `Redefinir senha: ${resetUrl}`;
-    return this.sendMail(email, subject, html, text);
+  async sendPasswordResetEmail(
+    email: string, 
+    name: string, 
+    resetUrl: string,
+    ipAddress?: string,
+    userAgent?: string
+  ) {
+    const template = EmailTemplates.passwordReset({
+      userName: name,
+      resetUrl,
+      expiresIn: '1 hora',
+      ipAddress,
+      userAgent
+    });
+    
+    return this.sendMail(email, template.subject, template.html, template.text);
+  }
+
+  async sendPasswordChangedEmail(
+    email: string,
+    name: string,
+    ipAddress?: string
+  ) {
+    const template = EmailTemplates.passwordChanged(name, ipAddress);
+    return this.sendMail(email, template.subject, template.html, template.text);
   }
 
   // métodos auxiliares para notificações podem ser adicionados aqui

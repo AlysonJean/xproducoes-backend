@@ -75,7 +75,9 @@ export class AuthController {
   ): Promise<void> => {
     try {
       const { email } = req.body;
-      const result = await this.authService.requestPasswordReset(email);
+      const ipAddress = req.ip || req.socket.remoteAddress || undefined;
+      const userAgent = req.get('user-agent') || undefined;
+      const result = await this.authService.requestPasswordReset(email, ipAddress, userAgent);
       res.status(200).json(result);
     } catch (error) {
       next(error);
@@ -89,7 +91,8 @@ export class AuthController {
   ): Promise<void> => {
     try {
       const { token, password } = req.body;
-      const result = await this.authService.resetPassword(token, password);
+      const ipAddress = req.ip || req.socket.remoteAddress || undefined;
+      const result = await this.authService.resetPassword(token, password, ipAddress);
       res.status(200).json(result);
     } catch (error) {
       next(error);
