@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "npx prisma generate && tsc",
-    "migrate:baseline": "npx prisma migrate resolve --applied 20250906134342_init && npx prisma migrate deploy",
+    "migrate:baseline": "npx prisma migrate resolve --applied 20250906134342_init && npx prisma migrate resolve --applied 20250906_create_messaging_tables && npx prisma migrate deploy",
     "start": "node dist/index.js",
     "start:prod": "node dist/index.js",
     "prisma:generate": "prisma generate",
