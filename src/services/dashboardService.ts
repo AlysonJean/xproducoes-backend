@@ -1,6 +1,8 @@
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { prisma } from "../config/prisma";
 import { BookingService } from "./bookingService";
+import logger from "../config/logger";
+
 
 export class DashboardService {
 
@@ -463,7 +465,7 @@ export class DashboardService {
 
       return monthlyData;
     } catch (error) {
-      console.error('Erro ao buscar receita mensal:', error);
+      logger.error({obj:error}, 'Erro ao buscar receita mensal:');
       // Dados mock em caso de erro
       return Array.from({ length: 12 }, (_, i) => ({
         month: i + 1,

@@ -1,3 +1,5 @@
+import logger from "./config/logger";
+
 /**
  * ✅ PRISMA QUERY OPTIMIZER - ENTERPRISE PERFORMANCE
  * Helper para otimização de queries do Prisma com includes seletivos
@@ -311,7 +313,7 @@ export class PrismaQueryOptimizer {
 
       // Log apenas queries lentas (>500ms)
       if (duration > 500) {
-        console.warn(`Slow query detected: ${queryName} - ${duration}ms`, {
+        logger.warn(`Slow query detected: ${queryName} - ${duration}ms`, {
           query: queryName,
           duration,
           timestamp: new Date().toISOString(),
@@ -321,7 +323,7 @@ export class PrismaQueryOptimizer {
       return result;
     } catch (error) {
       const duration = Date.now() - startTime;
-      console.error(`Query failed: ${queryName} - ${duration}ms`, {
+      logger.error(`Query failed: ${queryName} - ${duration}ms`, {
         query: queryName,
         duration,
         error: error instanceof Error ? error.message : error,

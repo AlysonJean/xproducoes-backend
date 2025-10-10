@@ -24,13 +24,13 @@ import {
   getCollaboratorAvailabilities,
 } from "../controllers/collaboratorController";
 import { sendInvite } from '../controllers/inviteController';
-import { authMiddleware, adminOrCollaborator } from "../middlewares/authMiddleware";
+import { authenticate, requireAdminOrCollaborator } from "../middlewares/unifiedAuth";
 import { ensureAdmin } from "../config/ensureAdmin";
 
 const router: RouterType = Router();
 
 // Todas as rotas requerem autenticação
-router.use(authMiddleware);
+router.use(authenticate);
 
 // Rotas de CRUD de Colaboradores (apenas admin)
 router.post("/", ensureAdmin, createCollaborator);
@@ -47,10 +47,10 @@ router.delete("/:id", ensureAdmin, deleteCollaborator);
 router.get("/:id/stats", getCollaboratorStats);
 router.get("/:collaboratorId/events", getCollaboratorEvents);
 // Dashboard do colaborador (me)
-router.get('/me/dashboard', adminOrCollaborator, getMyDashboard);
+router.get('/me/dashboard', requireAdminOrCollaborator, getMyDashboard);
 // Perfil do colaborador (me)
-router.get('/me/profile', adminOrCollaborator, getMyProfile);
-router.put('/me/profile', adminOrCollaborator, updateMyProfile);
+router.get('/me/profile', requireAdminOrCollaborator, getMyProfile);
+router.put('/me/profile', requireAdminOrCollaborator, updateMyProfile);
 
 // Rotas de gestão de eventos
 router.post("/event-assignments", ensureAdmin, assignCollaboratorToEvent);

@@ -1,5 +1,7 @@
 import multer from "multer";
 import cloudinary from "../config/cloudinary";
+import logger from "../config/logger";
+
 
 export class UploadService {
   
@@ -16,11 +18,11 @@ export class UploadService {
   }
 
   private imageFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-    console.log('[ImageFilter] Checking file:', {
+    logger.info({obj:{
       originalname: file.originalname,
       mimetype: file.mimetype,
       size: file.size
-    });
+    }}, '[ImageFilter] Checking file:');
     
     const isValidImage = file.mimetype.startsWith("image/") || 
                         file.originalname.toLowerCase().endsWith('.svg') ||
@@ -28,16 +30,16 @@ export class UploadService {
                         file.mimetype === 'application/xml' ||
                         file.mimetype === 'application/svg+xml';
     
-    console.log('[ImageFilter] File validation result:', {
+    logger.info({obj:{
       isValidImage,
       mimetype: file.mimetype,
       originalname: file.originalname
-    });
+    }}, '[ImageFilter] File validation result:');
     
     if (isValidImage) {
       cb(null, true);
     } else {
-      console.error('[ImageFilter] File rejected:', file.mimetype);
+      logger.error({obj:file.mimetype}, '[ImageFilter] File rejected:');
       cb(new Error("Apenas arquivos de imagem são permitidos (PNG, JPEG, SVG)"));
     }
   };
@@ -54,12 +56,12 @@ export class UploadService {
         file.mimetype === 'image/svg+xml' ||
         (file.originalname && file.originalname.toLowerCase().endsWith('.svg'));
 
-      console.log('[UploadService] File info:', {
+      logger.info({obj:{
         originalname: file.originalname,
         mimetype: file.mimetype,
         size: file.size,
         isSvg: isSvg
-      });
+      }}, '[UploadService] File info:');
 
       // Base options
       const baseOptions: any = {
@@ -90,7 +92,7 @@ export class UploadService {
       // Prepare buffer for upload; sanitize SVGs synchronously before creating stream
       let bufferToSend = file.buffer;
       if (isSvg) {
-        console.log('[UploadService] Processing SVG file');
+        logger.info('[UploadService] Processing SVG file');
         try {
           // dynamic import but executed before upload stream and using promise chain
           const jsdomMod = require('jsdom');
@@ -100,18 +102,18 @@ export class UploadService {
           const window = new JSDOM('').window;
           const DOMPurify = createDOMPurify(window);
           const svgText = file.buffer.toString('utf8');
-          console.log('[UploadService] Original SVG length:', svgText.length);
+          logger.info({obj:svgText.length}, '[UploadService] Original SVG length:');
           const clean = DOMPurify.sanitize(svgText, { USE_PROFILES: { svg: true } });
-          console.log('[UploadService] Sanitized SVG length:', clean.length);
+          logger.info({obj:clean.length}, '[UploadService] Sanitized SVG length:');
           bufferToSend = Buffer.from(clean, 'utf8');
         } catch (sanErr) {
-          console.error('[UploadService] SVG sanitization failed:', sanErr);
+          logger.error({obj:sanErr}, '[UploadService] SVG sanitization failed:');
           reject(new Error('SVG sanitization failed'));
           return;
         }
       }
 
-      console.log('[UploadService] Starting Cloudinary upload with options:', isSvg ? svgOptions : rasterOptions);
+      logger.info({obj:isSvg ? svgOptions : rasterOptions}, '[UploadService] Starting Cloudinary upload with options:');
 
       const uploadStream = cloudinary.uploader.upload_stream(
         isSvg ? svgOptions : rasterOptions,
@@ -119,21 +121,21 @@ export class UploadService {
           if (error) {
             // Log detalhado do erro do Cloudinary para diagnóstico
             // Não loga buffer nem secrets
-            console.error('[Cloudinary] Upload error:', {
+            logger.error({obj:{
               name: error?.name,
               message: error?.message,
               http_code: error?.http_code,
-            });
+            }}, '[Cloudinary] Upload error:');
             const message = error?.message || 'Erro no upload da imagem';
             reject(new Error(message));
             return;
           }
           if (!result?.secure_url) {
-            console.error('[Cloudinary] Upload sem secure_url no resultado');
+            logger.error('[Cloudinary] Upload sem secure_url no resultado');
             reject(new Error('Falha ao obter URL segura do Cloudinary'));
             return;
           }
-          console.log('[UploadService] Upload successful:', result.secure_url);
+          logger.info({obj:result.secure_url}, '[UploadService] Upload successful:');
           resolve(result.secure_url);
         },
       );

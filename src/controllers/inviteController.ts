@@ -3,6 +3,8 @@ import { prisma } from '../config/database';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import { sendMail } from '../services/mailerService';
+import logger from "../config/logger";
+
 
 const INVITE_EXPIRATION_HOURS = parseInt(process.env.INVITE_EXPIRATION_HOURS || '72', 10);
 
@@ -33,7 +35,7 @@ export async function sendInvite(req: Request, res: Response) {
 
     return res.status(201).json({ success: true, data: { inviteId: invite.id }, message: 'Convite enviado' });
   } catch (error) {
-    console.error('Erro ao enviar convite:', error);
+    logger.error({obj:error}, 'Erro ao enviar convite:');
     return res.status(500).json({ success: false, message: 'Erro ao enviar convite' });
   }
 }
@@ -94,7 +96,7 @@ export async function registerFromInvite(req: Request, res: Response) {
 
     return res.status(201).json({ success: true, data: { userId: user.id }, message: 'Registro concluído' });
   } catch (error) {
-    console.error('Erro ao registrar a partir do convite:', error);
+    logger.error({obj:error}, 'Erro ao registrar a partir do convite:');
     return res.status(500).json({ success: false, message: 'Erro ao registrar' });
   }
 }

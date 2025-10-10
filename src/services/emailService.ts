@@ -1,5 +1,7 @@
 import nodemailer from 'nodemailer';
 import { EmailTemplates } from '../templates/emailTemplates';
+import logger from "../config/logger";
+
 
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : undefined;
@@ -39,9 +41,9 @@ export class EmailService {
           secure: false,
           auth: { user: testAccount.user, pass: testAccount.pass },
         });
-        console.info('Ethereal account created for emails:', testAccount.user);
+        logger.info({obj:testAccount.user}, 'Ethereal account created for emails:');
       } catch (e) {
-        console.warn('Failed to create Ethereal account, keeping jsonTransport', e);
+        logger.warn({obj:e}, 'Failed to create Ethereal account, keeping jsonTransport');
       }
     }
     // if not using ethereal and transporter is still jsonTransport, keep it
@@ -54,7 +56,7 @@ export class EmailService {
     const info = await this.transporter.sendMail({ from: FROM, to, subject, html, text });
     try {
       const url = nodemailer.getTestMessageUrl(info);
-      if (url) console.info('Preview URL:', url);
+      if (url) logger.info({obj:url}, 'Preview URL:');
     } catch {
       // ignore
     }

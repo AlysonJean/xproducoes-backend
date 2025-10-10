@@ -1,6 +1,6 @@
 import { Router, type Router as RouterType } from "express";
 import { profileController } from "../controllers/profileController";
-import { authenticate } from "../middlewares/auth";
+import { authenticate } from "../middlewares/unifiedAuth";
 
 const router: RouterType = Router();
 

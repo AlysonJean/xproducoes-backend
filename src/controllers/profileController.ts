@@ -22,6 +22,8 @@ interface AuthRequest extends Request {
 }
 import * as clientService from "../services/clientService";
 import { prisma } from "../config/prisma";
+import logger from "../config/logger";
+
 
 export class ProfileController {
   // Buscar perfil completo do usuário
@@ -58,7 +60,7 @@ export class ProfileController {
 
       return res.json(user);
     } catch (error) {
-      console.error("Erro ao buscar perfil:", error);
+      logger.error({obj:error}, "Erro ao buscar perfil:");
       return res.status(500).json({ message: "Erro interno do servidor" });
     }
   }
@@ -90,7 +92,7 @@ export class ProfileController {
 
       return res.json(updatedUser);
     } catch (error) {
-      console.error("Erro ao atualizar perfil:", error);
+      logger.error({obj:error}, "Erro ao atualizar perfil:");
       return res.status(500).json({ message: "Erro interno do servidor" });
     }
   }
@@ -138,7 +140,7 @@ export class ProfileController {
 
       return res.json(collaborators);
     } catch (error) {
-      console.error("Erro ao buscar colaboradores:", error);
+      logger.error({obj:error}, "Erro ao buscar colaboradores:");
       return res.status(500).json({ message: "Erro interno do servidor" });
     }
   }
@@ -185,7 +187,7 @@ export class ProfileController {
 
       return res.json(collaborator);
     } catch (error) {
-      console.error("Erro ao buscar detalhes do colaborador:", error);
+      logger.error({obj:error}, "Erro ao buscar detalhes do colaborador:");
       return res.status(500).json({ message: "Erro interno do servidor" });
     }
   }
@@ -231,7 +233,7 @@ export class ProfileController {
 
       return res.json(updatedProfile);
     } catch (error) {
-      console.error("Erro ao atualizar perfil de colaborador:", error);
+      logger.error({obj:error}, "Erro ao atualizar perfil de colaborador:");
       return res.status(500).json({ message: "Erro interno do servidor" });
     }
   }
@@ -250,7 +252,7 @@ export class ProfileController {
       const updatedProfile = await clientService.updateClientProfileByUserId(userId, parsed.data);
       return res.json(updatedProfile);
     } catch (error) {
-      console.error("Erro ao atualizar perfil de cliente:", error);
+      logger.error({obj:error}, "Erro ao atualizar perfil de cliente:");
       return res.status(500).json({ message: "Erro interno do servidor" });
     }
   }
@@ -280,7 +282,7 @@ export class ProfileController {
         "Portfolio functionality not implemented - PortfolioItem model missing from schema",
       );
     } catch (error) {
-      console.error("Erro ao adicionar item ao portfolio:", error);
+      logger.error({obj:error}, "Erro ao adicionar item ao portfolio:");
       return res.status(500).json({ message: "Erro interno do servidor" });
     }
   }
@@ -292,7 +294,7 @@ export class ProfileController {
       const clients = await clientService.listClientsWithProfiles({ industry, companySize, location });
       return res.json(clients);
     } catch (error) {
-      console.error("Erro ao buscar clientes:", error);
+      logger.error({obj:error}, "Erro ao buscar clientes:");
       return res.status(500).json({ message: "Erro interno do servidor" });
     }
   }

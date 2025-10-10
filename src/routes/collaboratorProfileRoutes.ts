@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { prisma } from '../config/prisma';
-import { authenticate } from '../middlewares/auth';
-import { requireCollaborator } from '../middlewares/auth';
+import { authenticate } from "../middlewares/unifiedAuth";
+import { requireCollaborator } from "../middlewares/unifiedAuth";
+import logger from "../config/logger";
+
 
 const router = Router();
 
@@ -46,7 +48,7 @@ router.get('/me/profile', async (req, res) => {
 
     res.json(collaborator);
   } catch (error) {
-    console.error('Erro ao obter perfil:', error);
+    logger.error({obj:error}, 'Erro ao obter perfil:');
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -116,7 +118,7 @@ router.put('/me/profile', async (req, res) => {
 
     res.json(collaborator);
   } catch (error) {
-    console.error('Erro ao atualizar perfil:', error);
+    logger.error({obj:error}, 'Erro ao atualizar perfil:');
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -134,7 +136,7 @@ router.post('/me/avatar', async (req, res) => {
     // Por enquanto, apenas retorna sucesso
     res.json({ message: 'Avatar atualizado com sucesso' });
   } catch (error) {
-    console.error('Erro ao fazer upload do avatar:', error);
+    logger.error({obj:error}, 'Erro ao fazer upload do avatar:');
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -156,7 +158,7 @@ router.get('/me/portfolio', async (req, res) => {
     // Por enquanto, retorna array vazio
     res.json([]);
   } catch (error) {
-    console.error('Erro ao obter portfólio:', error);
+    logger.error({obj:error}, 'Erro ao obter portfólio:');
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -174,7 +176,7 @@ router.post('/me/portfolio', async (req, res) => {
     // TODO: Implementar criação de item do portfólio
     res.status(201).json({ message: 'Item adicionado ao portfólio' });
   } catch (error) {
-    console.error('Erro ao adicionar item ao portfólio:', error);
+    logger.error({obj:error}, 'Erro ao adicionar item ao portfólio:');
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -193,7 +195,7 @@ router.put('/me/portfolio/:id', async (req, res) => {
     // TODO: Implementar atualização de item do portfólio
     res.json({ message: 'Item do portfólio atualizado' });
   } catch (error) {
-    console.error('Erro ao atualizar item do portfólio:', error);
+    logger.error({obj:error}, 'Erro ao atualizar item do portfólio:');
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -211,7 +213,7 @@ router.delete('/me/portfolio/:id', async (req, res) => {
     // TODO: Implementar remoção de item do portfólio
     res.json({ message: 'Item removido do portfólio' });
   } catch (error) {
-    console.error('Erro ao remover item do portfólio:', error);
+    logger.error({obj:error}, 'Erro ao remover item do portfólio:');
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -247,7 +249,7 @@ router.get('/me/settings', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Erro ao obter configurações:', error);
+    logger.error({obj:error}, 'Erro ao obter configurações:');
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -265,7 +267,7 @@ router.put('/me/settings', async (req, res) => {
     // TODO: Implementar atualização de configurações
     res.json({ message: 'Configurações atualizadas' });
   } catch (error) {
-    console.error('Erro ao atualizar configurações:', error);
+    logger.error({obj:error}, 'Erro ao atualizar configurações:');
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -314,7 +316,7 @@ router.get('/me/stats', async (req, res) => {
 
     res.json(stats);
   } catch (error) {
-    console.error('Erro ao obter estatísticas:', error);
+    logger.error({obj:error}, 'Erro ao obter estatísticas:');
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -345,7 +347,7 @@ router.get('/me/availability', async (req, res) => {
 
     res.json(collaborator.availabilities);
   } catch (error) {
-    console.error('Erro ao obter disponibilidade:', error);
+    logger.error({obj:error}, 'Erro ao obter disponibilidade:');
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -363,7 +365,7 @@ router.put('/me/availability', async (req, res) => {
     // TODO: Implementar atualização de disponibilidade
     res.json({ message: 'Disponibilidade atualizada' });
   } catch (error) {
-    console.error('Erro ao atualizar disponibilidade:', error);
+    logger.error({obj:error}, 'Erro ao atualizar disponibilidade:');
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -427,7 +429,7 @@ router.get('/me/reviews', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Erro ao obter avaliações:', error);
+    logger.error({obj:error}, 'Erro ao obter avaliações:');
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -446,7 +448,7 @@ router.post('/me/reviews/:reviewId/respond', async (req, res) => {
     // TODO: Implementar resposta a avaliação
     res.json({ message: 'Resposta enviada' });
   } catch (error) {
-    console.error('Erro ao responder avaliação:', error);
+    logger.error({obj:error}, 'Erro ao responder avaliação:');
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });

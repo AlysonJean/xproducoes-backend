@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { ChecklistController } from '../controllers/checklistController';
-import authMiddleware from '../middlewares/authAdvanced';
+import unifiedAuth from "../middlewares/unifiedAuth";
 
 const router = Router();
 
 // Middleware de autenticação para todas as rotas
-router.use(authMiddleware.authenticateToken);
+router.use(unifiedAuth.authenticateToken);
 
 // ================================
 // ROTAS PARA COLABORADORES
@@ -28,21 +28,21 @@ router.put('/:id/status', ChecklistController.updateChecklistStatus);
 // ================================
 
 // Buscar todos os checklists (admin)
-router.get('/', authMiddleware.requireManager, ChecklistController.getAllChecklists);
+router.get('/', unifiedAuth.requireManager, ChecklistController.getAllChecklists);
 
 // Criar novo checklist
-router.post('/', authMiddleware.requireManager, ChecklistController.createChecklist);
+router.post('/', unifiedAuth.requireManager, ChecklistController.createChecklist);
 
 // Atualizar checklist
-router.put('/:id', authMiddleware.requireManager, ChecklistController.updateChecklist);
+router.put('/:id', unifiedAuth.requireManager, ChecklistController.updateChecklist);
 
 // Deletar checklist
-router.delete('/:id', authMiddleware.requireManager, ChecklistController.deleteChecklist);
+router.delete('/:id', unifiedAuth.requireManager, ChecklistController.deleteChecklist);
 
 // Atribuir checklist a usuários
-router.post('/:checklistId/assign', authMiddleware.requireManager, ChecklistController.assignChecklist);
+router.post('/:checklistId/assign', unifiedAuth.requireManager, ChecklistController.assignChecklist);
 
 // Remover atribuição de checklist
-router.delete('/:checklistId/assign/:userId', authMiddleware.requireManager, ChecklistController.unassignChecklist);
+router.delete('/:checklistId/assign/:userId', unifiedAuth.requireManager, ChecklistController.unassignChecklist);
 
 export default router;

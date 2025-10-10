@@ -1,3 +1,8 @@
+/**
+ * @deprecated Este arquivo foi consolidado em unifiedAuth.ts
+ * Use: import { authenticate, requireCollaborator, requireRole } from "../middlewares/unifiedAuth"
+ */
+
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { UserRole } from "@prisma/client";
@@ -34,7 +39,7 @@ export const authenticate = async (
       req.userId = decoded.userId;
       req.userRole = decoded.role;
       return next();
-    } catch (jwtError) {
+    } catch {
       return res.status(401).json({ message: "Token de autorização inválido" });
     }
   } catch (error) {

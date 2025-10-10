@@ -6,6 +6,8 @@ import { uploadSingle } from '../middlewares/upload';
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
 import { uploadLogo } from '../controllers/logoController';
 import { safeFetch } from '../utils/safeFetch';
+import logger from "../config/logger";
+
 // Import jsdom/dompurify dinamicamente dentro do handler to avoid startup errors
 
 const router = Router();
@@ -88,13 +90,13 @@ router.get('/svg-proxy', uploadRateLimit, async (req: Request, res: Response) =>
 
 			for (const a of addresses) {
 				if (isPrivate(a.address)) {
-					console.warn('[SSRF] Rejected request - hostname resolves to private IP', { hostname: parsed.hostname, address: a.address });
+					logger.warn({obj:{ hostname: parsed.hostname, address: a.address }}, '[SSRF] Rejected request - hostname resolves to private IP');
 					return res.status(400).send('Host resolves to internal address');
 				}
 			}
 		} catch (dnsErr) {
 			// Em caso de falha no DNS, recusar para evitar comportamento inseguro
-			console.error('DNS lookup failed for svg-proxy:', dnsErr);
+			logger.error({obj:dnsErr}, 'DNS lookup failed for svg-proxy:');
 			return res.status(400).send('DNS lookup failed');
 		}
 
@@ -110,11 +112,11 @@ router.get('/svg-proxy', uploadRateLimit, async (req: Request, res: Response) =>
 			upstreamResp = await safeFetch(url, { allowedHosts: allowedHosts });
 		} catch (err: any) {
 			if (err.message === 'Host not allowed' || err.message === 'Host resolves to internal address' || err.message === 'Redirect to unsupported protocol' || err.message === 'URL contains credentials which are not allowed' || err.message === 'Only https protocol allowed') {
-				console.warn('[SSRF] Rejected request in svg-proxy:', err.message);
+				logger.warn({obj:err.message}, '[SSRF] Rejected request in svg-proxy:');
 				return res.status(400).send(err.message);
 			}
 			if (err.name === 'AbortError') return res.status(504).send('Upstream request timed out');
-			console.error('Fetch error in svg-proxy:', err);
+			logger.error({obj:err}, 'Fetch error in svg-proxy:');
 			return res.status(502).send('Bad Gateway');
 		}
 		const upstream = upstreamResp;
@@ -167,7 +169,7 @@ router.get('/svg-proxy', uploadRateLimit, async (req: Request, res: Response) =>
 				return res.status(200).send(clean);
 			} catch (sanErr) {
 				// Se sanitização falhar por algum motivo, logar e retornar erro
-				console.error('SVG sanitization error:', sanErr);
+				logger.error({obj:sanErr}, 'SVG sanitization error:');
 				return res.status(500).send('SVG sanitization error');
 			}
 		}
@@ -181,7 +183,7 @@ router.get('/svg-proxy', uploadRateLimit, async (req: Request, res: Response) =>
 			const buffer = Buffer.from(arrayBuffer);
 			return res.status(200).send(buffer);
 		} catch (errBuffer) {
-			console.error('Error proxying image buffer:', errBuffer);
+			logger.error({obj:errBuffer}, 'Error proxying image buffer:');
 			return res.status(500).send('Proxy error');
 		}
 	} catch (e: any) {

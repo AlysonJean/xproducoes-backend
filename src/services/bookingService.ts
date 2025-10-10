@@ -677,7 +677,7 @@ export class BookingService {
             });
           } catch (e) {
             // Não bloquear toda operação se uma atribuição falhar
-            console.warn('Falha ao atribuir colaborador:', e);
+            logger.warn({ error: e }, 'Falha ao atribuir colaborador');
           }
         }
       }
@@ -695,7 +695,7 @@ export class BookingService {
           await EmailService.sendBookingConfirmation({ email: clientEmail, name: clientName }, bookingFull);
         }
       } catch (e) {
-        console.warn('Erro ao enviar email de confirmação:', e);
+        logger.warn({ error: e }, 'Erro ao enviar email de confirmação');
       }
 
       // Webhook: delegate to WebhookService for dispatching & persistence
@@ -704,7 +704,7 @@ export class BookingService {
         const bookingFull = await this.getBookingById(id);
         void WebhookService.dispatchBookingConfirmed(bookingFull);
       } catch (e) {
-        console.warn('Erro ao disparar webhook de confirmação (delegado):', e);
+        logger.warn({ error: e }, 'Erro ao disparar webhook de confirmação (delegado)');
       }
 
       return await this.getBookingById(id);

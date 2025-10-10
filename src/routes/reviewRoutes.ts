@@ -1,6 +1,7 @@
 import { Router, type Router as RouterType } from "express";
 import { ReviewController } from "../controllers/reviewController";
-import { authMiddleware, adminOnly } from "../middlewares/authMiddleware";
+import { authenticate, requireAdmin } from "../middlewares/unifiedAuth";
+import { reviewRateLimit } from "../middlewares/rateLimitMiddleware";
 
 const reviewRoutes: RouterType = Router();
 const reviewController = new ReviewController();
@@ -14,14 +15,14 @@ reviewRoutes.get("/equipment/:equipmentId", reviewController.getByEquipment);
 reviewRoutes.get("/stats", reviewController.getStats);
 reviewRoutes.get("/recent", reviewController.getRecent);
 
-// Rotas protegidas
-reviewRoutes.post("/", authMiddleware, reviewController.create);
-reviewRoutes.get("/user/:userId", authMiddleware, reviewController.getByUser);
-reviewRoutes.put("/:id", authMiddleware, reviewController.update);
-reviewRoutes.delete("/:id", authMiddleware, reviewController.delete);
+// Rotas protegidas (com rate limit anti-spam)
+reviewRoutes.post("/", authenticate, reviewRateLimit, reviewController.create);
+reviewRoutes.get("/user/:userId", authenticate, reviewController.getByUser);
+reviewRoutes.put("/:id", authenticate, reviewRateLimit, reviewController.update);
+reviewRoutes.delete("/:id", authenticate, reviewController.delete);
 
 // Rotas administrativas
-reviewRoutes.post("/:id/approve", authMiddleware, adminOnly, reviewController.approve);
-reviewRoutes.post("/:id/reject", authMiddleware, adminOnly, reviewController.reject);
+reviewRoutes.post("/:id/approve", authenticate, requireAdmin, reviewController.approve);
+reviewRoutes.post("/:id/reject", authenticate, requireAdmin, reviewController.reject);
 
 export default reviewRoutes;

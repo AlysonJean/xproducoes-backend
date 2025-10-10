@@ -2,14 +2,15 @@
 
 import { Router, type Router as RouterType } from "express";
 import { DashboardController } from "../controllers/dashboardController";
-import { authMiddleware, adminOnly } from "../middlewares/authMiddleware";
+import { authenticate, requireAdmin } from "../middlewares/unifiedAuth";
 import { cacheMiddleware } from "../middlewares/cacheMiddleware";
+import { dashboardRateLimit } from "../middlewares/rateLimitMiddleware";
 
 const dashboardRoutes: RouterType = Router();
 const dashboardController = new DashboardController();
 
-// Todas as rotas do dashboard requerem login de admin
-dashboardRoutes.use(authMiddleware, adminOnly);
+// Todas as rotas do dashboard requerem login de admin + rate limit
+dashboardRoutes.use(authenticate, requireAdmin, dashboardRateLimit);
 
 // Rotas com cache aplicado (ETAPA 2 - Performance)
 dashboardRoutes.get("/", cacheMiddleware, dashboardController.getStats);

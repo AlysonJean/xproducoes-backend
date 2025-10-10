@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import multer from "multer";
 import { UploadService } from '../services/uploadService';
+import logger from "../config/logger";
+
 
 const uploadService = new UploadService();
 
@@ -12,19 +14,19 @@ export const uploadSingle = (fieldName: string = 'image') => {
   const middleware = multerConfig.single(fieldName);
   
   return (req: Request, res: Response, next: NextFunction) => {
-    console.log(`[UploadMiddleware] Processing ${fieldName} upload`);
-    console.log('[UploadMiddleware] Request headers:', {
+    logger.info(`[UploadMiddleware] Processing ${fieldName} upload`);
+    logger.info({obj:{
       'content-type': req.headers['content-type'],
       'content-length': req.headers['content-length']
-    });
+    }}, '[UploadMiddleware] Request headers:');
     
     middleware(req, res, (err: any) => {
       if (err) {
-        console.error('[UploadMiddleware] Multer error:', {
+        logger.error({obj:{
           name: err.name,
           message: err.message,
           code: err.code
-        });
+        }}, '[UploadMiddleware] Multer error:');
         
         if (err instanceof multer.MulterError) {
           if (err.code === 'LIMIT_FILE_SIZE') {
@@ -37,12 +39,12 @@ export const uploadSingle = (fieldName: string = 'image') => {
         return res.status(400).json({ error: err.message || 'Tipo de arquivo não permitido.' });
       }
       
-      console.log('[UploadMiddleware] File processed successfully:', {
+      logger.info({obj:{
         fieldname: req.file?.fieldname,
         originalname: req.file?.originalname,
         mimetype: req.file?.mimetype,
         size: req.file?.size
-      });
+      }}, '[UploadMiddleware] File processed successfully:');
       
       next();
     });

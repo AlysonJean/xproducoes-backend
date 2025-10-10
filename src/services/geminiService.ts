@@ -2,6 +2,8 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { prisma } from "../config/prisma";
+import logger from "../config/logger";
+
 
 // Validate API key presence
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
@@ -12,11 +14,11 @@ if (GEMINI_KEY) {
   try {
     genAI = new GoogleGenerativeAI(GEMINI_KEY);
   } catch (e) {
-    console.error('Falha ao inicializar Gemini client:', e);
+    logger.error({obj:e}, 'Falha ao inicializar Gemini client:');
     genAI = null;
   }
 } else {
-  console.warn('GEMINI_API_KEY não configurada. Gemini estará desativado. Para habilitar, configure GEMINI_API_KEY no ambiente.');
+  logger.warn('GEMINI_API_KEY não configurada. Gemini estará desativado. Para habilitar, configure GEMINI_API_KEY no ambiente.');
 }
 
 export class GeminiService {
@@ -24,7 +26,7 @@ export class GeminiService {
     // If no key and mock fallback enabled, return a safe mocked suggestion for local dev
     if (!genAI) {
       if (USE_MOCK_FALLBACK) {
-        console.info('GEMINI chave ausente: usando fallback mock (GEMINI_MOCK_FALLBACK=true)');
+        logger.info('GEMINI chave ausente: usando fallback mock (GEMINI_MOCK_FALLBACK=true)');
         return "Que tal uma 'Festa Acústica ao Entardecer'? Use nosso kit acústico, iluminação suave e um pequeno palco para criar um clima intimista e inesquecível.";
       }
       // Otherwise throw a clear error for operators/developers
@@ -78,8 +80,7 @@ export class GeminiService {
       return text;
     } catch (error: any) {
       // Detect common API errors to provide actionable logs
-      console.error('Erro ao comunicar com a API Gemini:',
-        typeof error === 'object' && error !== null ? error.message || error : error);
+      logger.error({obj:typeof error === 'object' && error !== null ? error.message || error : error}, 'Erro ao comunicar com a API Gemini:');
 
       // If the underlying error from Google contains structured details, try to surface a friendly message
       try {
@@ -88,7 +89,7 @@ export class GeminiService {
           // If the error indicates invalid API key, log a clear instruction
           const isApiKeyInvalid = JSON.stringify(details).includes('API_KEY_INVALID');
           if (isApiKeyInvalid) {
-            console.error('Gemini API retornou API_KEY_INVALID. Verifique se GEMINI_API_KEY está correta e ativa no console do Google Cloud.');
+            logger.error('Gemini API retornou API_KEY_INVALID. Verifique se GEMINI_API_KEY está correta e ativa no console do Google Cloud.');
           }
         }
       } catch {

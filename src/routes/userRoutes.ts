@@ -1,6 +1,6 @@
 import { Router } from "express";
 import * as userController from "../controllers/userController";
-import { authMiddleware } from "../middlewares/authMiddleware";
+import { authenticate } from "../middlewares/unifiedAuth";
 import { uploadSingle } from "../middlewares/upload";
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
 
@@ -9,17 +9,17 @@ const userRoutes = Router();
 userRoutes.post("/register", userController.register);
 userRoutes.post("/login", userController.login);
 
-userRoutes.get("/profile", authMiddleware, userController.getProfile);
+userRoutes.get("/profile", authenticate, userController.getProfile);
 userRoutes.put(
   "/profile",
-  authMiddleware,
+  authenticate,
   uploadRateLimit, uploadSingle("avatar"),
   require("../middlewares/upload").processUpload,
   userController.updateProfile,
 );
 
 // Rota temporária para favoritos (evitar 404)
-userRoutes.get("/favorites", authMiddleware, (req, res) => {
+userRoutes.get("/favorites", authenticate, (req, res) => {
   res.json({
     success: true,
     data: {
@@ -30,13 +30,13 @@ userRoutes.get("/favorites", authMiddleware, (req, res) => {
 });
 
 // Rota para estatísticas do usuário
-userRoutes.get("/stats", authMiddleware, userController.getStats);
+userRoutes.get("/stats", authenticate, userController.getStats);
 
 // Endpoint para promover usuário a VIP (verificação server-side)
-userRoutes.post("/promote-vip", authMiddleware, userController.promoteVip);
+userRoutes.post("/promote-vip", authenticate, userController.promoteVip);
 
 // Rota para alterar senha
-userRoutes.post("/change-password", authMiddleware, async (req, res) => {
+userRoutes.post("/change-password", authenticate, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     
@@ -61,9 +61,9 @@ userRoutes.post("/change-password", authMiddleware, async (req, res) => {
   }
 });
 
-userRoutes.get("/", authMiddleware, userController.listUsers);
+userRoutes.get("/", authenticate, userController.listUsers);
 // Alias para compatibilidade REST/testes
-userRoutes.get("/users", authMiddleware, userController.listUsers);
+userRoutes.get("/users", authenticate, userController.listUsers);
 
 userRoutes.post("/forgot-password", userController.forgotPassword);
 userRoutes.post("/reset-password", userController.resetPassword);

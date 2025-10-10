@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { AuthService } from "../services/authService";
+import logger from "../config/logger";
+
 
 export class AuthController {
   private authService: AuthService;
@@ -63,7 +65,7 @@ export class AuthController {
         throw error;
       }
     } catch (error) {
-      console.error("Erro no login:", error);
+      logger.error({obj:error}, "Erro no login:");
       next(error);
     }
   };
@@ -280,7 +282,7 @@ export class AuthController {
           res.status(201).json(result);
         }
       } catch (error) {
-        console.error("Erro no login social:", error);
+        logger.error({obj:error}, "Erro no login social:");
         if (error instanceof Error) {
           res.status(400).json({ message: error.message });
           return;
@@ -288,7 +290,7 @@ export class AuthController {
         throw error;
       }
     } catch (error) {
-      console.error("Erro no processamento de login social:", error);
+      logger.error({obj:error}, "Erro no processamento de login social:");
       next(error);
     }
   };

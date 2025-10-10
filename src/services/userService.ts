@@ -65,7 +65,7 @@ export async function requestPasswordReset(email: string, ipAddress?: string, us
   if (!user) {
     // Log opcional e retorno silencioso
     try {
-      console.info(`requestPasswordReset called for non-existing email: ${email}`);
+      logger.info(`requestPasswordReset called for non-existing email: ${email}`);
     } catch {
       // noop
     }
@@ -97,7 +97,7 @@ export async function requestPasswordReset(email: string, ipAddress?: string, us
       userAgent
     );
   } catch (e) {
-    console.warn('Falha ao enviar email de reset:', e);
+    logger.warn({obj:e}, 'Falha ao enviar email de reset:');
   }
 
   // Não retornar o token no corpo da resposta
@@ -128,7 +128,7 @@ export async function resendEmailVerification(userId: string) {
   try {
     await (await import('./emailService')).default.sendVerificationEmail(user.email, verifyUrl);
   } catch (e) {
-    console.warn('Falha ao enviar e-mail de verificação:', e);
+    logger.warn({obj:e}, 'Falha ao enviar e-mail de verificação:');
   }
   return { success: true };
 }
@@ -161,6 +161,8 @@ import crypto from "crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { config as envConfig } from "../config/environment";
+import logger from "../config/logger";
+
 
 // Use centralized, cryptographically generated secret from environment config
 const config = { jwtSecret: envConfig.jwtSecret };
@@ -182,7 +184,7 @@ export async function register(data: RegisterInput) {
   try {
     await prisma.client.create({ data: { userId: user.id } });
   } catch (e) {
-    console.warn('Falha ao criar perfil de cliente (não bloqueante):', e);
+    logger.warn({obj:e}, 'Falha ao criar perfil de cliente (não bloqueante):');
   }
   // Envia e-mail de verificação (não bloqueante)
   try {
@@ -191,7 +193,7 @@ export async function register(data: RegisterInput) {
     const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
     await (await import('./emailService')).default.sendVerificationEmail(user.email, verifyUrl);
   } catch (e) {
-    console.warn('Falha ao enviar e-mail de verificação (não bloqueante):', e);
+    logger.warn({obj:e}, 'Falha ao enviar e-mail de verificação (não bloqueante):');
   }
   return { ...user, needsEmailVerification: true } as const;
 }
@@ -372,7 +374,7 @@ export async function resetPassword(token: string, newPassword: string, ipAddres
       ipAddress
     );
   } catch (e) {
-    console.warn('Falha ao enviar email de confirmação:', e);
+    logger.warn({obj:e}, 'Falha ao enviar email de confirmação:');
   }
   
   return true;
@@ -421,7 +423,7 @@ export async function getUserStats(userId: string) {
       recentBookings
     };
   } catch (error) {
-    console.error('Erro ao buscar estatísticas do usuário:', error);
+    logger.error({obj:error}, 'Erro ao buscar estatísticas do usuário:');
     // Retornar valores padrão em caso de erro
     return {
       totalBookings: 0,

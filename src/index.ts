@@ -6,6 +6,8 @@ import https from "https";
 import { initializeSocket } from "./config/socket";
 import { config } from "./config/environment";
 import fs from "fs";
+import logger from "./config/logger";
+
 
 const PORT = Number(process.env.PORT) || 3001;
 
@@ -50,8 +52,8 @@ function configureServer(): { server: http.Server | https.Server; protocol: stri
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-    console.warn('⚠️  Falha ao configurar HTTPS:', errorMessage);
-    console.warn('🔄 Voltando para HTTP (não seguro)');
+    logger.warn({obj:errorMessage}, '⚠️  Falha ao configurar HTTPS:');
+    logger.warn('🔄 Voltando para HTTP (não seguro)');
 
     const server = http.createServer(app);
     return {
@@ -90,7 +92,7 @@ function configureSSLOptions(): https.ServerOptions & { certSource: string } {
         sslOptions.passphrase = config.ssl.passphrase;
       }
 
-      console.log('🔒 Usando certificados SSL fornecidos');
+      logger.info('🔒 Usando certificados SSL fornecidos');
       return sslOptions;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
@@ -110,9 +112,9 @@ function configureSSLOptions(): https.ServerOptions & { certSource: string } {
       throw new Error('Não foi possível gerar certificado auto-assinado');
     }
 
-    console.log('🔒 Usando certificado auto-assinado (desenvolvimento)');
-    console.log('⚠️  AVISO: Certificado auto-assinado - não use em produção!');
-    console.log('💡 Para HTTPS em produção, configure SSL_CERT_PATH e SSL_KEY_PATH');
+    logger.info('🔒 Usando certificado auto-assinado (desenvolvimento)');
+    logger.info('⚠️  AVISO: Certificado auto-assinado - não use em produção!');
+    logger.info('💡 Para HTTPS em produção, configure SSL_CERT_PATH e SSL_KEY_PATH');
 
     return {
       cert: selfSigned.cert,
@@ -166,8 +168,8 @@ function generateSelfSignedCertRobust(): { cert: string; key: string } | null {
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-    console.warn('WARN: Falha ao gerar certificado auto-assinado:', errorMessage);
-    console.warn('Para desenvolvimento com HTTPS, forneça certificados válidos via SSL_CERT_PATH e SSL_KEY_PATH');
+    logger.warn({obj:errorMessage}, 'WARN: Falha ao gerar certificado auto-assinado:');
+    logger.warn('Para desenvolvimento com HTTPS, forneça certificados válidos via SSL_CERT_PATH e SSL_KEY_PATH');
     return null;
   }
 }
@@ -183,8 +185,8 @@ function createSelfSignedCertificate(_publicKey: string): string {
   // Nota: Esta é uma implementação simplificada para desenvolvimento.
   // Para produção, use certificados válidos de uma CA confiável.
 
-  console.warn('INFO: Usando certificado auto-assinado simplificado para desenvolvimento');
-  console.warn('INFO: Para certificados completos, considere usar uma CA válida');
+  logger.warn('INFO: Usando certificado auto-assinado simplificado para desenvolvimento');
+  logger.warn('INFO: Para certificados completos, considere usar uma CA válida');
 
   // Gerar um certificado básico válido para desenvolvimento
   // Em produção, sempre use certificados de CA confiável
@@ -223,18 +225,18 @@ async function startServerWithRetries(initialPort: number, maxRetries = 10) {
         });
       });
 
-      console.log(`🚀 API rodando em ${protocol}://localhost:${port}`);
-      console.log(`🔌 Socket.IO inicializado na porta ${port} (${protocol.toUpperCase()})`);
-      console.log(`🔐 Configuração SSL: ${sslInfo}`);
+      logger.info(`🚀 API rodando em ${protocol}://localhost:${port}`);
+      logger.info(`🔌 Socket.IO inicializado na porta ${port} (${protocol.toUpperCase()})`);
+      logger.info(`🔐 Configuração SSL: ${sslInfo}`);
       return;
     } catch (err: any) {
       // Tratamento de erro específico de porta em uso
       if (err && (err.code === 'EADDRINUSE' || err.code === 'EACCES')) {
-        console.warn(`⚠️ Porta ${port} indisponível (${err.code}). Tentando próxima porta...`);
+        logger.warn(`⚠️ Porta ${port} indisponível (${err.code}). Tentando próxima porta...`);
         port++;
         // Se for última tentativa, registrar erro e sair
         if (attempt === maxRetries) {
-          console.error(`Erro: não foi possível iniciar o servidor após ${maxRetries + 1} tentativas. Último erro:`, err);
+          logger.error(`Erro: não foi possível iniciar o servidor após ${maxRetries + 1} tentativas. Último erro:`, err);
           process.exit(1);
         }
         // Aguarda um breve período antes de tentar novamente
@@ -242,7 +244,7 @@ async function startServerWithRetries(initialPort: number, maxRetries = 10) {
         continue;
       }
 
-      console.error('Erro ao iniciar o servidor:', err);
+      logger.error({obj:err}, 'Erro ao iniciar o servidor:');
       process.exit(1);
     }
   }
@@ -250,12 +252,12 @@ async function startServerWithRetries(initialPort: number, maxRetries = 10) {
 
 // Iniciar servidor com tentativas
 startServerWithRetries(Number(process.env.PORT) || PORT).catch(err => {
-  console.error('Erro fatal ao iniciar servidor:', err);
+  logger.error({obj:err}, 'Erro fatal ao iniciar servidor:');
   process.exit(1);
 });
 
 const gracefulShutdown = async (signal?: string) => {
-  console.log(`Recebido sinal ${signal || 'shutdown'} - encerrando a API...`);
+  logger.info(`Recebido sinal ${signal || 'shutdown'} - encerrando a API...`);
   try {
     // Parar timers e limpeza interna
     try { securityMonitor.stop(); } catch { /* ignore */ }
@@ -268,10 +270,10 @@ const gracefulShutdown = async (signal?: string) => {
     // Desconectar Prisma
     try { await prisma.$disconnect(); } catch { /* ignore */ }
 
-    console.log('Encerramento gracioso concluído.');
+    logger.info('Encerramento gracioso concluído.');
     process.exit(0);
   } catch (err) {
-    console.error('Erro durante o shutdown:', err);
+    logger.error({obj:err}, 'Erro durante o shutdown:');
     process.exit(1);
   }
 };

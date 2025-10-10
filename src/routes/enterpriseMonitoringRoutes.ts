@@ -1,14 +1,13 @@
 import { Router } from "express";
 import { enterpriseMonitoringController } from "../controllers/enterpriseMonitoringController";
-import { authMiddleware } from "../middlewares/authMiddleware";
-import { adminOnly } from "../middlewares/roleMiddleware";
+import { authenticate, requireAdmin } from "../middlewares/unifiedAuth";
 
 const router = Router();
 
 // ===== PROTEÇÃO DE ROTAS =====
 // Todas as rotas de monitoramento requerem autenticação de admin
-router.use(authMiddleware);
-router.use(adminOnly);
+router.use(authenticate);
+router.use(requireAdmin);
 
 // ===== DASHBOARD EXECUTIVO =====
 router.get("/dashboard", enterpriseMonitoringController.getDashboard);

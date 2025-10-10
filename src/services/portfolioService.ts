@@ -1,4 +1,6 @@
 import { prisma } from "../config/prisma";
+import logger from "../config/logger";
+
 
 export async function updatePortfolio(id: string, data: Partial<{ title: string; description: string; eventDate: string | Date; imageUrl?: string; }>) {
   const updateData: any = {};
@@ -55,7 +57,7 @@ export async function create(
   try {
     return await prisma.portfolio.create({ data: portfolioData });
   } catch (error) {
-    console.error('Erro ao criar portfólio no banco de dados:', error);
+    logger.error({obj:error}, 'Erro ao criar portfólio no banco de dados:');
     throw new Error('Erro interno ao salvar portfólio');
   }
 }

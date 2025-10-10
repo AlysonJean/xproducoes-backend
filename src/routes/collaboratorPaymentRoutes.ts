@@ -7,13 +7,13 @@ import {
   getCollaboratorPayments,
   getPaymentStats,
 } from "../controllers/collaboratorController";
-import { authMiddleware } from "../middlewares/authMiddleware";
+import { authenticate } from "../middlewares/unifiedAuth";
 import { ensureAdmin } from "../config/ensureAdmin";
 
 const router: RouterType = Router();
 
 // Todas as rotas requerem autenticação
-router.use(authMiddleware);
+router.use(authenticate);
 
 // Rotas de pagamentos de colaboradores
 router.get("/", getAllPayments);

@@ -1,3 +1,10 @@
+/**
+ * @deprecated Este arquivo foi consolidado em unifiedAuth.ts
+ * Use: import { authenticate, requireRole, requireAdmin, requireCollaboratorOrAdmin } from "../middlewares/unifiedAuth"
+ * 
+ * Este middleware tinha enhanced logging, mas não era usado em nenhuma rota.
+ */
+
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { config } from "../config/environment";

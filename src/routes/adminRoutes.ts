@@ -1,7 +1,7 @@
 // Caminho: backend/src/routes/adminRoutes.ts
 
 import { Router, type Router as RouterType } from "express";
-import { authMiddleware, adminOnly } from "../middlewares/authMiddleware";
+import { authenticate, requireAdmin } from "../middlewares/unifiedAuth";
 import { AdminController } from "../controllers/adminController";
 import { UploadService } from "../services/uploadService";
 import { ContactController } from "../controllers/contactController";
@@ -16,7 +16,7 @@ const contactController = new ContactController();
 const bookingController = new BookingController();
 const uploadService = new UploadService();
 
-adminRoutes.use(authMiddleware, adminOnly);
+adminRoutes.use(authenticate, requireAdmin);
 
 // Rotas de Clientes
 adminRoutes.get("/clients", adminController.listClients);

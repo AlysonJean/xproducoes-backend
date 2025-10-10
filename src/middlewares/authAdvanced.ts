@@ -1,4 +1,10 @@
 /**
+ * @deprecated Este arquivo foi consolidado em unifiedAuth.ts
+ * Use: import unifiedAuth from "../middlewares/unifiedAuth"
+ * Ou importe funções específicas: import { authenticateWithDB, requireStaff, requireManager } from "../middlewares/unifiedAuth"
+ */
+
+/**
  * 🔐 Sistema de Autorização Avançado com RBAC
  * Controle granular de permissões por recurso e ação
  */

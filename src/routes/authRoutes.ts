@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { AuthController } from "../controllers/authController";
-import { authMiddleware, adminOnly } from "../middlewares/authMiddleware";
+import { authenticate, requireAdmin } from "../middlewares/unifiedAuth";
 import { authRateLimit, passwordResetRateLimit } from "../middlewares/rateLimitMiddleware";
 import { z } from 'zod';
 import { userRegisterSchema, userLoginSchema } from '../validators/userSchema';
@@ -50,21 +50,21 @@ authRoutes.get('/oauth/facebook/authorize', authRateLimit, authController.facebo
 authRoutes.get('/oauth/facebook/callback', authRateLimit, authController.facebookCallback);
 
 // Rotas protegidas
-authRoutes.get("/me", authMiddleware, authController.getProfile);
-authRoutes.get("/profile", authMiddleware, authController.getProfile);
-authRoutes.put("/profile", authMiddleware, authController.updateProfile);
-authRoutes.post("/logout", authMiddleware, authController.logout);
+authRoutes.get("/me", authenticate, authController.getProfile);
+authRoutes.get("/profile", authenticate, authController.getProfile);
+authRoutes.put("/profile", authenticate, authController.updateProfile);
+authRoutes.post("/logout", authenticate, authController.logout);
 
 // Rotas administrativas
 authRoutes.post(
   "/invite-collaborator",
-  authMiddleware,
-  adminOnly,
+  authenticate,
+  requireAdmin,
   authController.inviteCollaborator,
 );
 
 // Rota admin para envio de campanhas simples (segmento por role)
-authRoutes.post('/admin/send-campaign', authMiddleware, adminOnly, async (req: any, res: any, next: any) => {
+authRoutes.post('/admin/send-campaign', authenticate, requireAdmin, async (req: any, res: any, next: any) => {
   try {
     const { subject, html, text, segment } = req.body;
     // segment: { role: 'CLIENT' } ou { ids: ['id1','id2'] }

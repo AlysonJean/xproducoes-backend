@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { BookingController } from "../controllers/bookingController";
 import { criticalEndpointRateLimit } from '../middlewares/rateLimitMiddleware';
-import { authenticate } from "../middlewares/auth";
+import { authenticate } from "../middlewares/unifiedAuth";
 import { roleMiddleware } from "../middlewares/roleMiddleware";
 
 const router = Router();

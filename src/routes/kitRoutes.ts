@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { KitController } from "../controllers/kitController";
-import { authMiddleware } from "../middlewares/authMiddleware";
+import { authenticate } from "../middlewares/unifiedAuth";
 import { ensureAdmin } from "../config/ensureAdmin";
 import { uploadSingle } from "../middlewares/upload";
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
@@ -19,7 +19,7 @@ kitRoutes.get("/:id", kitController.findOne);
 // Rotas de Admin com upload de imagem
 kitRoutes.post(
   "/",
-  authMiddleware,
+  authenticate,
   ensureAdmin,
   uploadRateLimit, uploadSingle("image"),
   require("../middlewares/upload").processUpload,
@@ -27,12 +27,12 @@ kitRoutes.post(
 );
 kitRoutes.put(
   "/:id",
-  authMiddleware,
+  authenticate,
   ensureAdmin,
   uploadRateLimit, uploadSingle("image"),
   require("../middlewares/upload").processUpload,
   kitController.update,
 );
-kitRoutes.delete("/:id", authMiddleware, ensureAdmin, kitController.delete);
+kitRoutes.delete("/:id", authenticate, ensureAdmin, kitController.delete);
 
 export default kitRoutes;

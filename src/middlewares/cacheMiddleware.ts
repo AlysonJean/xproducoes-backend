@@ -1,4 +1,6 @@
 import { Request, Response, NextFunction } from "express";
+import logger from "../config/logger";
+
 
 const cache: Map<string, { data: any; expires: number }> = new Map();
 const DEFAULT_TTL = 60 * 1000; // 1 minuto
@@ -32,5 +34,5 @@ export async function warmCache() {
   // Aqui você pode pré-carregar rotas críticas, se desejar
   // Exemplo: await fetch('http://localhost:3001/api/dashboard');
   // Por enquanto, apenas loga:
-  console.log("Cache aquecido!");
+  logger.info("Cache aquecido!");
 }

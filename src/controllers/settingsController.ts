@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../config/prisma';
+import logger from "../config/logger";
+
 
 export const getAppSettings = async (req: Request, res: Response) => {
   try {
@@ -11,7 +13,7 @@ export const getAppSettings = async (req: Request, res: Response) => {
     if (!settings) {
       // Se não existir configurações, retornar valores padrão sem tentar criar
       // (pode falhar se a tabela não existir ou não houver permissões)
-      console.warn('WARN: Configurações de app não encontradas, retornando valores padrão');
+      logger.warn('WARN: Configurações de app não encontradas, retornando valores padrão');
       return res.json({
         id: 'default',
         logoUrl: null,
@@ -23,7 +25,7 @@ export const getAppSettings = async (req: Request, res: Response) => {
 
     res.json(settings);
   } catch (error) {
-    console.error('Erro ao buscar configurações:', error);
+    logger.error({obj:error}, 'Erro ao buscar configurações:');
     // Retornar valores padrão em caso de erro
     res.json({
       id: 'default',
@@ -59,7 +61,7 @@ export const updateAppSettings = async (req: Request, res: Response) => {
 
     res.json(updatedSettings);
   } catch (error) {
-    console.error('Erro ao atualizar configurações:', error);
+    logger.error({obj:error}, 'Erro ao atualizar configurações:');
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 };

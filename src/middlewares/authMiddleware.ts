@@ -1,3 +1,15 @@
+/**
+ * @deprecated Este arquivo foi consolidado em unifiedAuth.ts
+ * Use: import { authenticate, requireAdmin, requireAdminOrCollaborator } from "../middlewares/unifiedAuth"
+ * 
+ * Mapeamento:
+ * - authMiddleware -> authenticate
+ * - adminOnly -> requireAdmin
+ * - collaboratorOnly -> requireCollaborator
+ * - adminOrCollaborator -> requireAdminOrCollaborator
+ * - optionalAuth -> optionalAuth
+ */
+
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { config } from "../config/environment";

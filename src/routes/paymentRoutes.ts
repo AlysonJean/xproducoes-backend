@@ -1,23 +1,27 @@
 import { Router, type Router as RouterType } from "express";
 import { PaymentController } from "../controllers/paymentController";
-import { authMiddleware, adminOnly } from "../middlewares/authMiddleware";
+import { authenticate, requireAdmin } from "../middlewares/unifiedAuth";
+import { paymentRateLimit } from "../middlewares/rateLimitMiddleware";
 
 const paymentRoutes: RouterType = Router();
 const paymentController = new PaymentController();
 
-paymentRoutes.use(authMiddleware);
+paymentRoutes.use(authenticate);
 
 // Rotas para usuários
 paymentRoutes.post(
   "/create-checkout-session",
+  paymentRateLimit,
   paymentController.createCheckoutSession,
 );
 paymentRoutes.post(
   "/create-intent/:bookingId",
+  paymentRateLimit,
   paymentController.createPaymentIntent,
 );
 paymentRoutes.post(
   "/confirm/:paymentIntentId",
+  paymentRateLimit,
   paymentController.confirmPayment,
 );
 paymentRoutes.get("/history", paymentController.getHistory);
@@ -26,17 +30,17 @@ paymentRoutes.get("/booking/:bookingId", paymentController.getByBooking);
 // Rotas administrativas
 paymentRoutes.post(
   "/refund/:paymentId",
-  adminOnly,
+  requireAdmin,
   paymentController.refund,
 );
 paymentRoutes.get(
   "/all",
-  adminOnly,
+  requireAdmin,
   paymentController.getAllPayments,
 );
 paymentRoutes.get(
   "/stats",
-  adminOnly,
+  requireAdmin,
   paymentController.getPaymentStats,
 );
 

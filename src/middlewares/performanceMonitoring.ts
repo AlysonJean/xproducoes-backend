@@ -1,4 +1,6 @@
 import { Request, Response, NextFunction } from "express";
+import logger from "../config/logger";
+
 
 /**
  * Middleware para capturar métricas de performance das requisições
@@ -16,7 +18,7 @@ export function performanceMonitoringMiddleware(
     // Monitoramento enterprise está disponível mas não tem método recordRequest
     // por isso vou apenas logar por enquanto
     if (responseTime > 2000) {
-      console.log(`Slow request: ${req.method} ${req.path} - ${responseTime}ms`);
+      logger.info(`Slow request: ${req.method} ${req.path} - ${responseTime}ms`);
     }
   });
 

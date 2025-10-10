@@ -1,5 +1,7 @@
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { Request, Response } from 'express';
+import logger from "../config/logger";
+
 
 // Rate limiting para autenticação - Mais restritivo
 export const authRateLimit = rateLimit({
@@ -88,8 +90,89 @@ export const criticalEndpointRateLimit = rateLimit({
       timestamp: new Date().toISOString(),
       path: req.path,
     };
-    console.warn('[RATE LIMIT] Endpoint crítico atingido', logData);
+    logger.warn(logData, '[RATE LIMIT] Endpoint crítico atingido');
     res.status(429).json({ error: 'Operação crítica limitada. Aguarde alguns minutos.' });
+  },
+});
+
+// Rate limiting para pagamentos - Muito restritivo
+export const paymentRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutos
+  max: 5, // Máximo 5 tentativas de pagamento
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req: Request, res: Response) => {
+    logger.warn({
+      ip: req.ip,
+      userId: (req as any).userId,
+      userAgent: req.headers['user-agent'],
+      path: req.path,
+    }, '[RATE LIMIT] Tentativas de pagamento excedidas');
+    res.status(429).json({
+      success: false,
+      error: 'PAYMENT_RATE_LIMIT',
+      message: 'Muitas tentativas de pagamento. Por favor, aguarde 10 minutos.',
+    });
+  },
+});
+
+// Rate limiting para carrinho - Moderado
+export const cartRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minuto
+  max: 20, // 20 operações por minuto
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req: Request, res: Response) => {
+    res.status(429).json({
+      success: false,
+      error: 'CART_RATE_LIMIT',
+      message: 'Operações no carrinho muito rápidas. Aguarde um momento.',
+    });
+  },
+});
+
+// Rate limiting para quotes - Moderado
+export const quoteRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutos
+  max: 10, // 10 solicitações de orçamento
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req: Request, res: Response) => {
+    res.status(429).json({
+      success: false,
+      error: 'QUOTE_RATE_LIMIT',
+      message: 'Muitas solicitações de orçamento. Aguarde alguns minutos.',
+    });
+  },
+});
+
+// Rate limiting para review/comentários - Anti-spam
+export const reviewRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hora
+  max: 5, // 5 avaliações por hora
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req: Request, res: Response) => {
+    res.status(429).json({
+      success: false,
+      error: 'REVIEW_RATE_LIMIT',
+      message: 'Limite de avaliações atingido. Tente novamente em 1 hora.',
+    });
+  },
+});
+
+// Rate limiting para dashboard queries - Proteção de recursos
+export const dashboardRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minuto
+  max: 30, // 30 queries por minuto
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req: Request, res: Response) => {
+    res.status(429).json({
+      success: false,
+      error: 'DASHBOARD_RATE_LIMIT',
+      message: 'Muitas requisições ao dashboard. Aguarde um momento.',
+    });
   },
 });
 
@@ -102,4 +185,9 @@ export const rateLimiters = {
   passwordReset: passwordResetRateLimit,
   dynamic: dynamicRateLimit,
   critical: criticalEndpointRateLimit,
+  payment: paymentRateLimit,
+  cart: cartRateLimit,
+  quote: quoteRateLimit,
+  review: reviewRateLimit,
+  dashboard: dashboardRateLimit,
 };

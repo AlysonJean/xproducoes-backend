@@ -5,17 +5,17 @@ import {
   sendMessage,
   createSupportChat,
 } from '../controllers/collaboratorMessagesController';
-import { authMiddleware, adminOrCollaborator } from '../middlewares/authMiddleware';
+import { authenticate, requireAdminOrCollaborator } from "../middlewares/unifiedAuth";
 
 const router = Router();
 
 // Todas as rotas requerem autenticação
-router.use(authMiddleware);
+router.use(authenticate);
 
 // Rotas de mensagens para colaboradores
-router.get('/chats', adminOrCollaborator, getMyChats);
-router.post('/chats/support', adminOrCollaborator, createSupportChat);
-router.get('/chats/:chatId/messages', adminOrCollaborator, getChatMessages);
-router.post('/chats/:chatId/messages', adminOrCollaborator, sendMessage);
+router.get('/chats', requireAdminOrCollaborator, getMyChats);
+router.post('/chats/support', requireAdminOrCollaborator, createSupportChat);
+router.get('/chats/:chatId/messages', requireAdminOrCollaborator, getChatMessages);
+router.post('/chats/:chatId/messages', requireAdminOrCollaborator, sendMessage);
 
 export default router;

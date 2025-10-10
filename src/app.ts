@@ -91,6 +91,8 @@ app.use((req, res) => {
 
 // Error handler global
 import { Request, Response, NextFunction } from "express";
+import logger from "./config/logger";
+
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   const origin = req.headers.origin;
   if (origin && allowedOrigins.includes(origin)) {
@@ -102,7 +104,7 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
        "Origin, X-Requested-With, Content-Type, Accept, Authorization, Idempotency-Key, X-Idempotency-Key, x-svg-proxy-token",
      );
   }
-  console.error("Erro global:", err);
+  logger.error({obj:err}, "Erro global:");
   res.status(500).json({
     success: false,
     error: err.message || "Erro interno",

@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../config/prisma';
+import logger from "../config/logger";
+
 
 export class CollaboratorMessagesController {
   // Buscar chats do colaborador
@@ -92,7 +94,7 @@ export class CollaboratorMessagesController {
 
       return res.json({ success: true, data: chatsWithUnread });
     } catch (error) {
-      console.error('Erro ao buscar chats:', error);
+      logger.error({obj:error}, 'Erro ao buscar chats:');
       return res.status(500).json({ success: false, message: 'Erro ao buscar chats' });
     }
   }
@@ -185,7 +187,7 @@ export class CollaboratorMessagesController {
         }
       });
     } catch (error) {
-      console.error('Erro ao buscar mensagens:', error);
+      logger.error({obj:error}, 'Erro ao buscar mensagens:');
       return res.status(500).json({ success: false, message: 'Erro ao buscar mensagens' });
     }
   }
@@ -253,7 +255,7 @@ export class CollaboratorMessagesController {
 
       return res.json({ success: true, data: message });
     } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
+      logger.error({obj:error}, 'Erro ao enviar mensagem:');
       return res.status(500).json({ success: false, message: 'Erro ao enviar mensagem' });
     }
   }
@@ -328,7 +330,7 @@ export class CollaboratorMessagesController {
 
       return res.json({ success: true, data: chat });
     } catch (error) {
-      console.error('Erro ao criar chat de suporte:', error);
+      logger.error({obj:error}, 'Erro ao criar chat de suporte:');
       return res.status(500).json({ success: false, message: 'Erro ao criar chat de suporte' });
     }
   }

@@ -1,6 +1,6 @@
 import { Router, type Router as RouterType } from "express";
 import { CategoryController } from "../controllers/categoryController";
-import { authMiddleware } from "../middlewares/authMiddleware";
+import { authenticate } from "../middlewares/unifiedAuth";
 import { ensureAdmin } from "../config/ensureAdmin";
 
 const categoryRoutes: RouterType = Router();
@@ -15,19 +15,19 @@ categoryRoutes.get("/featured", categoryController.getFeatured);
 categoryRoutes.get("/:id", categoryController.getById);
 categoryRoutes.post(
   "/",
-  authMiddleware,
+  authenticate,
   ensureAdmin,
   categoryController.create,
 );
 categoryRoutes.put(
   "/:id",
-  authMiddleware,
+  authenticate,
   ensureAdmin,
   categoryController.update,
 );
 categoryRoutes.delete(
   "/:id",
-  authMiddleware,
+  authenticate,
   ensureAdmin,
   categoryController.delete,
 );

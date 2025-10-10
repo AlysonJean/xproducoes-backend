@@ -1,6 +1,5 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { AuthenticatedRequest } from '../middlewares/authAdvanced';
 
 const prisma = new PrismaClient();
 
@@ -10,7 +9,7 @@ const prisma = new PrismaClient();
 
 export class ChecklistController {
   // Buscar checklists do colaborador atual
-  static async getMyChecklists(req: AuthenticatedRequest, res: Response) {
+  static async getMyChecklists(req: Request, res: Response) {
     try {
       const userId = req.user!.id;
       const { status, page = 1, limit = 10 } = req.query;
@@ -74,7 +73,7 @@ export class ChecklistController {
   }
 
   // Buscar checklist específico
-  static async getChecklist(req: AuthenticatedRequest, res: Response) {
+  static async getChecklist(req: Request, res: Response) {
     try {
       const { id } = req.params;
       const userId = req.user!.id;
@@ -130,7 +129,7 @@ export class ChecklistController {
   }
 
   // Atualizar status de um item do checklist
-  static async updateChecklistItem(req: AuthenticatedRequest, res: Response) {
+  static async updateChecklistItem(req: Request, res: Response) {
     try {
       const { checklistId, itemId } = req.params;
       const { status, notes } = req.body;
@@ -214,7 +213,7 @@ export class ChecklistController {
   }
 
   // Atualizar status do assignment do checklist
-  static async updateChecklistStatus(req: AuthenticatedRequest, res: Response) {
+  static async updateChecklistStatus(req: Request, res: Response) {
     try {
       const { id } = req.params;
       const { status, notes } = req.body;
@@ -286,7 +285,7 @@ export class ChecklistController {
   // ================================
 
   // Criar novo checklist
-  static async createChecklist(req: AuthenticatedRequest, res: Response) {
+  static async createChecklist(req: Request, res: Response) {
     try {
       const { title, description, type, items, assignedToIds, dueDate, priority } = req.body;
       const createdById = req.user!.id;
@@ -333,7 +332,7 @@ export class ChecklistController {
   }
 
   // Buscar todos os checklists (admin)
-  static async getAllChecklists(req: AuthenticatedRequest, res: Response) {
+  static async getAllChecklists(req: Request, res: Response) {
     try {
       const { status, type, assignedTo, page = 1, limit = 10 } = req.query;
 
@@ -405,7 +404,7 @@ export class ChecklistController {
   }
 
   // Atualizar checklist
-  static async updateChecklist(req: AuthenticatedRequest, res: Response) {
+  static async updateChecklist(req: Request, res: Response) {
     try {
       const { id } = req.params;
       const { title, description, type, status, items } = req.body;
@@ -466,7 +465,7 @@ export class ChecklistController {
   }
 
   // Deletar checklist
-  static async deleteChecklist(req: AuthenticatedRequest, res: Response) {
+  static async deleteChecklist(req: Request, res: Response) {
     try {
       const { id } = req.params;
 
@@ -482,7 +481,7 @@ export class ChecklistController {
   }
 
   // Atribuir checklist a usuários
-  static async assignChecklist(req: AuthenticatedRequest, res: Response) {
+  static async assignChecklist(req: Request, res: Response) {
     try {
       const { checklistId } = req.params;
       const { assignedToIds, dueDate, priority, notes } = req.body;
@@ -508,7 +507,7 @@ export class ChecklistController {
   }
 
   // Remover atribuição de checklist
-  static async unassignChecklist(req: AuthenticatedRequest, res: Response) {
+  static async unassignChecklist(req: Request, res: Response) {
     try {
       const { checklistId, userId } = req.params;
 

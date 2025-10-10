@@ -1,6 +1,6 @@
 import { Router, type Router as RouterType } from "express";
 import { FaqController } from "../controllers/faqController";
-import { authMiddleware } from "../middlewares/authMiddleware";
+import { authenticate } from "../middlewares/unifiedAuth";
 import { roleMiddleware } from "../middlewares/roleMiddleware";
 
 const faqRoutes: RouterType = Router();
@@ -14,19 +14,19 @@ faqRoutes.get("/faq", faqController.findAll);
 // Rotas de Admin para gerir o FAQ
 faqRoutes.post(
   "/",
-  authMiddleware,
+  authenticate,
   roleMiddleware(["ADMIN"]),
   faqController.create,
 );
 faqRoutes.put(
   "/:id",
-  authMiddleware,
+  authenticate,
   roleMiddleware(["ADMIN"]),
   faqController.update,
 );
 faqRoutes.delete(
   "/:id",
-  authMiddleware,
+  authenticate,
   roleMiddleware(["ADMIN"]),
   faqController.delete,
 );

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { PortfolioController } from "../controllers/portfolioController";
-import { authMiddleware } from "../middlewares/authMiddleware";
+import { authenticate } from "../middlewares/unifiedAuth";
 import { roleMiddleware } from "../middlewares/roleMiddleware";
 import { uploadSingle } from "../middlewares/upload";
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
@@ -16,7 +16,7 @@ portfolioRoutes.get("/portfolio", portfolioController.findAll);
 // Rotas de Admin para gerir o portfólio
 portfolioRoutes.post(
   "/",
-  authMiddleware,
+  authenticate,
   roleMiddleware(["ADMIN"]),
   uploadRateLimit, uploadSingle("image"),
   require("../middlewares/upload").processUpload,
@@ -24,7 +24,7 @@ portfolioRoutes.post(
 );
 portfolioRoutes.put(
   "/:id",
-  authMiddleware,
+  authenticate,
   roleMiddleware(["ADMIN"]),
   uploadRateLimit, uploadSingle("image"),
   require("../middlewares/upload").processUpload,
@@ -32,7 +32,7 @@ portfolioRoutes.put(
 );
 portfolioRoutes.delete(
   "/:id",
-  authMiddleware,
+  authenticate,
   roleMiddleware(["ADMIN"]),
   portfolioController.delete,
 );
