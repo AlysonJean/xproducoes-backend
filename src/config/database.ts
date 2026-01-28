@@ -14,21 +14,11 @@ declare global {
 if (process.env.NODE_ENV === "production") {
   prisma = new PrismaClient({
     log: ['error'],
-    datasources: {
-      db: {
-        url: process.env.DATABASE_URL,
-      },
-    },
   });
 } else {
   if (!global.__prisma) {
     global.__prisma = new PrismaClient({
       log: ['error', 'warn'], // Reduzido para evitar spam de logs
-      datasources: {
-        db: {
-          url: process.env.DATABASE_URL,
-        },
-      },
     });
   }
   prisma = global.__prisma;

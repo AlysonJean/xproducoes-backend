@@ -92,7 +92,7 @@ export class EnterpriseMonitoringController {
   // ===== TESTE DE INTEGRAÇÃO ESPECÍFICA =====
   testIntegration = async (req: Request, res: Response, _next: NextFunction) => {
     try {
-      const { name } = req.params;
+      const { name } = req.params as { name: string };
       
       if (!name) {
         return res.status(400).json({ 

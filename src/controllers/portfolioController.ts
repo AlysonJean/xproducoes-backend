@@ -4,7 +4,7 @@ import * as portfolioService from "../services/portfolioService";
 export class PortfolioController {
   update = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       if (!id) {
         return res.status(400).json({ message: "ID é obrigatório." });
       }
@@ -49,7 +49,7 @@ export class PortfolioController {
 
   delete = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       if (!id) {
         return res.status(400).json({ message: "ID é obrigatório." });
       }

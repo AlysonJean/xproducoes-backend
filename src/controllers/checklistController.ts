@@ -75,7 +75,7 @@ export class ChecklistController {
   // Buscar checklist específico
   static async getChecklist(req: Request, res: Response) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const userId = req.user!.id;
 
       const assignment = await prisma.checklistAssignment.findFirst({
@@ -131,7 +131,7 @@ export class ChecklistController {
   // Atualizar status de um item do checklist
   static async updateChecklistItem(req: Request, res: Response) {
     try {
-      const { checklistId, itemId } = req.params;
+      const { checklistId, itemId } = req.params as { checklistId: string; itemId: string };
       const { status, notes } = req.body;
       const userId = req.user!.id;
 
@@ -215,7 +215,7 @@ export class ChecklistController {
   // Atualizar status do assignment do checklist
   static async updateChecklistStatus(req: Request, res: Response) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const { status, notes } = req.body;
       const userId = req.user!.id;
 
@@ -406,7 +406,7 @@ export class ChecklistController {
   // Atualizar checklist
   static async updateChecklist(req: Request, res: Response) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const { title, description, type, status, items } = req.body;
 
       const checklist = await prisma.checklist.update({
@@ -467,7 +467,7 @@ export class ChecklistController {
   // Deletar checklist
   static async deleteChecklist(req: Request, res: Response) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
 
       await prisma.checklist.delete({
         where: { id },
@@ -483,7 +483,7 @@ export class ChecklistController {
   // Atribuir checklist a usuários
   static async assignChecklist(req: Request, res: Response) {
     try {
-      const { checklistId } = req.params;
+      const { checklistId } = req.params as { checklistId: string };
       const { assignedToIds, dueDate, priority, notes } = req.body;
       const assignedById = req.user!.id;
 
@@ -509,7 +509,7 @@ export class ChecklistController {
   // Remover atribuição de checklist
   static async unassignChecklist(req: Request, res: Response) {
     try {
-      const { checklistId, userId } = req.params;
+      const { checklistId, userId } = req.params as { checklistId: string; userId: string };
 
       await prisma.checklistAssignment.deleteMany({
         where: {

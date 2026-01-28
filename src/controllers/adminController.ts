@@ -244,7 +244,7 @@ export class AdminController {
   // Obter um cliente específico por ID (com perfil)
   getClientById = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = req.params["id"];
+      const id = req.params["id"] as string;
       if (!id) {
         return res.status(400).json({ error: "ID é obrigatório" });
       }
@@ -263,7 +263,7 @@ export class AdminController {
   // Atualizar dados do usuário e do perfil de cliente
   updateClient = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = req.params["id"];
+      const id = req.params["id"] as string;
       if (!id) {
         return res.status(400).json({ error: "ID é obrigatório" });
       }
@@ -325,7 +325,7 @@ export class AdminController {
   // Deletar um cliente (user + perfil)
   deleteClient = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = req.params["id"];
+      const id = req.params["id"] as string;
       if (!id) {
         return res.status(400).json({ error: "ID é obrigatório" });
       }
@@ -365,7 +365,7 @@ export class AdminController {
 
   async getUserById(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const user = await userService.getUserById(Number(id));
       if (!user) {
         return res.status(404).json({ message: "Usuário não encontrado" });
@@ -379,7 +379,7 @@ export class AdminController {
 
   async updateUserRole(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const { role } = req.body;
       
       const user = await userService.updateUserRole(Number(id), role);
@@ -392,7 +392,7 @@ export class AdminController {
 
   async deleteUser(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       await userService.deleteUser(Number(id));
       res.status(204).send();
     } catch (error) {
@@ -457,7 +457,7 @@ export class AdminController {
 
   async updateBookingStatus(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const { status } = req.body;
       
       const booking = await bookingService.updateBookingStatus(id, status);
@@ -471,7 +471,7 @@ export class AdminController {
   // Marca o email do usuário como verificado (apenas admin)
   async verifyUserEmail(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params; // user id
+      const { id } = req.params as { id: string }; // user id
       if (!id) return res.status(400).json({ message: 'ID do usuário é obrigatório' });
 
       const user = await prisma.user.findUnique({ where: { id } });
@@ -490,7 +490,7 @@ export class AdminController {
   // Reenvia e-mail de verificação: gera token e envia para o usuário
   async resendVerification(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params; // user id
+      const { id } = req.params as { id: string }; // user id
       if (!id) return res.status(400).json({ message: 'ID do usuário é obrigatório' });
 
       const user = await prisma.user.findUnique({ where: { id } });

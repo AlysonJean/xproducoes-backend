@@ -25,7 +25,7 @@ export class ReviewController {
 
   async getByEquipment(req: Request, res: Response, next: NextFunction) {
     try {
-      const { equipmentId } = req.params;
+      const { equipmentId } = req.params as { equipmentId: string };
       const reviews = await reviewService.findByEquipment(equipmentId);
       return res.status(200).json(reviews);
     } catch (error) {
@@ -35,7 +35,7 @@ export class ReviewController {
 
   async getByUser(req: Request, res: Response, next: NextFunction) {
     try {
-      const { userId } = req.params;
+      const { userId } = req.params as { userId: string };
       const actualUserId = userId === 'me' ? req.userId : userId;
       const reviews = await reviewService.findByUser(actualUserId!);
       return res.status(200).json(reviews);
@@ -72,7 +72,7 @@ export class ReviewController {
 
   async update(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const review = await reviewService.update(id, req.body);
       return res.status(200).json(review);
     } catch (error) {
@@ -85,7 +85,7 @@ export class ReviewController {
 
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       await reviewService.deleteReview(id);
       return res.status(204).send();
     } catch (error) {
@@ -98,7 +98,7 @@ export class ReviewController {
 
   async approve(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const review = await reviewService.approve(id);
       return res.status(200).json(review);
     } catch (error) {
@@ -111,7 +111,7 @@ export class ReviewController {
 
   async reject(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const review = await reviewService.reject(id);
       return res.status(200).json(review);
     } catch (error) {

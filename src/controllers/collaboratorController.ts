@@ -129,7 +129,7 @@ export class CollaboratorController {
 
   async getCollaboratorById(req: Request, res: Response) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
 
       if (!id) {
         return res.status(400).json({
@@ -162,7 +162,7 @@ export class CollaboratorController {
 
   async updateCollaborator(req: Request, res: Response) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const updateData = req.body;
 
       if (!id) {
@@ -193,7 +193,7 @@ export class CollaboratorController {
 
   async deleteCollaborator(req: Request, res: Response) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
 
       if (!id) {
         return res.status(400).json({
@@ -252,7 +252,7 @@ export class CollaboratorController {
 
   async getEventCollaborators(req: Request, res: Response) {
     try {
-      const { eventId } = req.params;
+      const { eventId } = req.params as { eventId: string };
 
       if (!eventId) {
         return res.status(400).json({
@@ -279,7 +279,7 @@ export class CollaboratorController {
 
   async getCollaboratorEvents(req: Request, res: Response) {
     try {
-      const { collaboratorId } = req.params;
+      const { collaboratorId } = req.params as { collaboratorId: string };
 
       if (!collaboratorId) {
         return res.status(400).json({
@@ -306,7 +306,7 @@ export class CollaboratorController {
 
   async updateEventCollaborator(req: Request, res: Response) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
 
       if (!id) {
         return res.status(400).json({
@@ -331,7 +331,7 @@ export class CollaboratorController {
 
   async removeCollaboratorFromEvent(req: Request, res: Response) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
 
       if (!id) {
         return res.status(400).json({
@@ -386,7 +386,7 @@ export class CollaboratorController {
 
   async getCollaboratorStats(req: Request, res: Response) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
 
       if (!id) {
         return res.status(400).json({
@@ -443,7 +443,7 @@ export class CollaboratorController {
       }
 
       // Reutiliza o service para agregar os dados do dashboard
-      const stats = await collaboratorService.getCollaboratorDashboard(collaborator.id);
+      const stats = await collaboratorService.getCollaboratorDashboard(collaborator!.id);
 
       return res.json({ success: true, data: stats });
     } catch (error) {
@@ -685,7 +685,7 @@ export class CollaboratorController {
 
   async updateAvailability(req: Request, res: Response) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const updateSchema = z.object({
         date: z.string().optional(), // Mudado de start/endDate para date para alinhar com modelo
         startTime: z.string().optional(),
@@ -727,7 +727,7 @@ export class CollaboratorController {
 
   async deleteAvailability(req: Request, res: Response) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       await collaboratorService.deleteAvailability(id);
       return res.json({
         success: true,
@@ -744,7 +744,7 @@ export class CollaboratorController {
 
   async getCollaboratorAvailabilities(req: Request, res: Response) {
     try {
-      const { collaboratorId } = req.params;
+      const { collaboratorId } = req.params as { collaboratorId: string };
       const availabilities = await collaboratorService.getCollaboratorAvailabilities(collaboratorId);
 
       return res.json({
@@ -876,7 +876,7 @@ export class CollaboratorController {
 
   async updatePayment(req: Request, res: Response) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const updateSchema = z.object({
         amount: z.number().min(0).optional(),
         description: z.string().optional(),
@@ -917,7 +917,7 @@ export class CollaboratorController {
 
   async deletePayment(req: Request, res: Response) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       // Método não implementado no service
       return res.status(501).json({
         success: false,
@@ -934,7 +934,7 @@ export class CollaboratorController {
 
   async getCollaboratorPayments(req: Request, res: Response) {
     try {
-      const { collaboratorId } = req.params;
+      const { collaboratorId } = req.params as { collaboratorId: string };
       // Método implementado no service
       const payments = await collaboratorService.getCollaboratorPayments(collaboratorId);
 
@@ -953,7 +953,7 @@ export class CollaboratorController {
 
   async getPaymentStats(req: Request, res: Response) {
     try {
-      const { collaboratorId } = req.params;
+      const { collaboratorId } = req.params as { collaboratorId: string };
       // Método não implementado no service - retorna stats padrão
       const stats = await collaboratorService.getPaymentStats();
 

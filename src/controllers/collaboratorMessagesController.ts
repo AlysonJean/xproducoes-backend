@@ -102,7 +102,7 @@ export class CollaboratorMessagesController {
   // Buscar mensagens de um chat específico
   async getChatMessages(req: Request, res: Response) {
     try {
-      const { chatId } = req.params;
+      const { chatId } = req.params as { chatId: string };
       const userId = req.userId as string;
       const { page = '1', limit = '20' } = req.query;
 
@@ -195,7 +195,7 @@ export class CollaboratorMessagesController {
   // Enviar mensagem
   async sendMessage(req: Request, res: Response) {
     try {
-      const { chatId } = req.params;
+      const { chatId } = req.params as { chatId: string };
       const { content, messageType = 'TEXT' } = req.body;
       const userId = req.userId as string;
 

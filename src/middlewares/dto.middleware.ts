@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { Decimal } from "@prisma/client/runtime/library";
+import { Prisma } from "@prisma/client";
 
 /**
  * Middleware de transformação de DTO
@@ -13,7 +13,7 @@ function transformPrismaData(obj: any): any {
   }
 
   // Se é um Decimal do Prisma, converte para number
-  if (obj instanceof Decimal) {
+  if (obj instanceof Prisma.Decimal) {
     return obj.toNumber();
   }
 

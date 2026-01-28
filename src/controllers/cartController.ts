@@ -20,7 +20,7 @@ export class CartController {
   };
 
   removeItem = async (req: Request, res: Response) => {
-    const { equipmentId } = req.params;
+    const { equipmentId } = req.params as { equipmentId: string };
     if (!equipmentId)
       return res
         .status(400)

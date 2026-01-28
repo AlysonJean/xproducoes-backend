@@ -43,7 +43,7 @@ export class PaymentController {
     next: NextFunction,
   ) => {
     try {
-      const { bookingId } = req.params;
+      const { bookingId } = req.params as { bookingId: string };
       
       if (!bookingId) {
         return res.status(400).json({ message: "ID da reserva é obrigatório." });
@@ -62,7 +62,7 @@ export class PaymentController {
     next: NextFunction,
   ) => {
     try {
-      const { paymentIntentId } = req.params;
+      const { paymentIntentId } = req.params as { paymentIntentId: string };
       
       if (!paymentIntentId) {
         return res.status(400).json({ message: "ID do payment intent é obrigatório." });
@@ -81,7 +81,7 @@ export class PaymentController {
     next: NextFunction,
   ) => {
     try {
-      const { paymentId } = req.params;
+      const { paymentId } = req.params as { paymentId: string };
       const { amount } = req.body;
       
       if (!paymentId) {
@@ -114,7 +114,7 @@ export class PaymentController {
     next: NextFunction,
   ) => {
     try {
-      const { bookingId } = req.params;
+      const { bookingId } = req.params as { bookingId: string };
       
       if (!bookingId) {
         return res.status(400).json({ message: "ID da reserva é obrigatório." });

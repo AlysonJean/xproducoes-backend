@@ -22,7 +22,7 @@ export class FaqController {
 
   update = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const faqItem = await FaqService.update(id, req.body);
       return res.json(faqItem);
     } catch (error) {
@@ -32,7 +32,7 @@ export class FaqController {
 
   delete = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       await FaqService.delete(id);
       return res.status(204).send();
     } catch (error) {

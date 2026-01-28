@@ -148,7 +148,7 @@ export class ProfileController {
   // Buscar detalhes de um colaborador específico
   async getCollaboratorDetails(req: Request, res: Response) {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
 
       const collaborator = await prisma.user.findUnique({
         where: { id },

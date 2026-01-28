@@ -45,7 +45,7 @@ export class CategoryController {
         return res.status(403).json({ message: "Acesso negado" });
       }
       categoryUpdateSchema.parse(req.body);
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const { name } = req.body;
 
       if (!id) {
@@ -71,7 +71,7 @@ export class CategoryController {
         return res.status(403).json({ message: "Acesso negado" });
       }
 
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       if (!id) {
         return res
           .status(400)
@@ -91,7 +91,7 @@ export class CategoryController {
 
   getById = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       if (!id) {
         return res
           .status(400)

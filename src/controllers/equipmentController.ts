@@ -57,7 +57,7 @@ export class EquipmentController {
       if (data.quantity) data.quantity = Number(data.quantity);
       equipmentCreateSchema.partial().parse(data);
 
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       if (!id) {
         return res
           .status(400)
@@ -101,7 +101,7 @@ export class EquipmentController {
     next: NextFunction,
   ): Promise<any> => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       if (!id) {
         return res
           .status(400)
@@ -134,7 +134,7 @@ export class EquipmentController {
         throw new Error("Acesso negado");
       }
 
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       if (!id) {
         return res
           .status(400)
@@ -158,7 +158,7 @@ export class EquipmentController {
     next: NextFunction,
   ): Promise<any> => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const { month, year } = req.query;
 
       if (!id) {
@@ -201,7 +201,7 @@ export class EquipmentController {
     next: NextFunction,
   ): Promise<any> => {
     try {
-      const { categoryId } = req.params;
+      const { categoryId } = req.params as { categoryId: string };
       
       if (!categoryId) {
         return res

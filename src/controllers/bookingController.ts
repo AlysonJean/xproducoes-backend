@@ -144,7 +144,7 @@ export class BookingController {
     }
 
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const { status } = req.body as { status: BookingStatus };
 
       if (!id) {
@@ -185,7 +185,7 @@ export class BookingController {
 
   updateDeliveryStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const { status } = req.body as { status: DeliveryStatus };
 
       if (!id) {
@@ -253,7 +253,7 @@ export class BookingController {
 
   findOne = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
 
       if (!id) {
         res.status(400).json({ 
@@ -307,7 +307,7 @@ export class BookingController {
 
   update = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       
       if (!id) {
         res.status(400).json({ 
@@ -363,7 +363,7 @@ export class BookingController {
   // Adicionar attachment (comprovante) à reserva
   addAttachment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       if (!id) {
         res.status(400).json({ success: false, message: 'ID da reserva é obrigatório.' });
         return;
@@ -403,7 +403,7 @@ export class BookingController {
 
   removeAttachment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { id, attachmentId } = req.params;
+      const { id, attachmentId } = req.params as { id: string; attachmentId: string };
       if (!id || !attachmentId) {
         res.status(400).json({ success: false, message: 'ID da reserva e do attachment são obrigatórios.' });
         return;
@@ -436,7 +436,7 @@ export class BookingController {
 
   delete = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       
       if (!id) {
         res.status(400).json({ 
@@ -485,7 +485,7 @@ export class BookingController {
 
   confirm = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       
       if (!id) {
         res.status(400).json({ 
@@ -522,7 +522,7 @@ export class BookingController {
       return;
     }
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const { totalPrice, collaborators } = req.body as { totalPrice?: number; collaborators?: Array<any> };
       if (!id) {
         res.status(400).json({ success: false, message: 'ID da reserva é obrigatório.' });
@@ -541,7 +541,7 @@ export class BookingController {
 
   cancel = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const { reason } = req.body;
       
       if (!id) {
@@ -673,7 +673,7 @@ export class BookingController {
   // Método legado mantido para compatibilidade
   getCollaboratorEvents = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { collaboratorId } = req.params;
+      const { collaboratorId } = req.params as { collaboratorId: string };
       const { month, year } = req.query;
 
       if (!collaboratorId) {

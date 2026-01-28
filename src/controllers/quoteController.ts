@@ -109,7 +109,7 @@ export class QuoteController {
    */
   async getById(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
 
       // Simular busca (substituir por implementação real)
       const quote = {
@@ -155,7 +155,7 @@ export class QuoteController {
    */
   async updateStatus(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const { status } = updateStatusSchema.parse(req.body);
 
       // Simular atualização (substituir por implementação real)
@@ -196,7 +196,7 @@ export class QuoteController {
    */
   async respond(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       const validatedData = respondSchema.parse(req.body);
 
       // Simular resposta (substituir por implementação real)

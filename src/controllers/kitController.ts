@@ -23,7 +23,7 @@ export class KitController {
         data.price = Number(data.price);
       }
 
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       if (!id) {
         return res.status(400).json({ message: "ID é obrigatório." });
       }
@@ -46,7 +46,7 @@ export class KitController {
 
   findOne = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       if (!id) {
         return res.status(400).json({ message: "ID é obrigatório." });
       }
@@ -63,7 +63,7 @@ export class KitController {
 
   delete = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
       if (!id) {
         return res.status(400).json({ message: "ID é obrigatório." });
       }
