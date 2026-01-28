@@ -54,10 +54,20 @@ export async function getAllAvailabilities() {
   return repo.findAllAvailabilities();
 }
 
-export async function getCollaboratorAvailabilities() {
-  // Busca por colaborador (stub)
-  // Exemplo: return prisma.collaborator.findMany({ where: { ... } });
-  return [];
+export async function getCollaboratorAvailabilities(collaboratorId: string) {
+  return repo.findCollaboratorAvailabilities(collaboratorId);
+}
+
+export async function createAvailability(data: any) {
+  return repo.setAvailability(data);
+}
+
+export async function updateAvailability(id: string, data: any) {
+  return repo.updateAvailability(id, data);
+}
+
+export async function deleteAvailability(id: string) {
+  return repo.deleteAvailability(id);
 }
 
 export async function getAllPayments() {
@@ -72,16 +82,12 @@ export async function updatePayment(id: string, data: any) {
   return repo.updatePayment(id, data as any);
 }
 
-export async function getCollaboratorPayments() {
-  // Busca por colaborador (stub)
-  // Exemplo: return prisma.collaborator.findMany({ where: { ... } });
-  return [];
+export async function getCollaboratorPayments(collaboratorId: string) {
+  return repo.findCollaboratorPayments(collaboratorId);
 }
 
-export async function getPaymentStats() {
-  // Busca por colaborador (stub)
-  // Exemplo: return prisma.collaborator.findMany({ where: { ... } });
-  return [];
+export async function getPaymentStats(collaboratorId: string) {
+  return repo.getPaymentStats(collaboratorId);
 }
 
 // Classe para compatibilidade com controllers
@@ -119,10 +125,6 @@ export class CollaboratorService {
     return [];
   }
 
-  async getPaymentStats() {
-    return getPaymentStats();
-  }
-
   // Métodos adicionais para o collaboratorController
   async createCollaborator(data: any) {
     return this.create(data);
@@ -154,13 +156,11 @@ export class CollaboratorService {
   }
 
   async getEventCollaborators(eventId: string) {
-    // Implementação simples
-    return [];
+    return getEventCollaborators(eventId);
   }
 
   async getCollaboratorEvents(collaboratorId: string) {
-    // Implementação simples
-    return [];
+    return getCollaboratorEvents(collaboratorId);
   }
 
   async searchCollaborators(params: any) {
@@ -188,12 +188,24 @@ export class CollaboratorService {
     return [];
   }
 
-  async getCollaboratorAvailabilities() {
-    return [];
+  async getCollaboratorAvailabilities(collaboratorId: string) {
+    return getCollaboratorAvailabilities(collaboratorId);
+  }
+
+  async createAvailability(data: any) {
+    return createAvailability(data);
+  }
+
+  async updateAvailability(id: string, data: any) {
+    return updateAvailability(id, data);
+  }
+
+  async deleteAvailability(id: string) {
+    return deleteAvailability(id);
   }
 
   async getAllPayments() {
-    return [];
+    return getAllPayments();
   }
 
   async createPaymentRecord(data: any) {
@@ -208,7 +220,21 @@ export class CollaboratorService {
     return repo.updatePayment(id, data);
   }
 
-  async getCollaboratorPayments() {
-    return [];
+  async getCollaboratorPayments(collaboratorId: string) {
+    return getCollaboratorPayments(collaboratorId);
+  }
+
+  async getPaymentStats(collaboratorId?: string) {
+     if (collaboratorId) {
+        return getPaymentStats(collaboratorId);
+     }
+     return {
+       totalPayments: 0,
+       totalPaid: 0,
+       totalPending: 0,
+       averagePayment: 0,
+       paymentsCompleted: 0,
+       paymentsPending: 0,
+     };
   }
 }

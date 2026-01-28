@@ -1,9 +1,8 @@
 import { z } from "zod";
 import { BookingStatus, DeliveryStatus } from "@prisma/client";
 
-// Schema base para criação de booking
-export const bookingCreateSchema = z
-  .object({
+// Schema base (sem refinements)
+const bookingBaseSchema = z.object({
     // Cliente (ou user registrado ou dados manuais)
   // aceitar UUIDs ou CUIDs (seed usa cuid())
   userId: z.union([z.string().uuid(), z.string().regex(/^[a-z0-9]{20,}$/i)]).optional(),
@@ -66,7 +65,10 @@ export const bookingCreateSchema = z
     // Campos admin-only
     serviceValue: z.number().positive().optional(),
     paymentProofUrl: z.string().url().optional(),
-  })
+  });
+
+// Schema para criação de booking (com validações cruzadas)
+export const bookingCreateSchema = bookingBaseSchema
   .refine(
     (data) => {
       // Garante que pelo menos uma forma de identificar o cliente seja fornecida
@@ -114,7 +116,7 @@ export const bookingFiltersSchema = z.object({
 });
 
 // Schema para atualização de booking
-export const bookingUpdateSchema = bookingCreateSchema.partial();
+export const bookingUpdateSchema = bookingBaseSchema.partial();
 
 // Schema para atualização de status
 export const bookingStatusUpdateSchema = z.object({

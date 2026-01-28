@@ -39,16 +39,7 @@ prisma.$connect().catch((error) => {
   console.error('Erro ao conectar com o banco de dados:', error);
   console.warn('Continuando sem conexão com banco - algumas funcionalidades podem não funcionar');
 });
-
-// Handle graceful shutdown
-const gracefulShutdown = async () => {
-  console.log('Desconectando do banco de dados...');
-  await prisma.$disconnect();
-  process.exit(0);
-};
-
-process.on('SIGINT', gracefulShutdown);
-process.on('SIGTERM', gracefulShutdown);
+// Graceful shutdown managed by application entry point
 process.on('beforeExit', async () => {
   await prisma.$disconnect();
 });

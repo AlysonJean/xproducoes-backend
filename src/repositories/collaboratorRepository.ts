@@ -505,24 +505,60 @@ export class CollaboratorRepository {
   }
 
   private async getMonthlyEarnings(collaboratorId: string) {
-    const result = (await prisma.$queryRaw`
-      SELECT 
-        TO_CHAR(date_trunc('month', ec."createdAt"), 'YYYY-MM') as month,
-        COALESCE(SUM(COALESCE(ec."totalPayment", ec."fixedRate", 0)), 0) as earnings,
-        COUNT(*) as events
-      FROM "EventCollaborator" ec
-      WHERE ec."collaboratorId" = ${collaboratorId}
-        AND ec.status = 'COMPLETED'
-        AND ec."createdAt" >= NOW() - INTERVAL '12 months'
-      GROUP BY date_trunc('month', ec."createdAt")
-      ORDER BY month DESC
-    `) as Array<{
-      month: string;
-      earnings: number;
-      events: number;
-    }>;
+    try {
+      // Data de 12 meses atrás
+      const oneYearAgo = new Date();
+      oneYearAgo.setMonth(oneYearAgo.getMonth() - 12);
 
-    return result;
+      // Buscar eventos concluídos nos últimos 12 meses usando Prisma puro (DB agnostic)
+      const events = await prisma.eventCollaborator.findMany({
+        where: {
+          collaboratorId,
+          status: "COMPLETED",
+          createdAt: {
+            gte: oneYearAgo,
+          },
+        },
+        select: {
+          createdAt: true,
+          totalPayment: true,
+          fixedRate: true,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      // Agrupar por mês em memória
+      const monthlyData = events.reduce((acc, event) => {
+        const date = new Date(event.createdAt);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        
+        if (!acc[monthKey]) {
+          acc[monthKey] = { month: monthKey, earnings: 0, events: 0 };
+        }
+
+        // Converter Decimal para number de forma segura
+        const toNum = (val: any) => {
+          if (!val) return 0;
+          if (typeof val === 'number') return val;
+          if (typeof val.toNumber === 'function') return val.toNumber();
+          return Number(val);
+        };
+
+        const earning = toNum(event.totalPayment) || toNum(event.fixedRate) || 0;
+
+        acc[monthKey].earnings += earning;
+        acc[monthKey].events += 1;
+
+        return acc;
+      }, {} as Record<string, { month: string; earnings: number; events: number }>);
+
+      return Object.values(monthlyData).sort((a, b) => b.month.localeCompare(a.month));
+    } catch (error) {
+      console.error("Erro ao calcular ganhos mensais:", error);
+      return []; // Retorna lista vazia em caso de erro para não quebrar o dashboard
+    }
   }
 
   private async updateCollaboratorStats(collaboratorId: string): Promise<void> {
@@ -654,6 +690,23 @@ export class CollaboratorRepository {
       {} as Record<string, number>
     );
 
+    // Calcular taxa de conclusão totalEvents > 0 ? (completedEvents / totalEvents) * 100 : 0;
+    const totalAssignments = collaborator.eventAssignments.length;
+    const completionRate = totalAssignments > 0
+      ? ((eventsByStatus.COMPLETED || 0) / totalAssignments) * 100
+      : 0;
+
+    // Calcular avaliação média
+    // Filtrar atribuições que têm rating numérico
+    const ratings = collaborator.eventAssignments
+      .filter((e) => typeof e.rating === "number" && e.rating !== null)
+      .map((e) => Number(e.rating));
+      
+    const averageRating =
+      ratings.length > 0
+        ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length
+        : 0;
+
     // Atividades recentes (últimos 10 dias)
     const tenDaysAgo = new Date();
     tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
@@ -698,16 +751,23 @@ export class CollaboratorRepository {
         languages: collaborator.languages,
         status: collaborator.status,
       },
+      // Stats no nível raiz para compatibilidade com Dashboard Frontend
+      totalEarnings,
+      totalEvents: totalAssignments,
+      completionRate: Math.round(completionRate),
+      averageRating,
       stats: {
-        totalEvents: collaborator.eventAssignments.length,
+        totalEvents: totalAssignments,
         completedEvents: eventsByStatus.COMPLETED || 0,
         confirmedEvents: eventsByStatus.CONFIRMED || 0,
         pendingEvents: eventsByStatus.PENDING || 0,
         totalEarnings,
         currentMonthEvents: currentMonthEvents.length,
-        averageEventValue: collaborator.eventAssignments.length > 0
-          ? totalEarnings / collaborator.eventAssignments.length
+        averageEventValue: totalAssignments > 0
+          ? totalEarnings / totalAssignments
           : 0,
+        completionRate: Math.round(completionRate),
+        averageRating
       },
       upcomingEvents: upcomingEvents.map((assignment) => ({
         id: assignment.booking.id,
@@ -718,8 +778,8 @@ export class CollaboratorRepository {
         status: assignment.booking.status,
       })),
       recentActivities,
+      monthlyEarnings: await this.getMonthlyEarnings(collaboratorId),
       monthlyData: {
-        // Dados para gráficos mensais (últimos 6 meses) - simplificado
         revenue: {},
         events: {},
       },

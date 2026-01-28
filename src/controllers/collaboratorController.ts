@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { CollaboratorService } from "../services/collaboratorService";
 import { z } from "zod";
+import { prisma } from "../config/prisma";
 
 const collaboratorService = new CollaboratorService();
 
@@ -420,10 +421,25 @@ export class CollaboratorController {
       }
 
       // Buscar o colaborador pelo userId
-      const collaborator = await collaboratorService.findByUserId(userId);
+      let collaborator = await collaboratorService.findByUserId(userId);
       
       if (!collaborator) {
-        return res.status(404).json({ success: false, message: 'Colaborador não encontrado' });
+        // Tentar criar perfil automaticamente se não existir (mesma lógica do getMyProfile)
+        try {
+          console.log(`[Dashboard] Perfil não encontrado para usuário ${userId}. Criando perfil padrão...`);
+          collaborator = await prisma.collaborator.create({
+            data: {
+              userId,
+              collaboratorRole: 'OTHER',
+              status: 'PENDING_APPROVAL',
+              specialties: [],
+            },
+            include: { user: true }
+          }) as any;
+        } catch (createError) {
+          console.error('[Dashboard] Erro ao criar perfil automático:', createError);
+          return res.status(404).json({ success: false, message: 'Colaborador não encontrado' });
+        }
       }
 
       // Reutiliza o service para agregar os dados do dashboard
@@ -447,16 +463,70 @@ export class CollaboratorController {
       }
 
       // Buscar o colaborador pelo userId
+      let collaborator = await collaboratorService.findByUserId(userId);
+      
+      if (!collaborator) {
+        // Auto-criação de perfil para usuários com role COLLABORATOR que ainda não possuem registro
+        // Isso corrige o problema de "Perfil não encontrado" para usuários recém-promovidos
+        try {
+          console.log(`Perfil não encontrado para usuário ${userId}. Criando perfil padrão...`);
+          
+          // Verificar se já existe (concorrência) ou criar
+          collaborator = await prisma.collaborator.create({
+            data: {
+              userId,
+              collaboratorRole: 'OTHER',
+              status: 'PENDING_APPROVAL',
+              specialties: [],
+            },
+            include: {
+              user: {
+                select: {
+                  name: true,
+                  email: true,
+                  avatarUrl: true,
+                  bio: true,
+                  location: true,
+                  website: true,
+                }
+              }
+            }
+          }) as any;
+          
+        } catch (createError) {
+          console.error('Erro ao criar perfil automático:', createError);
+          return res.status(404).json({ success: false, message: 'Colaborador não encontrado' });
+        }
+      }
+      
+      return res.json({ success: true, data: collaborator });
+    } catch (error) {
+      console.error('Erro ao buscar perfil do colaborador:', error);
+      return res.status(500).json({ success: false, message: 'Erro ao buscar perfil do colaborador' });
+    }
+  }
+
+  // Meus eventos
+  async getMyEvents(req: Request, res: Response) {
+    try {
+      const userId = req.userId as string;
+
+      if (!userId) {
+        return res.status(400).json({ success: false, message: 'Usuário não autenticado' });
+      }
+
       const collaborator = await collaboratorService.findByUserId(userId);
       
       if (!collaborator) {
         return res.status(404).json({ success: false, message: 'Colaborador não encontrado' });
       }
+      
+      const events = await collaboratorService.getCollaboratorEvents(collaborator.id);
 
-      return res.json({ success: true, data: collaborator });
+      return res.json({ success: true, data: events });
     } catch (error) {
-      console.error('Erro ao buscar perfil do colaborador:', error);
-      return res.status(500).json({ success: false, message: 'Erro ao buscar perfil do colaborador' });
+      console.error('Erro ao buscar eventos do colaborador:', error);
+      return res.status(500).json({ success: false, message: 'Erro ao buscar eventos do colaborador' });
     }
   }
 
@@ -554,31 +624,48 @@ export class CollaboratorController {
   async createAvailability(req: Request, res: Response) {
     try {
       const availabilitySchema = z.object({
-        collaboratorId: z.string().uuid("ID do colaborador inválido"),
+        collaboratorId: z.string().uuid("ID do colaborador inválido").optional(), // Opcional se for chamada via /me
         startDate: z.string().min(1, "Data de início é obrigatória"),
         endDate: z.string().min(1, "Data de fim é obrigatória"),
-        startTime: z.string().optional(),
-        endTime: z.string().optional(),
-        dayOfWeek: z
-          .enum([
-            "MONDAY",
-            "TUESDAY",
-            "WEDNESDAY",
-            "THURSDAY",
-            "FRIDAY",
-            "SATURDAY",
-            "SUNDAY",
-          ])
-          .optional(),
-        isRecurring: z.boolean().default(false),
+        startTime: z.string().default("00:00"),
+        endTime: z.string().default("23:59"),
         status: z.enum(["AVAILABLE", "BUSY", "OFF_DUTY"]).default("AVAILABLE"),
         notes: z.string().optional(),
       });
 
-      return res.status(501).json({
-        success: false,
-        message: "Criação de disponibilidade não implementada ainda",
+      const validatedData = availabilitySchema.parse(req.body);
+      let collaboratorId = validatedData.collaboratorId;
+
+      // Se não houver collaboratorId no body, tentar obter do usuário autenticado
+      if (!collaboratorId && req.userId) {
+         const collaborator = await collaboratorService.findByUserId(req.userId);
+         if (collaborator) {
+           collaboratorId = collaborator.id;
+         }
+      }
+
+      if (!collaboratorId) {
+        return res.status(400).json({ success: false, message: "ID do colaborador é obrigatório" });
+      }
+
+      // Converter strings de data para Date objects se necessário
+      // O repositório espera Date objects para as datas
+      // Assumindo que o front envia ISO strings YYYY-MM-DD
+      const avail = await collaboratorService.createAvailability({
+        collaboratorId,
+        date: new Date(validatedData.startDate), // Simplificação: usando startDate como a data do registro
+        startTime: validatedData.startTime,
+        endTime: validatedData.endTime,
+        status: validatedData.status,
+        notes: validatedData.notes
       });
+
+      return res.status(201).json({
+        success: true,
+        data: avail,
+        message: "Disponibilidade criada com sucesso"
+      });
+
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
@@ -600,8 +687,7 @@ export class CollaboratorController {
     try {
       const { id } = req.params;
       const updateSchema = z.object({
-        startDate: z.string().optional(),
-        endDate: z.string().optional(),
+        date: z.string().optional(), // Mudado de start/endDate para date para alinhar com modelo
         startTime: z.string().optional(),
         endTime: z.string().optional(),
         status: z.enum(["AVAILABLE", "BUSY", "OFF_DUTY"]).optional(),
@@ -609,10 +695,18 @@ export class CollaboratorController {
       });
 
       const validatedData = updateSchema.parse(req.body);
-      // Método não implementado no service
-      return res.status(501).json({
-        success: false,
-        message: "Atualização de disponibilidade não implementada ainda",
+      
+      const updateData: any = { ...validatedData };
+      if (validatedData.date) {
+        updateData.date = new Date(validatedData.date);
+      }
+
+      const updated = await collaboratorService.updateAvailability(id, updateData);
+
+      return res.json({
+        success: true,
+        data: updated,
+        message: "Disponibilidade atualizada"
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -634,10 +728,10 @@ export class CollaboratorController {
   async deleteAvailability(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      // Método não implementado no service
-      return res.status(501).json({
-        success: false,
-        message: "Remoção de disponibilidade não implementada ainda",
+      await collaboratorService.deleteAvailability(id);
+      return res.json({
+        success: true,
+        message: "Disponibilidade removida com sucesso",
       });
     } catch (error) {
       console.error("Erro ao remover disponibilidade:", error);
@@ -651,9 +745,7 @@ export class CollaboratorController {
   async getCollaboratorAvailabilities(req: Request, res: Response) {
     try {
       const { collaboratorId } = req.params;
-      // Método não implementado no service - retorna array vazio
-      const availabilities =
-        await collaboratorService.getCollaboratorAvailabilities();
+      const availabilities = await collaboratorService.getCollaboratorAvailabilities(collaboratorId);
 
       return res.json({
         success: true,
@@ -666,6 +758,56 @@ export class CollaboratorController {
         message: "Erro ao buscar disponibilidades do colaborador",
       });
     }
+  }
+
+  // --- MÉTODOS /ME (Usuário Autenticado) ---
+
+  async getMyAvailability(req: Request, res: Response) {
+      try {
+        const userId = req.userId as string;
+        if (!userId) return res.status(401).json({ success: false, message: 'Não autenticado' });
+
+        const collaborator = await collaboratorService.findByUserId(userId);
+        if (!collaborator) return res.status(404).json({ success: false, message: 'Perfil de colaborador não encontrado' });
+
+        const availabilities = await collaboratorService.getCollaboratorAvailabilities(collaborator.id);
+        return res.json({ success: true, data: availabilities });
+      } catch (error) {
+        console.error("Erro ao buscar minha disponibilidade:", error);
+        return res.status(500).json({ success: false, message: "Erro interno" });
+      }
+  }
+
+  async getMyPayments(req: Request, res: Response) {
+      try {
+        const userId = req.userId as string;
+        if (!userId) return res.status(401).json({ success: false, message: 'Não autenticado' });
+
+        const collaborator = await collaboratorService.findByUserId(userId);
+        if (!collaborator) return res.status(404).json({ success: false, message: 'Perfil de colaborador não encontrado' });
+
+        const payments = await collaboratorService.getCollaboratorPayments(collaborator.id);
+        return res.json({ success: true, data: payments });
+      } catch (error) {
+        console.error("Erro ao buscar meus pagamentos:", error);
+        return res.status(500).json({ success: false, message: "Erro interno" });
+      }
+  }
+
+  async getMyStats(req: Request, res: Response) {
+      try {
+        const userId = req.userId as string;
+        if (!userId) return res.status(401).json({ success: false, message: 'Não autenticado' });
+
+        const collaborator = await collaboratorService.findByUserId(userId);
+        if (!collaborator) return res.status(404).json({ success: false, message: 'Perfil de colaborador não encontrado' });
+
+        const stats = await collaboratorService.getCollaboratorStats(collaborator.id);
+        return res.json({ success: true, data: stats });
+      } catch (error) {
+        console.error("Erro ao buscar minhas estatísticas:", error);
+        return res.status(500).json({ success: false, message: "Erro interno" });
+      }
   }
 
   // Gerenciamento de Pagamentos
@@ -793,8 +935,8 @@ export class CollaboratorController {
   async getCollaboratorPayments(req: Request, res: Response) {
     try {
       const { collaboratorId } = req.params;
-      // Método não implementado no service - retorna array vazio
-      const payments = await collaboratorService.getCollaboratorPayments();
+      // Método implementado no service
+      const payments = await collaboratorService.getCollaboratorPayments(collaboratorId);
 
       return res.json({
         success: true,
@@ -825,6 +967,27 @@ export class CollaboratorController {
         success: false,
         message: "Erro ao buscar estatísticas de pagamentos",
       });
+    }
+  }
+
+  // Minhas notificações
+  async getMyNotifications(req: Request, res: Response) {
+    try {
+      const userId = req.userId as string;
+      if (!userId) {
+        return res.status(400).json({ success: false, message: 'Usuário não autenticado' });
+      }
+
+      const notifications = await prisma.notification.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: 50
+      });
+
+      return res.json({ success: true, data: notifications });
+    } catch (error) {
+      console.error('Erro ao buscar notificações:', error);
+      return res.status(500).json({ success: false, message: 'Erro ao buscar notificações' });
     }
   }
 
@@ -881,6 +1044,11 @@ export const {
   deletePayment,
   getCollaboratorPayments,
   getPaymentStats,
+  getMyAvailability,
+  getMyPayments,
+  getMyStats,
+  getMyEvents,
+  getMyNotifications,
 } = collaboratorController;
 
 // Alias para createEventCollaborator

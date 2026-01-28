@@ -6,16 +6,19 @@ import logger from "../config/logger";
 // Rate limiting para autenticação - Mais restritivo
 export const authRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 20, // Máximo 20 tentativas por IP
+  max: 1000, // AUMENTADO PARA DESENVOLVIMENTO (Era 20)
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req: Request, res: Response) => {
+    logger.warn(`Rate limit exceeded for IP: ${req.ip}`);
     res.status(429).json({
       error: 'Too Many Requests',
       message: 'Muitas tentativas de autenticação. Aguarde antes de tentar novamente.',
     });
   },
   skip: (req: Request) => {
+    // Sempre pular em ambiente de desenvolvimento
+    if (process.env.NODE_ENV === 'development') return true;
     const whitelist = ['127.0.0.1', '::1'];
     return req.ip ? whitelist.includes(req.ip) : false;
   },
@@ -23,7 +26,7 @@ export const authRateLimit = rateLimit({
 
 export const apiRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 2000, // Aumentado para debug
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -37,9 +40,10 @@ export const createResourceRateLimit = rateLimit({
 
 export const uploadRateLimit = rateLimit({
   windowMs: 5 * 60 * 1000,
-  max: 5,
+  max: 50, // Increased for dev
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req: Request) => process.env.NODE_ENV === 'development',
 });
 
 export const searchRateLimit = rateLimit({
