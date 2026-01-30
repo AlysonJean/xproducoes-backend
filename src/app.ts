@@ -39,6 +39,15 @@ app.use(
 // Monitoramento de segurança
 app.use(securityMonitoringMiddleware);
 
+// Rota raiz para verificação de saúde (Health Check)
+app.get("/", (req, res) => {
+  res.status(200).json({ 
+    message: "API X-Produções Online 🚀",
+    environment: process.env.NODE_ENV,
+    version: "1.0.0"
+  });
+});
+
 // Servir arquivos estáticos para manifest e service worker (produção)
 if (process.env.NODE_ENV === "production") {
   const path = require("path");
