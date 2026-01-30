@@ -3,7 +3,7 @@
  * Sistema de monitoramento enterprise para todas as integrações e saúde do sistema
  */
 
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../config/database";
 import { cacheService } from "./cacheService";
 import logger from "../config/logger";
 import os from "os";
@@ -46,13 +46,13 @@ interface Alert {
 }
 
 class EnterpriseMonitoringService {
-  private prisma: PrismaClient;
+  private prisma: typeof prisma;
   private alerts: Alert[] = [];
   private healthChecks: Map<string, IntegrationHealth> = new Map();
   private isMonitoring = false;
 
   constructor() {
-    this.prisma = new PrismaClient();
+    this.prisma = prisma;
     this.startBackgroundMonitoring();
   }
 

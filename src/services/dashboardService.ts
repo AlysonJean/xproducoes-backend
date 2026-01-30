@@ -189,7 +189,7 @@ export class DashboardService {
 
     const firstYear = result.eventDate.getFullYear();
     const currentYear = new Date().getFullYear();
-    const years = [];
+    const years: number[] = [];
 
     for (let year = firstYear; year <= currentYear; year++) {
       years.push(year);

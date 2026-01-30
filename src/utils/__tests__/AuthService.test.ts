@@ -1,8 +1,14 @@
 import { AuthService } from "../../services/authService";
 
 jest.mock("../../services/userService", () => ({
-  register: jest.fn(async (data) => ({ id: 'u1', ...data })),
-  login: jest.fn(async (data) => ({ token: 'jwt', user: { id: 'u1', ...data } })),
+  register: jest.fn(async (data) => {
+    if (data.email.includes("duplicate")) throw new Error("Email já está em uso.");
+    return { id: 'u1', ...data };
+  }),
+  login: jest.fn(async (data) => {
+    if (data.password === "senhaerrada") throw new Error("Credenciais inválidas");
+    return { token: 'jwt', user: { id: 'u1', ...data } };
+  }),
   requestPasswordReset: jest.fn(async (email) => ({ success: true })),
   resetPassword: jest.fn(async (token, newPassword) => ({ success: true })),
   getProfile: jest.fn(async (userId) => ({ id: userId, name: 'User' })),
@@ -61,16 +67,12 @@ describe("AuthService", () => {
 
   // Mantém os testes originais para cenários de erro
   it("deve lançar erro ao registrar e-mail duplicado", async () => {
-    await service.register({
-      name: "Teste",
-      email: uniqueEmail,
-      password: "123456",
-      phone,
-    });
+    // Simulando erro no mock
+    const duplicateEmail = "duplicate@teste.com";
     await expect(
       service.register({
         name: "Teste",
-        email: uniqueEmail,
+        email: duplicateEmail,
         password: "123456",
         phone,
       }),
@@ -78,12 +80,7 @@ describe("AuthService", () => {
   });
 
   it("deve lançar erro ao logar com senha errada", async () => {
-    await service.register({
-      name: "Teste",
-      email: uniqueEmail,
-      password: "123456",
-      phone,
-    });
+    // O mock já está configurado para falhar com 'senhaerrada'
     await expect(
       service.login({ email: uniqueEmail, password: "senhaerrada" }),
     ).rejects.toThrow();

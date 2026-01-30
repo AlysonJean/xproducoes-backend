@@ -1,8 +1,49 @@
 
 import request from 'supertest';
+import { UserRole } from '@prisma/client';
+
+// Mock auth middleware before app import
+jest.mock('../../middlewares/unifiedAuth', () => ({
+  authenticate: (req: any, res: any, next: any) => {
+    req.user = { id: '1', role: 'ADMIN' };
+    req.userId = '1';
+    req.userRole = 'ADMIN';
+    next();
+  },
+  authenticateToken: (req: any, res: any, next: any) => {
+    req.user = { id: '1', role: 'ADMIN' };
+    req.userId = '1';
+    req.userRole = 'ADMIN';
+    next();
+  },
+  requireAdmin: (req: any, res: any, next: any) => next(),
+  requireAdminOrCollaborator: (req: any, res: any, next: any) => next(),
+  requireCollaborator: (req: any, res: any, next: any) => next(),
+  requireManager: (req: any, res: any, next: any) => next(),
+  requireStaff: (req: any, res: any, next: any) => next(),
+  optionalAuth: (req: any, res: any, next: any) => next(),
+}));
+
+// Mock rate limiters to avoid issues in tests
+jest.mock('../../middlewares/rateLimitMiddleware', () => ({
+  authRateLimit: (req: any, res: any, next: any) => next(),
+  uploadRateLimit: (req: any, res: any, next: any) => next(),
+  apiRateLimit: (req: any, res: any, next: any) => next(), // Note: apiLimiter or apiRateLimit? File says apiRateLimit
+  createResourceRateLimit: (req: any, res: any, next: any) => next(),
+  searchRateLimit: (req: any, res: any, next: any) => next(),
+  passwordResetRateLimit: (req: any, res: any, next: any) => next(),
+  dynamicRateLimit: (req: any, res: any, next: any) => next(),
+  criticalEndpointRateLimit: (req: any, res: any, next: any) => next(),
+  paymentRateLimit: (req: any, res: any, next: any) => next(),
+  cartRateLimit: (req: any, res: any, next: any) => next(),
+  quoteRateLimit: (req: any, res: any, next: any) => next(),
+  reviewRateLimit: (req: any, res: any, next: any) => next(),
+  dashboardRateLimit: (req: any, res: any, next: any) => next(),
+  apiLimiter: (req: any, res: any, next: any) => next(), // Just in case
+}));
+
 import app from '../../app';
 import * as userService from '../../services/userService';
-import { UserRole } from '@prisma/client';
 
 describe('userController', () => {
   describe('register', () => {
@@ -10,14 +51,14 @@ describe('userController', () => {
       jest.spyOn(userService, 'register').mockResolvedValue({
         needsEmailVerification: true,
         id: '1',
-        name: 'A',
+        name: 'Ana',
         email: 'a@a.com',
         role: UserRole.CLIENT,
         createdAt: new Date(),
       });
       const res = await request(app)
         .post('/api/users/register')
-        .send({ email: 'a@a.com', password: '123456', name: 'A' });
+        .send({ email: 'a@a.com', password: 'Password123!', name: 'Ana' });
       expect(res.status).toBe(201);
       expect(res.body).toHaveProperty('id');
     });

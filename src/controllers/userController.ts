@@ -35,7 +35,7 @@ export async function login(req: Request, res: Response) {
 
 export async function getProfile(req: Request, res: Response) {
   try {
-    const user = await userService.getProfile(req.userId!);
+    const user = await userService.getProfile((req as any).userId!);
     return res.json(user);
   } catch (error: any) {
     return res.status(404).json({ error: error.message });
@@ -60,7 +60,7 @@ export async function updateProfile(req: Request, res: Response) {
     }
     
     const user = await userService.updateProfile(
-      req.userId!,
+      (req as any).userId!,
       updateData,
       req.file,
     );
@@ -99,7 +99,7 @@ export async function resetPassword(req: Request, res: Response) {
 
 export async function getStats(req: Request, res: Response) {
   try {
-    const stats = await userService.getUserStats(req.userId!);
+    const stats = await userService.getUserStats((req as any).userId!);
     return res.json({
       success: true,
       data: stats
@@ -111,7 +111,7 @@ export async function getStats(req: Request, res: Response) {
 
 export async function promoteVip(req: Request, res: Response) {
   try {
-    await userService.promoteToVip(req.userId!);
+    await userService.promoteToVip((req as any).userId!);
     return res.json({ success: true, message: 'Usuário promovido a VIP' });
   } catch (error: any) {
     if (error.message && error.message.includes('Regra de promoção')) {

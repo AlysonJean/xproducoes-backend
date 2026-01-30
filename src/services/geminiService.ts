@@ -7,7 +7,11 @@ import logger from "../config/logger";
 
 // Validate API key presence
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
-const USE_MOCK_FALLBACK = String(process.env.GEMINI_MOCK_FALLBACK || '').toLowerCase() === 'true';
+// Default to true in development if not explicitly disabled
+const IS_DEV = process.env.NODE_ENV !== 'production';
+const USE_MOCK_FALLBACK = process.env.GEMINI_MOCK_FALLBACK 
+  ? String(process.env.GEMINI_MOCK_FALLBACK).toLowerCase() === 'true'
+  : IS_DEV; // Auto-enable mock in dev if variable is unset
 
 let genAI: GoogleGenerativeAI | null = null;
 if (GEMINI_KEY) {
@@ -21,16 +25,28 @@ if (GEMINI_KEY) {
   logger.warn('GEMINI_API_KEY não configurada. Gemini estará desativado. Para habilitar, configure GEMINI_API_KEY no ambiente.');
 }
 
+const MOCK_SUGGESTIONS = [
+  "Que tal uma 'Festa Acústica ao Entardecer'? Use nosso kit acústico, iluminação suave e um pequeno palco para criar um clima intimista e inesquecível.",
+  "Experimente uma 'Noite de Cinema ao Ar Livre'! Com nosso projetor de alta definição e sistema de som surround, crie uma experiência mágica sob as estrelas.",
+  "Organize uma 'Balada Neon'! Nossos kits de iluminação UV, strobos e lasers vão transformar seu espaço em uma pista de dança vibrante e cheia de energia.",
+  "Sugerimos um 'Lounge Corporativo Premium'. Utilize nossa iluminação arquitetural e som ambiente de alta fidelidade para criar um networking elegante e produtivo."
+];
+
+function getMockSuggestion() {
+  const randomIndex = Math.floor(Math.random() * MOCK_SUGGESTIONS.length);
+  return MOCK_SUGGESTIONS[randomIndex];
+}
+
 export class GeminiService {
   async suggestEventTheme(): Promise<string> {
     // If no key and mock fallback enabled, return a safe mocked suggestion for local dev
     if (!genAI) {
       if (USE_MOCK_FALLBACK) {
-        logger.info('GEMINI chave ausente: usando fallback mock (GEMINI_MOCK_FALLBACK=true)');
-        return "Que tal uma 'Festa Acústica ao Entardecer'? Use nosso kit acústico, iluminação suave e um pequeno palco para criar um clima intimista e inesquecível.";
+        logger.info('GEMINI chave ausente: usando fallback mock auto-habilitado em DEV');
+        return getMockSuggestion();
       }
       // Otherwise throw a clear error for operators/developers
-      throw new Error('GEMINI_API_KEY não configurada. Não é possível chamar o serviço de geração de conteúdo.');
+      throw new Error('GEMINI_API_KEY não configurada e fallback desativado.');
     }
 
     try {
@@ -81,6 +97,12 @@ export class GeminiService {
     } catch (error: any) {
       // Detect common API errors to provide actionable logs
       logger.error({obj:typeof error === 'object' && error !== null ? error.message || error : error}, 'Erro ao comunicar com a API Gemini:');
+
+      // Fallback on API error if we are in DEV or configured to do so
+      if (USE_MOCK_FALLBACK) {
+        logger.warn('Falha na API Gemini, retornando sugestão mockada como fallback.');
+        return getMockSuggestion();
+      }
 
       // If the underlying error from Google contains structured details, try to surface a friendly message
       try {

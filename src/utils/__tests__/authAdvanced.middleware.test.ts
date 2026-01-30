@@ -1,8 +1,9 @@
-const authAdvanced = require('../../middlewares/authAdvanced');
-const jwt = require('jsonwebtoken');
+import authAdvanced from '../../middlewares/authAdvanced';
+import jwt from 'jsonwebtoken';
+import { prisma } from '../../config/prisma';
 
 describe('authenticateToken', () => {
-  let req, res, next;
+  let req: any, res: any, next: any;
   beforeEach(() => {
     req = { headers: {}, user: undefined };
     res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
@@ -10,7 +11,7 @@ describe('authenticateToken', () => {
   });
 
   it('deve retornar 401 se não houver token', async () => {
-    await authAdvanced.authenticateToken(req, res, next);
+    await authAdvanced.authenticateToken(req as any, res as any, next);
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'MISSING_TOKEN' }));
   });
@@ -18,35 +19,34 @@ describe('authenticateToken', () => {
   it('deve retornar 401 se token for inválido', async () => {
     req.headers.authorization = 'Bearer tokeninvalido';
     jest.spyOn(jwt, 'verify').mockImplementation(() => { throw new jwt.JsonWebTokenError('invalid'); });
-    await authAdvanced.authenticateToken(req, res, next);
+    await authAdvanced.authenticateToken(req as any, res as any, next);
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'INVALID_TOKEN' }));
-    jwt.verify.mockRestore();
+    (jwt.verify as jest.Mock).mockRestore();
   });
 
   it('deve retornar 401 se usuário não existir', async () => {
     req.headers.authorization = 'Bearer valido';
-    jest.spyOn(jwt, 'verify').mockReturnValue({ userId: 'u1', role: 'ADMIN' });
-    const prisma = require('../../config/prisma');
+    jest.spyOn(jwt, 'verify').mockReturnValue({ userId: 'u1', role: 'ADMIN' } as any);
     jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(null);
-    await authAdvanced.authenticateToken(req, res, next);
+    await authAdvanced.authenticateToken(req as any, res as any, next);
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'USER_INACTIVE' }));
-    prisma.user.findUnique.mockRestore();
-    jwt.verify.mockRestore();
+    (prisma.user.findUnique as jest.Mock).mockRestore();
+    (jwt.verify as jest.Mock).mockRestore();
   });
 
   it('deve chamar next se token e usuário forem válidos', async () => {
     req.headers.authorization = 'Bearer valido';
-    jest.spyOn(jwt, 'verify').mockReturnValue({ userId: 'u1', role: 'ADMIN' });
-    const prisma = require('../../config/prisma');
-    jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({ id: 'u1', email: 'a@a.com', role: 'ADMIN', isActive: true });
-    await authAdvanced.authenticateToken(req, res, next);
+    jest.spyOn(jwt, 'verify').mockReturnValue({ userId: 'u1', role: 'ADMIN' } as any);
+    jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({ id: 'u1', email: 'a@a.com', role: 'ADMIN', isActive: true } as any);
+    await authAdvanced.authenticateToken(req as any, res as any, next);
     expect(next).toHaveBeenCalled();
-    prisma.user.findUnique.mockRestore();
-    jwt.verify.mockRestore();
+    (prisma.user.findUnique as jest.Mock).mockRestore();
+    (jwt.verify as jest.Mock).mockRestore();
   });
 });
+
 
 describe('authorize', () => {
   it('deve negar acesso se não autenticado', () => {
@@ -54,7 +54,7 @@ describe('authorize', () => {
     const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
     const next = jest.fn();
     const middleware = authAdvanced.authorize('resource', 'action');
-    middleware(req, res, next);
+    middleware(req as any, res as any, next);
     expect(res.status).toHaveBeenCalledWith(401);
   });
   it('deve negar acesso se não tiver permissão', () => {
@@ -62,7 +62,7 @@ describe('authorize', () => {
     const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
     const next = jest.fn();
     const middleware = authAdvanced.authorize('resource', 'action');
-    middleware(req, res, next);
+    middleware(req as any, res as any, next);
     expect(res.status).toHaveBeenCalledWith(403);
   });
   it('deve permitir acesso se for ADMIN', () => {
@@ -70,7 +70,7 @@ describe('authorize', () => {
     const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
     const next = jest.fn();
     const middleware = authAdvanced.authorize('resource', 'action');
-    middleware(req, res, next);
+    middleware(req as any, res as any, next);
     expect(next).toHaveBeenCalled();
   });
 });
@@ -95,11 +95,11 @@ describe('rateLimitByUser', () => {
     const req = { user: { id: 'u1' } };
     const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
     const next = jest.fn();
-    middleware(req, res, next);
+    middleware(req as any, res as any, next);
     expect(next).toHaveBeenCalled();
     // Segunda chamada deve bloquear
     const next2 = jest.fn();
-    middleware(req, res, next2);
+    middleware(req as any, res as any, next2);
     expect(res.status).toHaveBeenCalledWith(429);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'RATE_LIMIT_EXCEEDED' }));
   });

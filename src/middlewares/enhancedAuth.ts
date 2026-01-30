@@ -74,9 +74,9 @@ export function enhancedAuthMiddleware(
       });
     }
 
-    req.authUser = decoded;
-    req.userId = decoded.userId;
-    req.userRole = decoded.role;
+    (req as any).authUser = decoded;
+    (req as any).userId = decoded.userId;
+    (req as any).userRole = decoded.role;
 
     console.info('[AUTH] Authenticated request', {
       method: req.method,
@@ -123,7 +123,7 @@ export function enhancedAuthMiddleware(
 // Middleware to check specific roles
 export function requireRole(allowedRoles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.userRole) {
+    if (!(req as any).userRole) {
       return res.status(401).json({
         success: false,
         message: "Usuário não autenticado",
@@ -131,13 +131,13 @@ export function requireRole(allowedRoles: string[]) {
       });
     }
 
-    if (!allowedRoles.includes(req.userRole)) {
+    if (!allowedRoles.includes((req as any).userRole)) {
       return res.status(403).json({
         success: false,
         message: "Acesso negado",
         code: "INSUFFICIENT_PERMISSIONS",
         requiredRoles: allowedRoles,
-        userRole: req.userRole
+        userRole: (req as any).userRole
       });
     }
 

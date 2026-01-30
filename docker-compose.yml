@@ -19,5 +19,36 @@ services:
       timeout: 5s
       retries: 5
 
+  backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: xproducoes_backend
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/x_producoes_db?schema=public}
+      - NODE_ENV=production
+      - JWT_SECRET=${JWT_SECRET}
+      - PORT=4000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: xproducoes_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:

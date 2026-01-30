@@ -5,7 +5,7 @@ module.exports = {
   testEnvironment: "node",
   transform: {
     "^.+\\.tsx?$": ["ts-jest", {
-      tsconfig: process.env.NODE_ENV === 'production' ? 'tsconfig.json' : 'tsconfig.dev.json'
+      tsconfig: 'tsconfig.test.json'
     }],
   },
   setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],

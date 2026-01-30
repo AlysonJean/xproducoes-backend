@@ -68,7 +68,7 @@ authRoutes.post('/admin/send-campaign', authenticate, requireAdmin, async (req: 
   try {
     const { subject, html, text, segment } = req.body;
     // segment: { role: 'CLIENT' } ou { ids: ['id1','id2'] }
-    let users = [];
+    let users: any[] = [];
     if (segment?.ids && Array.isArray(segment.ids)) {
       users = await (await import('../services/userService')).listUsers();
       users = users.filter((u: any) => segment.ids.includes(u.id));

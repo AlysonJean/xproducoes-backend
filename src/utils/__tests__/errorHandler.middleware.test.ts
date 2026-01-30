@@ -1,7 +1,8 @@
+import { ZodError } from 'zod';
 import { errorHandler } from '../../middlewares/errorHandler';
 
 describe('errorHandler middleware', () => {
-  let req, res, next;
+  let req: any, res: any, next: any;
   beforeEach(() => {
     req = { path: '/rota', method: 'GET' };
     res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
@@ -9,8 +10,7 @@ describe('errorHandler middleware', () => {
   });
 
   it('deve retornar 422 para erro Zod', () => {
-    const zodErr = { issues: [{ message: 'Campo obrigatório' }], constructor: { name: 'ZodError' } };
-    Object.setPrototypeOf(zodErr, require('zod').ZodError.prototype);
+    const zodErr = new ZodError([{ code: 'custom', path: [], message: 'Campo obrigatório' }]);
     errorHandler(zodErr, req, res, next);
     expect(res.status).toHaveBeenCalledWith(422);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: 'Dados inválidos' }));

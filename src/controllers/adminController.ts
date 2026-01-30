@@ -284,7 +284,7 @@ export class AdminController {
 
       // ✅ Usar transação atômica para garantir consistência
       await prisma.$transaction(async (tx) => {
-        let updatedClient = null;
+        let updatedClient: any = null;
         
         // Atualizar dados do cliente
         if (Object.keys(clientData).length > 0) {
@@ -330,7 +330,7 @@ export class AdminController {
         return res.status(400).json({ error: "ID é obrigatório" });
       }
       // Remove perfil de cliente
-      let client = null;
+      let client: any = null;
       try {
         client = await clientService.getClientById(id);
       } catch {}

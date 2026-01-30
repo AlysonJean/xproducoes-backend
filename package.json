@@ -21,7 +21,6 @@
     "scan-history-secrets": "node ../scripts/scan_history_secrets.js",
     "config-hooks": "git config core.hooksPath .githooks || true"
   },
-  "_comment_prisma": "NOTA: A propriedade 'prisma' está deprecated no Prisma 7, mas ainda não há suporte oficial para prisma.config.ts. Migrar quando o Prisma 7 for lançado.",
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
   },
@@ -32,6 +31,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@prisma/adapter-pg": "^5.22.0",
     "@prisma/client": "^5.22.0",
     "@types/bcrypt": "^6.0.0",
     "@types/compression": "^1.8.1",
@@ -44,6 +44,7 @@
     "@types/node": "^24.3.0",
     "@types/node-fetch": "^2.6.13",
     "@types/nodemailer": "^7.0.1",
+    "@types/pg": "^8.16.0",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.7.0",
     "compression": "^1.8.1",
@@ -61,14 +62,15 @@
     "multer": "^2.0.2",
     "node-fetch": "^2.7.0",
     "nodemailer": "^7.0.5",
+    "pg": "^8.17.2",
     "pino": "^9.7.0",
     "prisma": "^5.22.0",
+    "react-ga4": "^2.1.0",
     "socket.io": "^4.8.1",
     "typescript": "^5.9.2",
     "zod": "^4.0.14"
   },
   "devDependencies": {
-    "tsx": "^4.21.0",
     "@eslint/js": "^9.35.0",
     "@types/cors": "^2.8.17",
     "@types/ioredis": "^5.0.0",
@@ -85,6 +87,7 @@
     "ts-jest": "^29.4.0",
     "ts-node": "^10.9.1",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.21.0",
     "typescript-eslint": "^8.43.0"
   },
   "overrides": {

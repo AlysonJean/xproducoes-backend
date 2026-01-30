@@ -1,4 +1,4 @@
-const {
+import {
   authMiddleware,
   adminOnly,
   collaboratorOnly,
@@ -6,14 +6,14 @@ const {
   optionalAuth,
   setSessionCookie,
   defaultCookieOptions
-} = require('../../middlewares/authMiddleware');
+} from '../../middlewares/authMiddleware';
 
-const jwt = require('jsonwebtoken');
+import jwt from 'jsonwebtoken';
 
 describe('authMiddleware', () => {
-  let req;
-  let res;
-  let next;
+  let req: any;
+  let res: any;
+  let next: any;
 
   beforeEach(() => {
     req = { headers: {}, ip: '127.0.0.1', get: jest.fn(), method: 'GET', path: '/api', connection: { remoteAddress: '127.0.0.1' } };
@@ -36,20 +36,20 @@ describe('authMiddleware', () => {
 
   it('deve chamar next se token for válido', () => {
     req.headers.authorization = 'Bearer valido';
-    jest.spyOn(jwt, 'verify').mockReturnValue({ userId: 'u1', role: 'ADMIN' });
+    jest.spyOn(jwt as any, 'verify').mockReturnValue({ userId: 'u1', role: 'ADMIN' });
     authMiddleware(req, res, next);
     expect(next).toHaveBeenCalled();
-    jwt.verify.mockRestore();
+    (jwt.verify as jest.Mock).mockRestore();
   });
 
   it('deve retornar 401 se token expirado', () => {
     req.headers.authorization = 'Bearer expirado';
     const error = new jwt.TokenExpiredError('jwt expired', new Date());
-    jest.spyOn(jwt, 'verify').mockImplementation(() => { throw error; });
+    jest.spyOn(jwt as any, 'verify').mockImplementation(() => { throw error; });
     authMiddleware(req, res, next);
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: expect.any(String) }));
-    jwt.verify.mockRestore();
+    (jwt.verify as jest.Mock).mockRestore();
   });
 });
 
@@ -58,14 +58,14 @@ describe('adminOnly', () => {
     const req = { userRole: 'CLIENT' };
     const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
     const next = jest.fn();
-    adminOnly(req, res, next);
+    adminOnly(req as any, res as any, next);
     expect(res.status).toHaveBeenCalledWith(403);
   });
   it('deve permitir acesso se for ADMIN', () => {
     const req = { userRole: 'ADMIN' };
     const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
     const next = jest.fn();
-    adminOnly(req, res, next);
+    adminOnly(req as any, res as any, next);
     expect(next).toHaveBeenCalled();
   });
 });
@@ -75,14 +75,14 @@ describe('collaboratorOnly', () => {
     const req = { userRole: 'CLIENT' };
     const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
     const next = jest.fn();
-    collaboratorOnly(req, res, next);
+    collaboratorOnly(req as any, res as any, next);
     expect(res.status).toHaveBeenCalledWith(403);
   });
   it('deve permitir acesso se for COLLABORATOR', () => {
     const req = { userRole: 'COLLABORATOR' };
     const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
     const next = jest.fn();
-    collaboratorOnly(req, res, next);
+    collaboratorOnly(req as any, res as any, next);
     expect(next).toHaveBeenCalled();
   });
 });
@@ -92,21 +92,21 @@ describe('adminOrCollaborator', () => {
     const req = { userRole: 'CLIENT' };
     const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
     const next = jest.fn();
-    adminOrCollaborator(req, res, next);
+    adminOrCollaborator(req as any, res as any, next);
     expect(res.status).toHaveBeenCalledWith(403);
   });
   it('deve permitir acesso se for ADMIN', () => {
     const req = { userRole: 'ADMIN' };
     const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
     const next = jest.fn();
-    adminOrCollaborator(req, res, next);
+    adminOrCollaborator(req as any, res as any, next);
     expect(next).toHaveBeenCalled();
   });
   it('deve permitir acesso se for COLLABORATOR', () => {
     const req = { userRole: 'COLLABORATOR' };
     const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
     const next = jest.fn();
-    adminOrCollaborator(req, res, next);
+    adminOrCollaborator(req as any, res as any, next);
     expect(next).toHaveBeenCalled();
   });
 });
@@ -116,25 +116,25 @@ describe('optionalAuth', () => {
     const req = { headers: {} };
     const res = {};
     const next = jest.fn();
-    optionalAuth(req, res, next);
+    optionalAuth(req as any, res as any, next);
     expect(next).toHaveBeenCalled();
   });
   it('deve seguir sem autenticação se formato inválido', () => {
     const req = { headers: { authorization: 'TokenInvalido' } };
     const res = {};
     const next = jest.fn();
-    optionalAuth(req, res, next);
+    optionalAuth(req as any, res as any, next);
     expect(next).toHaveBeenCalled();
   });
   it('deve setar user se token válido', () => {
-    const req = { headers: { authorization: 'Bearer valido' } };
+    const req: any = { headers: { authorization: 'Bearer valido' } };
     const res = {};
     const next = jest.fn();
-    jest.spyOn(jwt, 'verify').mockReturnValue({ userId: 'u1', role: 'ADMIN' });
-    optionalAuth(req, res, next);
+    jest.spyOn(jwt as any, 'verify').mockReturnValue({ userId: 'u1', role: 'ADMIN' });
+    optionalAuth(req, res as any, next);
     expect(req.userId).toBe('u1');
     expect(req.userRole).toBe('ADMIN');
-    jwt.verify.mockRestore();
+    (jwt.verify as jest.Mock).mockRestore();
     expect(next).toHaveBeenCalled();
   });
 });
@@ -142,7 +142,7 @@ describe('optionalAuth', () => {
 describe('setSessionCookie', () => {
   it('deve setar cookie com opções seguras', () => {
     const res = { cookie: jest.fn() };
-    setSessionCookie(res, 'token', 'abc123');
+    setSessionCookie(res as any, 'token', 'abc123');
     expect(res.cookie).toHaveBeenCalledWith('token', 'abc123', expect.objectContaining(defaultCookieOptions));
   });
 });

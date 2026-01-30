@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -22,17 +23,12 @@ model Portfolio {
   description String
   eventDate   DateTime
   imageUrl    String
-}
-
-model PortfolioItem {
-  id          String   @id @default(cuid())
-  title       String
-  description String
-  imageUrl    String
-  eventDate   DateTime
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@map("portfolios")
 }
+
 model Faq {
   id        String   @id @default(cuid())
   question  String

@@ -19,9 +19,10 @@ describe('cacheMiddleware', () => {
 
   it('deve armazenar resposta no cache e retornar do cache', () => {
     // Primeira chamada: armazena no cache
+    const originalJson = res.json;
     cacheMiddleware(req, res, next);
     res.json({ foo: 'bar' });
-    expect(res.json).toHaveBeenCalledWith({ foo: 'bar' });
+    expect(originalJson).toHaveBeenCalledWith({ foo: 'bar' });
 
     // Mock para simular chamada subsequente
     const res2 = { json: jest.fn() };
