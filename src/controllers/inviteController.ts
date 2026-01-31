@@ -31,12 +31,27 @@ export async function sendInvite(req: Request, res: Response) {
     const subject = 'Você foi convidado para se juntar à plataforma';
     const html = `<p>Você foi convidado a se registrar. Clique no link abaixo para completar o cadastro:</p><p><a href="${registrationLink}">Registrar-se</a></p>`;
 
-    await sendMail({ to: email, subject, html });
+    let emailSent = false;
+    try {
+      await sendMail({ to: email, subject, html });
+      emailSent = true;
+    } catch (emailError) {
+      logger.error({ obj: emailError }, 'Falha ao enviar email do convite, mas token foi gerado.');
+    }
 
-    return res.status(201).json({ success: true, data: { inviteId: invite.id }, message: 'Convite enviado' });
+    return res.status(201).json({ 
+      success: true, 
+      data: { 
+        inviteId: invite.id,
+        inviteUrl: registrationLink,
+        emailSent 
+      }, 
+      message: emailSent ? 'Convite enviado por e-mail' : 'Convite gerado (e-mail falhou)',
+      warning: emailSent ? undefined : 'Não foi possível enviar o e-mail. Copie o link abaixo.'
+    });
   } catch (error) {
-    logger.error({obj:error}, 'Erro ao enviar convite:');
-    return res.status(500).json({ success: false, message: 'Erro ao enviar convite' });
+    logger.error({obj:error}, 'Erro ao processar convite:');
+    return res.status(500).json({ success: false, message: 'Erro interno ao gerar convite' });
   }
 }
 

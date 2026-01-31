@@ -39,8 +39,8 @@ export class UploadController {
         return res.status(400).json({ message: "Nenhum arquivo foi enviado." });
       }
 
-      const { folder } = req.body;
-      const imageUrl = await this.uploadService.uploadImage(req.file, folder);
+      const { folder, fileName } = req.body;
+      const imageUrl = await this.uploadService.uploadImage(req.file, folder, fileName);
 
       return res.status(200).json({
         message: "Imagem carregada com sucesso.",

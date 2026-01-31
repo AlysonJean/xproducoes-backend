@@ -59,18 +59,16 @@ export async function getTotalUsers() {
 
 // Métodos adicionais para o authService
 export async function requestPasswordReset(email: string, ipAddress?: string, userAgent?: string) {
-  // Segurança: não revelar se o usuário existe. Sempre retornar sucesso para
-  // evitar enumeração de contas por e-mail.
+  // Segurança: O cliente solicitou mensagens assertivas para melhor UX.
+  // Permitindo retorno de erro caso usuário não exista.
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
-    // Log opcional e retorno silencioso
     try {
       logger.info(`requestPasswordReset called for non-existing email: ${email}`);
     } catch {
       // noop
     }
-    // Não vazar resetToken via API (melhor prática)
-    return { success: true };
+    throw new Error('Usuário não encontrado');
   }
 
   // Gerar token de reset (mais seguro - 64 caracteres)

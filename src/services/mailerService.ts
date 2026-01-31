@@ -25,7 +25,8 @@ const getTransporter = () => {
     secure, // true for 465, false for 587
     auth: user && pass ? { user, pass } : undefined,
     tls: {
-      rejectUnauthorized: process.env.NODE_ENV === 'production'
+      ciphers: 'SSLv3', // Necessário para alguns serviços como GoDaddy/Outlook
+      rejectUnauthorized: false
     }
   });
 

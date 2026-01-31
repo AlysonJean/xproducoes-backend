@@ -81,7 +81,11 @@ export class AuthController {
       const userAgent = req.get('user-agent') || undefined;
       const result = await this.authService.requestPasswordReset(email, ipAddress, userAgent);
       res.status(200).json(result);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message === 'Usuário não encontrado') {
+        res.status(404).json({ message: 'Não encontramos nenhuma conta com este e-mail.' });
+        return;
+      }
       next(error);
     }
   };

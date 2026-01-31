@@ -27,6 +27,7 @@ import collaboratorProfileRoutes from "./collaboratorProfileRoutes";
 import checklistRoutes from "./checklistRoutes";
 import settingsRoutes from "./settingsRoutes";
 import newsletterRoutes from "./newsletterRoutes";
+import bannerRoutes from "./bannerRoutes";
 
 const router: RouterType = Router();
 
@@ -79,6 +80,7 @@ router.use('/collaborator/messages', collaboratorMessagesRoutes);
 router.use('/collaborator/checklists', checklistRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/newsletter', newsletterRoutes);
+router.use('/banners', bannerRoutes);
 
 // Health endpoint
 router.get("/health", (req, res) => {

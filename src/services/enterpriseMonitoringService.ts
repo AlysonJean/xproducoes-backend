@@ -7,6 +7,7 @@ import { prisma } from "../config/database";
 import { cacheService } from "./cacheService";
 import logger from "../config/logger";
 import os from "os";
+import * as si from "systeminformation";
 
 interface IntegrationHealth {
   name: string;
@@ -261,28 +262,71 @@ class EnterpriseMonitoringService {
 
   // ===== SYSTEM HEALTH =====
   async getSystemHealth(): Promise<SystemHealth> {
-    const cpus = os.cpus();
-    const totalMem = os.totalmem();
-    const freeMem = os.freemem();
-    const usedMem = totalMem - freeMem;
+    try {
+      // Obter dados dinâmicos do ambiente (Container, Cloud, VPS)
+      const [cpu, mem, osInfo, fsSize, load] = await Promise.all([
+        si.cpu(),
+        si.mem(),
+        si.osInfo(),
+        si.fsSize(),
+        si.currentLoad()
+      ]);
 
-    return {
-      cpu: {
-        usage: await this.getCPUUsage(),
-        cores: cpus.length,
-        model: cpus[0]?.model || 'Unknown'
-      },
-      memory: {
-        total: totalMem,
-        used: usedMem,
-        free: freeMem,
-        usage: (usedMem / totalMem) * 100
-      },
-      disk: {
-        usage: 0 // Simplified - would need additional implementation
-      },
-      uptime: os.uptime()
-    };
+      return {
+        cpu: {
+          usage: load.currentLoad, // Carga real da CPU no momento
+          cores: cpu.cores,
+          model: `${cpu.manufacturer} ${cpu.brand}`,
+          loadAverage: load.avgLoad
+        },
+        memory: {
+          total: mem.total,
+          used: mem.active, // Memória ativa é mais precisa que usada
+          free: mem.available,
+          usage: (mem.active / mem.total) * 100,
+          swapUsed: mem.swapused,
+          swapTotal: mem.swaptotal
+        },
+        disk: {
+          usage: fsSize.length > 0 ? fsSize[0].use : 0,
+          total: fsSize.length > 0 ? fsSize[0].size : 0,
+          bg: fsSize.length > 0 ? fsSize[0].mount : '/'
+        },
+        os: {
+          platform: osInfo.platform,
+          distro: osInfo.distro,
+          release: osInfo.release,
+          hostname: osInfo.hostname
+        },
+        uptime: os.uptime(),
+        environment: process.env.NODE_ENV || 'development'
+      } as any;
+    } catch (error) {
+      logger.error('Erro ao coletar métricas avançadas:', error);
+      // Fallback para os nativo se falhar
+      const cpus = os.cpus();
+      const totalMem = os.totalmem();
+      const freeMem = os.freemem();
+      const usedMem = totalMem - freeMem;
+
+      return {
+        cpu: {
+          usage: await this.getCPUUsage(),
+          cores: cpus.length,
+          model: cpus[0]?.model || 'Unknown'
+        },
+        memory: {
+          total: totalMem,
+          used: usedMem,
+          free: freeMem,
+          usage: (usedMem / totalMem) * 100
+        },
+        disk: {
+          usage: 0
+        },
+        uptime: os.uptime()
+      };
+    }
   }
 
   // ===== PERFORMANCE METRICS =====

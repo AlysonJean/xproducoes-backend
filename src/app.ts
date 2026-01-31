@@ -7,6 +7,7 @@ import { dynamicCors } from "./config/cors";
 import apiV1 from "./api/v1";
 import cepRoutes from './routes/cepRoutes';
 import { securityMonitoringMiddleware } from "./config/securityMonitor";
+import { sitemapController } from "./controllers/sitemapController";
 
 dotenv.config();
 
@@ -38,6 +39,9 @@ app.use(
 
 // Monitoramento de segurança
 app.use(securityMonitoringMiddleware);
+
+// Sitemap - Critical for SEO
+app.get("/sitemap.xml", (req, res) => sitemapController.getSitemap(req, res));
 
 // Rota raiz para verificação de saúde (Health Check)
 app.get("/", (req, res) => {

@@ -65,15 +65,22 @@ export const uploadAvatar = uploadSingle('avatar');
 // Middleware para processamento após upload
 export const processUpload = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const { folder, fileName } = req.body;
+    
     if (req.file) {
       // Upload de arquivo único
-      const imageUrl = await uploadService.uploadImage(req.file);
+      const imageUrl = await uploadService.uploadImage(req.file, folder, fileName);
       req.body.imageUrl = imageUrl;
     } else if (req.files && Array.isArray(req.files)) {
       // Upload de múltiplos arquivos
       const imageUrls: string[] = [];
-      for (const file of req.files) {
-        const imageUrl = await uploadService.uploadImage(file);
+      const imageCount = req.files.length;
+      
+      for (let i = 0; i < imageCount; i++) {
+        const file = req.files[i];
+        // Se for múltiplos arquivos, adicionar índice ao nome para manter SEO mas único
+        const currentFileName = fileName ? `${fileName}-${i + 1}` : undefined;
+        const imageUrl = await uploadService.uploadImage(file, folder, currentFileName);
         imageUrls.push(imageUrl);
       }
       req.body.imageUrls = imageUrls;

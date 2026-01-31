@@ -45,12 +45,12 @@ export class UploadService {
   };
 
   // Upload sempre para Cloudinary
-  async uploadImage(file: Express.Multer.File, folder: string = "portfolio"): Promise<string> {
-    return this.uploadToCloudinary(file, folder);
+  async uploadImage(file: Express.Multer.File, folder: string = "portfolio", fileName?: string): Promise<string> {
+    return this.uploadToCloudinary(file, folder, fileName);
   }
 
   // Upload para Cloudinary (sempre)
-  private async uploadToCloudinary(file: Express.Multer.File, folder: string): Promise<string> {
+  private async uploadToCloudinary(file: Express.Multer.File, folder: string, fileName?: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const isSvg =
         file.mimetype === 'image/svg+xml' ||
@@ -68,8 +68,9 @@ export class UploadService {
         folder: `x-producoes/${folder}`,
         resource_type: 'image',
         use_filename: true,
-        unique_filename: true,
-        overwrite: false,
+        unique_filename: !fileName, // Se fileName for fornecido, não usar unique_filename (tentar usar o nome exato)
+        overwrite: true, // Permitir sobrescrever se o nome for o mesmo (atualizar imagem)
+        ...(fileName ? { public_id: fileName } : {}),
       };
 
       // Para SVG: não aplicar transformações que forcem rasterização ou conversão
