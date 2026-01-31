@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { prisma } from '../index';
+import { prisma } from '../config/prisma';
 import { z } from 'zod';
 
 export class NewsletterController {
