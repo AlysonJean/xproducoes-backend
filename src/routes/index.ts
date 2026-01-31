@@ -26,6 +26,7 @@ import { performanceMonitoringMiddleware } from "../middlewares/performanceMonit
 import collaboratorProfileRoutes from "./collaboratorProfileRoutes";
 import checklistRoutes from "./checklistRoutes";
 import settingsRoutes from "./settingsRoutes";
+import newsletterRoutes from "./newsletterRoutes";
 
 const router: RouterType = Router();
 
@@ -77,6 +78,7 @@ router.use('/collaborator-payments', collaboratorPaymentRoutes);
 router.use('/collaborator/messages', collaboratorMessagesRoutes);
 router.use('/collaborator/checklists', checklistRoutes);
 router.use('/settings', settingsRoutes);
+router.use('/newsletter', newsletterRoutes);
 
 // Health endpoint
 router.get("/health", (req, res) => {
