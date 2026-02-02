@@ -41,6 +41,43 @@ async function validateGoogleToken(accessToken: string): Promise<{
   }
 }
 
+// Função para validar access token do Facebook
+async function validateFacebookToken(accessToken: string): Promise<{
+  valid: boolean;
+  email?: string;
+  name?: string;
+  id?: string;
+  picture?: string;
+  error?: string;
+}> {
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/me?fields=id,name,email,picture&access_token=${encodeURIComponent(accessToken)}`
+    );
+    
+    if (!response.ok) {
+      return { valid: false, error: 'Token Facebook inválido ou expirado' };
+    }
+    
+    const data = await response.json();
+    
+    if (!data.email) {
+      return { valid: false, error: 'Permissão de email não concedida. Por favor, permita acesso ao email.' };
+    }
+    
+    return {
+      valid: true,
+      email: data.email,
+      name: data.name,
+      id: data.id,
+      picture: data.picture?.data?.url
+    };
+  } catch (error) {
+    logger.error({ error }, 'Erro ao validar token Facebook');
+    return { valid: false, error: 'Erro ao validar token com Facebook' };
+  }
+}
+
 
 export class AuthController {
   private authService: AuthService;
@@ -278,13 +315,20 @@ export class AuthController {
     try {
       const { accessToken, userData } = req.body;
       
-      // Validar token com Google (método seguro)
+      // Detectar provider pela rota
+      const isFacebook = req.path.includes('facebook');
+      const provider = isFacebook ? 'Facebook' : 'Google';
+      
+      // Validar token com o provider apropriado
       if (accessToken) {
-        logger.info("Validando access token com Google");
-        const validation = await validateGoogleToken(accessToken);
+        logger.info(`Validando access token com ${provider}`);
+        
+        const validation = isFacebook 
+          ? await validateFacebookToken(accessToken)
+          : await validateGoogleToken(accessToken);
         
         if (!validation.valid) {
-          logger.warn({ error: validation.error }, "Token Google inválido");
+          logger.warn({ error: validation.error }, `Token ${provider} inválido`);
           res.status(401).json({ message: validation.error || "Token inválido" });
           return;
         }
