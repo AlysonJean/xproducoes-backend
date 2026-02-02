@@ -68,8 +68,6 @@
     "pg": "^8.17.2",
     "pino": "^9.7.0",
     "prisma": "5.22.0",
-    "react-ga4": "^2.1.0",
-    "react-helmet-async": "^2.0.5",
     "socket.io": "^4.8.1",
     "systeminformation": "^5.30.7",
     "typescript": "^5.9.2",
