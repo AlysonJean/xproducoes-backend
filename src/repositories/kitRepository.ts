@@ -5,8 +5,11 @@ export class KitRepository {
   async create(data: any) {
     return prisma.kit.create({ data });
   }
-  async findAll() {
-    return prisma.kit.findMany({ include: { equipments: true } });
+  async findAll(limit?: number) {
+    return prisma.kit.findMany({ 
+      include: { equipments: true },
+      ...(limit ? { take: limit } : {})
+    });
   }
   async findOne(id: string) {
     return prisma.kit.findUnique({

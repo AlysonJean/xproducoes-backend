@@ -6,21 +6,19 @@ import logger from "../config/logger";
 // Rate limiting para autenticação - Mais restritivo
 export const authRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 1000, // AUMENTADO PARA DESENVOLVIMENTO (Era 20)
+  max: process.env.NODE_ENV === 'production' ? 20 : 200, // 20 prod, 200 dev
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req: Request, res: Response) => {
-    logger.warn(`Rate limit exceeded for IP: ${req.ip}`);
+    logger.warn({
+      ip: req.ip,
+      path: req.path,
+      environment: process.env.NODE_ENV
+    }, 'Rate limit de autenticação excedido');
     res.status(429).json({
       error: 'Too Many Requests',
       message: 'Muitas tentativas de autenticação. Aguarde antes de tentar novamente.',
     });
-  },
-  skip: (req: Request) => {
-    // Sempre pular em ambiente de desenvolvimento
-    if (process.env.NODE_ENV === 'development') return true;
-    const whitelist = ['127.0.0.1', '::1'];
-    return req.ip ? whitelist.includes(req.ip) : false;
   },
 });
 
@@ -40,10 +38,9 @@ export const createResourceRateLimit = rateLimit({
 
 export const uploadRateLimit = rateLimit({
   windowMs: 5 * 60 * 1000,
-  max: 50, // Increased for dev
+  max: process.env.NODE_ENV === 'production' ? 10 : 50, // 10 prod, 50 dev
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req: Request) => process.env.NODE_ENV === 'development',
 });
 
 export const searchRateLimit = rateLimit({
@@ -54,8 +51,8 @@ export const searchRateLimit = rateLimit({
 });
 
 export const passwordResetRateLimit = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 3,
+  windowMs: 60 * 60 * 1000, // 1 hora
+  max: process.env.NODE_ENV === 'production' ? 3 : 10, // 3 prod, 10 dev
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req: Request) => {
@@ -69,6 +66,17 @@ export const passwordResetRateLimit = rateLimit({
     } catch {
       return req.body?.email || (req.ip as string);
     }
+  },
+  handler: (req: Request, res: Response) => {
+    logger.warn({
+      email: req.body?.email,
+      ip: req.ip,
+      path: req.path,
+    }, 'Rate limit de reset de senha excedido');
+    res.status(429).json({
+      error: 'Too Many Requests',
+      message: 'Muitas tentativas de reset de senha. Aguarde antes de tentar novamente.',
+    });
   },
 });
 

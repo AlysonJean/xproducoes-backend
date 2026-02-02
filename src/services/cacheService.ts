@@ -76,7 +76,7 @@ export class CacheService {
         logger.info('✅ Cache Redis conectado com sucesso em produção');
       });
 
-      this.redis.on('error', (error: any) => {
+      this.redis.on('error', (error: Error) => {
         this.isRedisConnected = false;
         logger.error(`❌ Erro na conexão Redis (produção): ${error.message || String(error)}`);
         logger.warn('🔄 Continuando com cache em memória');

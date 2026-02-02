@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import * as dotenv from "dotenv";
+import logger from './logger';
 
 // Carregar variáveis de ambiente primeiro
 dotenv.config();
@@ -34,7 +35,7 @@ if (process.env.NODE_ENV === "production") {
 
 // Conectar explicitamente ao banco (apenas tentar, não sair do processo)
 prisma.$connect().catch((error) => {
-  console.error('FATAL: Erro ao conectar com o banco de dados:', error);
+  logger.error({ err: error }, 'FATAL: Erro ao conectar com o banco de dados');
   if (process.env.NODE_ENV !== 'test') {
     process.exit(1);
   }

@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { CartService } from "../services/cartService";
+import { getErrorMessage, isAppError } from "../types/common";
 
 const cartService = new CartService();
 
@@ -35,17 +36,18 @@ export class CartController {
       const data = { ...req.body, userId: req.userId! };
       const booking = await cartService.checkout(data);
       return res.status(200).json(booking);
-    } catch (error: any) {
-      if (error.name === "ZodError") {
+    } catch (error: unknown) {
+      if (isAppError(error) && error.name === "ZodError") {
         return res
           .status(422)
-          .json({ message: "Dados inválidos", details: error.errors });
+          .json({ message: "Dados inválidos", details: (error as Error & { errors?: unknown }).errors });
       }
-      if (error.message === "Acesso negado") {
-        return res.status(403).json({ message: error.message });
+      const errMsg = getErrorMessage(error);
+      if (errMsg === "Acesso negado") {
+        return res.status(403).json({ message: errMsg });
       }
-      if (error.message === "Não encontrado") {
-        return res.status(404).json({ message: error.message });
+      if (errMsg === "Não encontrado") {
+        return res.status(404).json({ message: errMsg });
       }
       return res.status(500).json({ message: "Erro interno do servidor" });
     }
@@ -94,8 +96,8 @@ export class CartController {
         finalPrice *= 1.05; // 5% extra
       }
       return res.json({ totalPrice: finalPrice });
-    } catch (error: any) {
-      return res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      return res.status(400).json({ message: getErrorMessage(error) });
     }
   };
 

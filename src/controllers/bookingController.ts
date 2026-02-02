@@ -3,6 +3,7 @@ import { BookingService } from "../services/bookingService";
 import { prisma } from "../config/prisma";
 import { BookingStatus, DeliveryStatus } from "@prisma/client";
 import { bookingCreateSchema } from "../validators/bookingSchema";
+import logger from "../config/logger";
 
 const bookingService = new BookingService();
 
@@ -32,7 +33,7 @@ export class BookingController {
         data: booking
       });
     } catch (error) {
-      console.error("Erro no controller create:", error);
+      logger.error({ err: error }, "Erro no controller create");
       if (error instanceof Error) {
         res.status(400).json({
           success: false,
@@ -58,7 +59,7 @@ export class BookingController {
 
       res.json({ success: true, data: bookings });
     } catch (error) {
-      console.error("Erro no controller findByUser:", error);
+      logger.error({ err: error }, "Erro no controller findByUser");
       if (error instanceof Error) {
         res.status(400).json({
           success: false,
@@ -122,7 +123,7 @@ export class BookingController {
         }
       });
     } catch (error) {
-      console.error("Erro no controller findAll:", error);
+      logger.error({ err: error }, "Erro no controller findAll");
       if (error instanceof Error) {
         res.status(400).json({
           success: false,
@@ -171,7 +172,7 @@ export class BookingController {
         data: updatedBooking
       });
     } catch (error) {
-      console.error("Erro no controller updateStatus:", error);
+      logger.error({ err: error }, "Erro no controller updateStatus");
       if (error instanceof Error) {
         res.status(400).json({
           success: false,
@@ -212,7 +213,7 @@ export class BookingController {
         data: updatedBooking
       });
     } catch (error) {
-      console.error("Erro no controller updateDeliveryStatus:", error);
+      logger.error({ err: error }, "Erro no controller updateDeliveryStatus");
       if (error instanceof Error) {
         res.status(400).json({
           success: false,
@@ -239,7 +240,7 @@ export class BookingController {
         data: events
       });
     } catch (error) {
-      console.error("Erro no controller getCalendarBookings:", error);
+      logger.error({ err: error }, "Erro no controller getCalendarBookings");
       if (error instanceof Error) {
         res.status(400).json({
           success: false,
@@ -293,7 +294,7 @@ export class BookingController {
         data: booking
       });
     } catch (error) {
-      console.error("Erro no controller findOne:", error);
+      logger.error({ err: error }, "Erro no controller findOne");
       if (error instanceof Error) {
         res.status(400).json({
           success: false,
@@ -339,7 +340,7 @@ export class BookingController {
       }
 
       // LOG: Mostra o payload recebido na atualização
-      console.log("[BOOKING UPDATE] Payload recebido:", JSON.stringify(req.body, null, 2));
+      logger.info({ payload: req.body }, "[BOOKING UPDATE] Payload recebido");
 
       const updatedBooking = await bookingService.updateBooking(id, req.body);
       res.json({
@@ -348,7 +349,7 @@ export class BookingController {
         data: updatedBooking
       });
     } catch (error) {
-      console.error("Erro no controller update:", error);
+      logger.error({ err: error }, "Erro no controller update");
       if (error instanceof Error) {
         res.status(400).json({
           success: false,
@@ -394,7 +395,7 @@ export class BookingController {
 
       res.status(201).json({ success: true, data: attachment });
     } catch (error) {
-      console.error('Erro ao adicionar attachment:', error);
+      logger.error({ err: error }, 'Erro ao adicionar attachment');
       if (error instanceof Error) {
         res.status(400).json({ success: false, message: error.message });
       } else next(error);
@@ -427,7 +428,7 @@ export class BookingController {
       const removed = await bookingService.removeAttachment(attachmentId);
       res.json({ success: true, data: removed });
     } catch (error) {
-      console.error('Erro ao remover attachment:', error);
+      logger.error({ err: error }, 'Erro ao remover attachment');
       if (error instanceof Error) {
         res.status(400).json({ success: false, message: error.message });
       } else next(error);
@@ -471,7 +472,7 @@ export class BookingController {
       
       res.status(204).send();
     } catch (error) {
-      console.error("Erro no controller delete:", error);
+      logger.error({ err: error }, "Erro no controller delete");
       if (error instanceof Error) {
         res.status(400).json({
           success: false,
@@ -503,7 +504,7 @@ export class BookingController {
         data: booking
       });
     } catch (error) {
-      console.error("Erro no controller confirm:", error);
+      logger.error({ err: error }, "Erro no controller confirm");
       if (error instanceof Error) {
         res.status(400).json({
           success: false,
@@ -532,7 +533,7 @@ export class BookingController {
       const booking = await bookingService.confirmWithDetails(id, { totalPrice, collaborators });
       res.json({ success: true, message: 'Reserva confirmada com detalhes', data: booking });
     } catch (error) {
-      console.error('Erro no controller confirmWithDetails:', error);
+      logger.error({ err: error }, 'Erro no controller confirmWithDetails');
       if (error instanceof Error) {
         res.status(400).json({ success: false, message: error.message });
       } else next(error);
@@ -560,7 +561,7 @@ export class BookingController {
         data: booking
       });
     } catch (error) {
-      console.error("Erro no controller cancel:", error);
+      logger.error({ err: error }, "Erro no controller cancel");
       if (error instanceof Error) {
         res.status(400).json({
           success: false,
@@ -581,7 +582,7 @@ export class BookingController {
         data: bookings
       });
     } catch (error) {
-      console.error("Erro no controller getUpcoming:", error);
+      logger.error({ err: error }, "Erro no controller getUpcoming");
       if (error instanceof Error) {
         res.status(400).json({
           success: false,
@@ -602,7 +603,7 @@ export class BookingController {
         data: bookings
       });
     } catch (error) {
-      console.error("Erro no controller getHistory:", error);
+      logger.error({ err: error }, "Erro no controller getHistory");
       if (error instanceof Error) {
         res.status(400).json({
           success: false,
@@ -631,7 +632,7 @@ export class BookingController {
         data: stats
       });
     } catch (error) {
-      console.error("Erro no controller getDashboardStats:", error);
+      logger.error({ err: error }, "Erro no controller getDashboardStats");
       if (error instanceof Error) {
         res.status(400).json({
           success: false,
@@ -658,7 +659,7 @@ export class BookingController {
         data: calendar
       });
     } catch (error) {
-      console.error("Erro no controller getCalendar:", error);
+      logger.error({ err: error }, "Erro no controller getCalendar");
       if (error instanceof Error) {
         res.status(400).json({
           success: false,
@@ -691,7 +692,7 @@ export class BookingController {
         data: { events: [] }
       });
     } catch (error) {
-      console.error("Erro no controller getCollaboratorEvents:", error);
+      logger.error({ err: error }, "Erro no controller getCollaboratorEvents");
       next(error);
     }
   };

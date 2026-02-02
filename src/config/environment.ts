@@ -1,16 +1,17 @@
 // Configuração centralizada para variáveis de ambiente seguras
+import logger from './logger';
 
 function required(name: string, value: string | undefined) {
   if (!value) {
     // In production, JWT_SECRET and other sensitive values must be provided.
     if (process.env.NODE_ENV === 'production') {
-      console.error(`FATAL: ambiente necessário não definido: ${name}`);
+      logger.error({ envVar: name }, 'FATAL: ambiente necessário não definido');
       process.exit(1);
     }
 
     // In non-production environments, generate a ephemeral secret for developer convenience
     const ephemeral = require('crypto').randomBytes(64).toString('hex');
-    console.warn(`WARN: ${name} não definido. Gerando valor efêmero para ambiente de desenvolvimento.`);
+    logger.warn({ envVar: name }, 'Variável não definida. Gerando valor efêmero para ambiente de desenvolvimento');
     return ephemeral;
   }
   return value;
@@ -66,16 +67,16 @@ function validateCritical() {
   }
 
   if (process.env.NODE_ENV === 'production' && criticalMissing.length > 0) {
-    console.error('FATAL: Missing critical environment variables:', criticalMissing.join('; '));
+    logger.error({ vars: criticalMissing }, 'FATAL: Missing critical environment variables');
     process.exit(1);
   }
 
   if (missing.length > 0) {
-    console.warn('WARN: Missing recommended environment variables:', missing.join('; '));
+    logger.warn({ vars: missing }, 'Missing recommended environment variables');
   }
 
   if (criticalMissing.length > 0) {
-    console.warn('WARN: Missing critical environment variables (development mode):', criticalMissing.join('; '));
+    logger.warn({ vars: criticalMissing }, 'Missing critical environment variables (development mode)');
   }
 }
 
@@ -113,8 +114,7 @@ export function generateSelfSignedCert() {
       cert: cert
     };
   } catch {
-    console.warn('WARN: Falha ao gerar certificado auto-assinado. Usando HTTP apenas.');
-    console.warn('Para desenvolvimento com HTTPS, instale OpenSSL ou forneça certificados válidos.');
+    logger.warn('Falha ao gerar certificado auto-assinado. Usando HTTP apenas. Para desenvolvimento com HTTPS, instale OpenSSL ou forneça certificados válidos.');
     return null;
   }
 }

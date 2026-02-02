@@ -1,4 +1,17 @@
 import { prisma } from "../config/prisma";
+import type { Prisma } from "@prisma/client";
+
+// Interfaces para filtros e dados
+interface ReviewFilters {
+  rating?: number | string;
+  equipmentId?: string;
+}
+
+interface ReviewUpdateData {
+  rating?: number;
+  comment?: string;
+  reported?: boolean;
+}
 
 export async function findPublicReviews() {
   return prisma.review.findMany({
@@ -79,8 +92,8 @@ export async function create(data: {
   });
 }
 
-export async function findAll(filters?: any) {
-  const where: any = {};
+export async function findAll(filters?: ReviewFilters) {
+  const where: Prisma.ReviewWhereInput = {};
   
   if (filters?.rating) {
     where.rating = { gte: Number(filters.rating) };
@@ -164,7 +177,7 @@ export async function findByUser(userId: string) {
   });
 }
 
-export async function update(id: string, data: any) {
+export async function update(id: string, data: ReviewUpdateData) {
   return prisma.review.update({
     where: { id },
     data,

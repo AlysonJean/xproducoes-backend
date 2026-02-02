@@ -3,8 +3,32 @@ import * as userService from "./userService";
 import jwt from "jsonwebtoken";
 import { config as envConfig } from "../config/environment";
 
+interface RegisterData {
+  name: string;
+  email: string;
+  password: string;
+  role?: string;
+  phone?: string;
+  companyName?: string;
+}
+
+interface LoginData {
+  email: string;
+  password: string;
+}
+
+interface InviteData {
+  email: string;
+  name?: string;
+  role?: string;
+  collaboratorRole?: string;
+  specialties?: string[];
+  hourlyRate?: number;
+  [key: string]: unknown; // Permitir campos extras
+}
+
 export class AuthService {
-  async register(data: any) {
+  async register(data: RegisterData) {
     return userService.register({
       name: data.name,
       email: data.email,
@@ -12,7 +36,7 @@ export class AuthService {
     });
   }
 
-  async login(data: any) {
+  async login(data: LoginData) {
     return userService.login({
       email: data.email,
       password: data.password
@@ -31,7 +55,7 @@ export class AuthService {
     return userService.getProfile(userId);
   }
 
-  async updateProfile(userId: string, data: any, file?: Express.Multer.File) {
+  async updateProfile(userId: string, data: userService.UpdateProfileInput, file?: Express.Multer.File) {
     return userService.updateProfile(userId, data, file);
   }
 
@@ -40,7 +64,7 @@ export class AuthService {
   }
 
   // Métodos adicionais para o authController
-  async inviteCollaborator(data: any) {
+  async inviteCollaborator(data: InviteData) {
     // Implementação simples - expandir conforme necessário
     return {
       id: `invite_${Date.now()}`,
@@ -50,7 +74,7 @@ export class AuthService {
     };
   }
 
-  async completeRegistration(data: any) {
+  async completeRegistration(data: RegisterData) {
     // Implementação simples para completar registro
     return this.register(data);
   }

@@ -1,9 +1,10 @@
 import { prisma } from "../config/prisma";
 import logger from "../config/logger";
+import type { Prisma } from "@prisma/client";
 
 
 export async function updatePortfolio(id: string, data: Partial<{ title: string; description: string; eventDate: string | Date; imageUrl?: string; }>) {
-  const updateData: any = {};
+  const updateData: Prisma.PortfolioUpdateInput = {};
   if (data.title) updateData.title = data.title.trim();
   if (data.description) updateData.description = data.description.trim();
   if (data.eventDate) {

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../config/prisma';
+import logger from '../config/logger';
 
 export class SitemapController {
   async getSitemap(req: Request, res: Response) {
@@ -107,7 +108,7 @@ export class SitemapController {
       res.send(xml);
 
     } catch (error) {
-      console.error('Sitemap generation error:', error);
+      logger.error({ err: error }, 'Sitemap generation error');
       res.status(500).send('Error generating sitemap');
     }
   }

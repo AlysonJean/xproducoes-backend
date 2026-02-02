@@ -1,9 +1,14 @@
 import pino from "pino";
+import { getRequestId } from "./asyncContext";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 
 const pinoLogger = pino({
   level: process.env.LOG_LEVEL || "info",
+  mixin: () => {
+    const requestId = getRequestId();
+    return requestId ? { requestId } : {};
+  },
   ...(isDevelopment && {
     transport: {
       target: "pino-pretty",

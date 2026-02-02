@@ -2,6 +2,7 @@ import { Router } from "express";
 import { AuthController } from "../controllers/authController";
 import { authenticate, requireAdmin } from "../middlewares/unifiedAuth";
 import { authRateLimit, passwordResetRateLimit } from "../middlewares/rateLimitMiddleware";
+import { validateJsonContentType } from "../middlewares/contentTypeValidation";
 import { z } from 'zod';
 import { userRegisterSchema, userLoginSchema } from '../validators/userSchema';
 import { registerFromInvite } from '../controllers/inviteController';
@@ -25,8 +26,8 @@ const authRoutes: any = Router();
 const authController = new AuthController();
 
 // Rotas públicas
-authRoutes.post("/register", authRateLimit, validate(userRegisterSchema), authController.register);
-authRoutes.post("/login", authRateLimit, validate(userLoginSchema), authController.login);
+authRoutes.post("/register", validateJsonContentType, authRateLimit, validate(userRegisterSchema), authController.register);
+authRoutes.post("/login", validateJsonContentType, authRateLimit, validate(userLoginSchema), authController.login);
 // Registro público a partir de convite
 authRoutes.post('/register-from-invite', registerFromInvite);
 authRoutes.get('/verify-email', authController.verifyEmail);

@@ -1,6 +1,45 @@
 import { Request, Response, NextFunction } from "express";
 import { AuthService } from "../services/authService";
 import logger from "../config/logger";
+import { isAppError, getErrorMessage, getErrorCode } from "../types/common";
+
+// Função para validar access token do Google
+async function validateGoogleToken(accessToken: string): Promise<{
+  valid: boolean;
+  email?: string;
+  name?: string;
+  sub?: string;
+  picture?: string;
+  error?: string;
+}> {
+  try {
+    const response = await fetch(
+      `https://www.googleapis.com/oauth2/v3/userinfo`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    
+    if (!response.ok) {
+      return { valid: false, error: 'Token inválido ou expirado' };
+    }
+    
+    const data = await response.json();
+    
+    if (!data.email) {
+      return { valid: false, error: 'Token não contém email' };
+    }
+    
+    return {
+      valid: true,
+      email: data.email,
+      name: data.name,
+      sub: data.sub,
+      picture: data.picture
+    };
+  } catch (error) {
+    logger.error({ error }, 'Erro ao validar token Google');
+    return { valid: false, error: 'Erro ao validar token com Google' };
+  }
+}
 
 
 export class AuthController {
@@ -50,15 +89,16 @@ export class AuthController {
       try {
         const result = await this.authService.login({ email, password });
         res.status(200).json(result);
-      } catch (error: any) {
-        if (error?.code === 'EMAIL_NOT_VERIFIED') {
+      } catch (error: unknown) {
+        if (getErrorCode(error) === 'EMAIL_NOT_VERIFIED') {
           res.status(403).json({
             message: 'E-mail não verificado. Verifique sua caixa de entrada.',
             code: 'EMAIL_NOT_VERIFIED',
           });
           return;
         }
-        if (error instanceof Error && (error.message === "Credenciais inválidas." || error.message === 'Usuário não encontrado' || error.message === 'Senha inválida')) {
+        const errMsg = getErrorMessage(error);
+        if (errMsg === "Credenciais inválidas." || errMsg === 'Usuário não encontrado' || errMsg === 'Senha inválida') {
           res.status(401).json({ message: 'Credenciais inválidas.' });
           return;
         }
@@ -81,8 +121,8 @@ export class AuthController {
       const userAgent = req.get('user-agent') || undefined;
       const result = await this.authService.requestPasswordReset(email, ipAddress, userAgent);
       res.status(200).json(result);
-    } catch (error: any) {
-      if (error.message === 'Usuário não encontrado') {
+    } catch (error: unknown) {
+      if (getErrorMessage(error) === 'Usuário não encontrado') {
         res.status(404).json({ message: 'Não encontramos nenhuma conta com este e-mail.' });
         return;
       }
@@ -117,8 +157,8 @@ export class AuthController {
       try {
         await (await import('../services/userService')).verifyEmailByToken(token);
         res.status(200).json({ success: true });
-      } catch (e: any) {
-        res.status(400).json({ message: e?.message || 'Token inválido' });
+      } catch (e: unknown) {
+        res.status(400).json({ message: getErrorMessage(e) || 'Token inválido' });
       }
     } catch (error) {
       next(error);
@@ -222,8 +262,8 @@ export class AuthController {
       try {
         await this.authService.resetPassword(token, password);
         res.status(200).json({ success: true });
-      } catch (e: any) {
-        res.status(400).json({ message: e?.message || 'Falha ao completar registro' });
+      } catch (e: unknown) {
+        res.status(400).json({ message: getErrorMessage(e) || 'Falha ao completar registro' });
       }
     } catch (error) {
       next(error);
@@ -236,34 +276,84 @@ export class AuthController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const { userData } = req.body;
+      const { accessToken, userData } = req.body;
+      
+      // Validar token com Google (método seguro)
+      if (accessToken) {
+        logger.info("Validando access token com Google");
+        const validation = await validateGoogleToken(accessToken);
+        
+        if (!validation.valid) {
+          logger.warn({ error: validation.error }, "Token Google inválido");
+          res.status(401).json({ message: validation.error || "Token inválido" });
+          return;
+        }
+        
+        const email = validation.email!;
+        const name = validation.name || email.split('@')[0];
+        
+        logger.info({ email, name }, "Token Google validado com sucesso");
+        
+        try {
+          // Buscar usuário pelo email
+          const user = await this.authService.findUserByEmail(email);
 
-      // Validações de tipo para evitar usos inseguros (ex: userData.email.split)
+          if (user) {
+            // Se existe, fazer login
+            logger.info({ userId: user.id }, "Usuário encontrado, fazendo login");
+            const result = await this.authService.loginById(user.id);
+            res.status(200).json(result);
+          } else {
+            // Se não existe, criar novo utilizador
+            const randomPassword = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12);
+            
+            const registerResult = await this.authService.register({
+              name,
+              email,
+              password: randomPassword,
+              role: "CLIENT",
+            });
+            
+            // Após registro, fazer login para obter token
+            const loginResult = await this.authService.loginById(registerResult.id);
+            res.status(201).json(loginResult);
+          }
+        } catch (error) {
+          logger.error({ error }, "Erro no login social");
+          if (error instanceof Error) {
+            res.status(400).json({ message: error.message });
+            return;
+          }
+          throw error;
+        }
+        return;
+      }
+      
+      // Fallback: userData enviado diretamente (legado - menos seguro)
+      logger.warn("Login social sem validação de token - modo legado");
+      
       if (!userData || typeof userData !== 'object') {
-        res.status(400).json({ message: "Dados de utilizador inválidos" });
+        res.status(400).json({ message: "Token ou dados de usuário são obrigatórios" });
         return;
       }
 
       const email = (userData.email && typeof userData.email === 'string') ? userData.email : null;
       if (!email) {
-        res.status(400).json({ message: "Dados de utilizador inválidos" });
+        res.status(400).json({ message: "E-mail é obrigatório" });
         return;
       }
 
-  // Implementação simplificada
-  // TODO Enterprise: validar o id_token/authorization_code com o provedor (Google, Facebook, etc.)
-  // e estabelecer verificação de domínio/appId, uso de PKCE e state anti-CSRF no frontend.
-
       try {
-        // Buscar usuário pelo email
-        const user = await this.authService.findUserByEmail(userData.email);
+        const user = await this.authService.findUserByEmail(email);
 
         if (user) {
           // Se existe, fazer login
+          logger.info({ userId: user.id }, "Usuário encontrado, fazendo login por ID");
           const result = await this.authService.loginById(user.id);
           res.status(200).json(result);
         } else {
           // Se não existe, criar novo utilizador
+          logger.info("Usuário não encontrado, criando novo");
           const randomPassword = Math.random().toString(36).slice(-8);
           // Calcular nome seguro: priorizar userData.name quando for string válida
           let safeName: string;
@@ -282,11 +372,14 @@ export class AuthController {
             password: randomPassword,
             role: "CLIENT",
           });
+          logger.info({ result }, "Registro realizado com sucesso");
 
-          res.status(201).json(result);
+          // Após registro, fazer login para obter token
+          const loginResult = await this.authService.loginById(result.id);
+          res.status(201).json(loginResult);
         }
       } catch (error) {
-        logger.error({obj:error}, "Erro no login social:");
+        logger.error({obj:error, errorMessage: error instanceof Error ? error.message : String(error)}, "Erro no login social:");
         if (error instanceof Error) {
           res.status(400).json({ message: error.message });
           return;

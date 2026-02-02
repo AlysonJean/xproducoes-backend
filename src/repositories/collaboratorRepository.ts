@@ -1,5 +1,6 @@
 // OBSOLETO: Centralizado no Prisma Client
 import { prisma } from "../config/prisma";
+import logger from "../config/logger";
 import {
   Collaborator,
   EventCollaborator,
@@ -556,7 +557,7 @@ export class CollaboratorRepository {
 
       return Object.values(monthlyData).sort((a, b) => b.month.localeCompare(a.month));
     } catch (error) {
-      console.error("Erro ao calcular ganhos mensais:", error);
+      logger.error({ error, collaboratorId }, "Erro ao calcular ganhos mensais");
       return []; // Retorna lista vazia em caso de erro para não quebrar o dashboard
     }
   }

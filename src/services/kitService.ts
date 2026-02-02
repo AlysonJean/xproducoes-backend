@@ -39,8 +39,8 @@ export async function update(
   return repo.update(id, kitData);
 }
 
-export async function findAll() {
-  return repo.findAll();
+export async function findAll(limit?: number) {
+  return repo.findAll(limit);
 }
 
 export async function findOne(id: string) {

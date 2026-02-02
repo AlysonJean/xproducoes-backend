@@ -26,12 +26,9 @@ class WebhookService {
         }
       });
     } catch (e) {
-      try {
-        const safeUrl = this.webhookUrl.replace(/'/g, "''");
-        await this.prisma.$executeRawUnsafe(`INSERT INTO "webhook_logs" (id, url, event, payload, status, "bookingId", "createdAt", "updatedAt") VALUES ('${id}', '${safeUrl}', 'booking_confirmed', '${payloadJson.replace(/'/g, "''")} '::jsonb, 'SENT', '${booking.id}', now(), now())`);
-      } catch (e2) {
-        logger.warn('Failed to persist initial webhook_log: ' + String(e2));
-      }
+      // Fallback: usar raw SQL seguro apenas se Prisma falhar
+      logger.warn('Prisma WebhookLog.create failed, skipping fallback: ' + String(e));
+      // Não fazemos fallback com raw SQL por questões de segurança
     }
 
     void this.sendWithRetries(id, payload, 1);
@@ -63,11 +60,8 @@ class WebhookService {
           }
         });
       } catch (e) {
-        try {
-          await this.prisma.$executeRawUnsafe(`UPDATE "webhook_logs" SET "responseCode" = ${res.status}, "responseBody" = '${text.replace(/'/g, "''")}', status = '${res.ok ? 'OK' : 'ERROR'}', attempts = COALESCE(attempts, 0) + 1, "updatedAt" = now() WHERE id = '${logId}'`);
-        } catch (e2) {
-          logger.warn('Failed to update webhook_log after response: ' + String(e2));
-        }
+        // Se Prisma falhar, apenas logamos o erro - não usamos raw SQL inseguro
+        logger.error({ error: e, logId, status: res.status }, 'Failed to update webhook_log after response');
       }
 
       if (!res.ok && attempt < maxAttempts) {
@@ -85,11 +79,8 @@ class WebhookService {
           }
         });
       } catch (e) {
-        try {
-          await this.prisma.$executeRawUnsafe(`UPDATE "webhook_logs" SET status = 'FAILED', "responseBody" = '${String(err).replace(/'/g, "''")}', attempts = COALESCE(attempts, 0) + 1, "updatedAt" = now() WHERE id = '${logId}'`);
-        } catch (e2) {
-      logger.warn('Failed to update webhook_log on error: ' + String(e2));
-        }
+        // Se Prisma falhar, apenas logamos o erro - não usamos raw SQL inseguro
+        logger.error({ error: e, logId, originalError: String(err) }, 'Failed to update webhook_log on error');
       }
 
       if (attempt < maxAttempts) {

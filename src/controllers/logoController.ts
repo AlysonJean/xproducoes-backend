@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { UploadService } from '../services/uploadService';
 import logger from "../config/logger";
-
+import { getErrorMessage, isAppError } from "../types/common";
 
 const uploadService = new UploadService();
 
@@ -33,12 +33,15 @@ export const uploadLogo = async (req: Request, res: Response, next: NextFunction
 
     logger.info('[LogoController] Sending success response');
     return res.status(200).json({ logoUrl });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errMsg = getErrorMessage(error);
+    const errName = isAppError(error) ? error.name : 'UnknownError';
+    const errStack = isAppError(error) ? error.stack : undefined;
     logger.error({obj:{
-      message: error?.message,
-      name: error?.name,
-      stack: error?.stack
+      message: errMsg,
+      name: errName,
+      stack: errStack
     }}, '[LogoController] Erro ao enviar logo:');
-    return res.status(500).json({ error: error?.message || 'Erro ao enviar logo.' });
+    return res.status(500).json({ error: errMsg || 'Erro ao enviar logo.' });
   }
 };

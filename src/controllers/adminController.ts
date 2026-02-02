@@ -63,12 +63,13 @@ import { UploadService } from "../services/uploadService";
 import EmailService from "../services/emailService";
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
+import { Client, User, Prisma } from "@prisma/client";
 
 const bookingService = new BookingService();
 const equipmentService = new EquipmentService();
 
 // ✅ Helper function para mapear cliente (elimina duplicação)
-function mapClientResponse(client: any) {
+function mapClientResponse(client: Client & { user?: User | null }) {
   const user = client.user;
   return {
     id: client.id,
@@ -109,7 +110,12 @@ export class AdminController {
 
       // ✅ NÃO fazer check-then-act - deixar unique constraint tratar
       // Preparar dados
-      const userData: any = {};
+      const userData: Prisma.UserCreateInput = {
+        email: '',
+        name: '',
+        passwordHash: '',
+        role: 'CLIENT',
+      };
       if (payload.email) userData.email = payload.email.toLowerCase().trim();
       if (payload.name) userData.name = payload.name.trim();
       userData.role = 'CLIENT';
@@ -129,7 +135,7 @@ export class AdminController {
       let inviteToken: string | undefined;
 
       const result = await prisma.$transaction(async (tx) => {
-        let createdUser: any = null;
+        let createdUser: User | null = null;
         if (payload.email) {
           // Se não enviou senha, gera uma temporária e cria token de convite
           if (!payload.password) {
@@ -147,12 +153,12 @@ export class AdminController {
           });
         }
 
-        const clientData: any = {
+        const clientData: Prisma.ClientCreateInput = {
+          user: createdUser ? { connect: { id: createdUser.id } } : payload.userId ? { connect: { id: payload.userId } } : undefined as unknown as Prisma.UserCreateNestedOneWithoutClientProfileInput,
           phone: payload.phone,
           companyName: payload.companyName,
           industry: payload.industry,
           companySize: payload.companySize,
-          userId: createdUser?.id || payload.userId,
         };
 
         const createdClient = await tx.client.create({ data: clientData });
@@ -217,22 +223,36 @@ export class AdminController {
   listClients = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { industry, companySize, location } = req.query;
-      // Paginação: page e pageSize
+      
+      // Configuração de Paginação Otimizada para Recursos
+      // Em DEV: Limite alto (1000) para facilitar visualização sem paginação no frontend
+      // Em PROD: Limite seguro (50) para economizar RAM, mas cobrir seus ~30 clientes previstos
+      const defaultPageSize = process.env.NODE_ENV === 'production' ? 50 : 1000;
+      
       const page = parseInt((req.query.page as string) || '1', 10);
-      const pageSize = parseInt((req.query.pageSize as string) || '20', 10);
+      const pageSize = parseInt((req.query.pageSize as string) || String(defaultPageSize), 10);
+
+      // Bloqueio de segurança hard-limit para evitar OOM em produção caso o client requisite pageSize gigante
+      const finalPageSize = process.env.NODE_ENV === 'production' && pageSize > 100 ? 100 : pageSize;
 
       // Busca total de clientes para meta
       const total = await clientService.countClientsWithProfiles({ industry, companySize, location });
       // Busca clientes paginados
-      const clients = await clientService.listClientsWithProfiles({ industry, companySize, location, page, pageSize });
+      const clients = await clientService.listClientsWithProfiles({ 
+        industry, 
+        companySize, 
+        location, 
+        page, 
+        pageSize: finalPageSize 
+      });
 
       return res.json({
         data: clients,
         meta: {
           total,
           page,
-          pageSize,
-          totalPages: Math.ceil(total / pageSize),
+          pageSize: finalPageSize,
+          totalPages: Math.ceil(total / finalPageSize),
         },
       });
     } catch (error) {
@@ -275,8 +295,8 @@ export class AdminController {
       ];
       const userFields = ['name', 'email', 'role', 'bio', 'location', 'avatarUrl', 'isActive'];
 
-      const clientData: any = {};
-      const userData: any = {};
+      const clientData: Record<string, unknown> = {};
+      const userData: Record<string, unknown> = {};
       for (const key in req.body) {
         if (clientFields.includes(key)) clientData[key] = req.body[key];
         if (userFields.includes(key)) userData[key] = req.body[key];
@@ -284,7 +304,7 @@ export class AdminController {
 
       // ✅ Usar transação atômica para garantir consistência
       await prisma.$transaction(async (tx) => {
-        let updatedClient: any = null;
+        let updatedClient: Client | null = null;
         
         // Atualizar dados do cliente
         if (Object.keys(clientData).length > 0) {
@@ -330,10 +350,10 @@ export class AdminController {
         return res.status(400).json({ error: "ID é obrigatório" });
       }
       // Remove perfil de cliente
-      let client: any = null;
+      let client: (Client & { user?: User | null }) | null = null;
       try {
         client = await clientService.getClientById(id);
-      } catch {}
+      } catch {/* ignore */}
       await prisma.client.delete({ where: { id } });
       // Remove usuário, se existir
       if (client && client.userId) {

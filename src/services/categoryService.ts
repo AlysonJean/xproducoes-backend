@@ -1,4 +1,5 @@
 import { CategoryRepository } from "../repositories/categoryRepository";
+import { createAppError } from "../types/common";
 
 const repo = new CategoryRepository();
 
@@ -20,9 +21,7 @@ export async function deleteCategory(id: string) {
   // Verifica se há equipamentos vinculados à categoria
   const equipmentCount = await repo.countEquipments(id);
   if (equipmentCount > 0) {
-    const error: any = new Error("Não é possível excluir a categoria pois existem equipamentos vinculados a ela.");
-    error.status = 400;
-    throw error;
+    throw createAppError("Não é possível excluir a categoria pois existem equipamentos vinculados a ela.", 400);
   }
   return repo.delete(id);
 }

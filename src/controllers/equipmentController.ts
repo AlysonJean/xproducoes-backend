@@ -84,9 +84,15 @@ export class EquipmentController {
   ): Promise<any> => {
     try {
       const cacheKey = "equipment:all";
+
+      // Limite dinâmico baseado no ambiente
+      // Apenas afeta a primeira busca (cache miss).
+      // Se mudar de ambiente, deve-se limpar o cache (Redis flush ou reiniciar server se for in-memory)
+      const limit = process.env.NODE_ENV === 'production' ? 300 : undefined;
+
       const equipments = await cacheService.getOrSet(
         cacheKey,
-        () => equipmentService.findAll(),
+        () => equipmentService.findAll(limit),
         CacheService.TTL.MEDIUM
       );
       return res.json(equipments);

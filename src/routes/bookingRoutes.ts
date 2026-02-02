@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { BookingController } from "../controllers/bookingController";
 import { criticalEndpointRateLimit } from '../middlewares/rateLimitMiddleware';
+import { validateJsonContentType } from "../middlewares/contentTypeValidation";
 import { authenticate } from "../middlewares/unifiedAuth";
 import { roleMiddleware } from "../middlewares/roleMiddleware";
 
@@ -15,9 +16,9 @@ router.get("/user", bookingController.findByUser); // Reservas do usuário logad
 router.get("/upcoming", bookingController.getUpcoming); // Próximas reservas
 router.get("/history", bookingController.getHistory); // Histórico de reservas
 router.get("/calendar", bookingController.getCalendar); // Calendário de eventos
-router.post("/", criticalEndpointRateLimit, bookingController.create); // Criar nova reserva
+router.post("/", validateJsonContentType, criticalEndpointRateLimit, bookingController.create); // Criar nova reserva
 router.get("/:id", bookingController.findOne); // Buscar reserva específica
-router.put("/:id", bookingController.update); // Atualizar reserva
+router.put("/:id", validateJsonContentType, bookingController.update); // Atualizar reserva
 router.delete("/:id", bookingController.delete); // Deletar reserva
 router.put("/:id/confirm", bookingController.confirm); // Confirmar reserva
 router.put("/:id/cancel", bookingController.cancel); // Cancelar reserva

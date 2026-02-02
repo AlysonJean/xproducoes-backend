@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../config/prisma';
 import { z } from 'zod';
+import logger from '../config/logger';
 
 export class NewsletterController {
   async subscribe(req: Request, res: Response): Promise<void> {
@@ -42,7 +43,7 @@ export class NewsletterController {
 
       res.status(201).json({ message: 'Inscrição realizada com sucesso!' });
     } catch (error) {
-      console.error('Newsletter subscribe error:', error);
+      logger.error({ err: error }, 'Newsletter subscribe error');
       res.status(500).json({ error: 'Erro interno ao processar inscrição' });
     }
   }
@@ -55,7 +56,7 @@ export class NewsletterController {
 
       res.json(subscribers);
     } catch (error) {
-      console.error('Newsletter list error:', error);
+      logger.error({ err: error }, 'Newsletter list error');
       res.status(500).json({ error: 'Erro ao listar inscritos' });
     }
   }

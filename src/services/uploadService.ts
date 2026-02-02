@@ -1,6 +1,8 @@
 import multer from "multer";
 import cloudinary from "../config/cloudinary";
 import logger from "../config/logger";
+import type { UploadApiErrorResponse, UploadApiResponse } from "cloudinary";
+import type { Request } from "express";
 
 
 export class UploadService {
@@ -17,7 +19,7 @@ export class UploadService {
     });
   }
 
-  private imageFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  private imageFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     logger.info({obj:{
       originalname: file.originalname,
       mimetype: file.mimetype,
@@ -118,7 +120,7 @@ export class UploadService {
 
       const uploadStream = cloudinary.uploader.upload_stream(
         isSvg ? svgOptions : rasterOptions,
-        (error: any, result: any) => {
+        (error: UploadApiErrorResponse | undefined, result: UploadApiResponse | undefined) => {
           if (error) {
             // Log detalhado do erro do Cloudinary para diagnóstico
             // Não loga buffer nem secrets
@@ -157,7 +159,7 @@ export class UploadService {
             { quality: "auto" },
           ],
         },
-        (error: any, result: any) => {
+        (error: UploadApiErrorResponse | undefined, result: UploadApiResponse | undefined) => {
           if (error) {
             reject(new Error("Erro no upload do avatar"));
             return;

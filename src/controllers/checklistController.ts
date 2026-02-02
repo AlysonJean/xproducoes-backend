@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../config/database';
+import logger from '../config/logger';
+import { ChecklistItemStatus, ChecklistAssignmentStatus, ChecklistStatus, Prisma } from '@prisma/client';
 
 // ================================
 // CONTROLLER DE CHECKLIST
@@ -65,7 +67,7 @@ export class ChecklistController {
         },
       });
     } catch (error) {
-      console.error('Erro ao buscar checklists:', error);
+      logger.error({ err: error }, 'Erro ao buscar checklists');
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
@@ -121,7 +123,7 @@ export class ChecklistController {
 
       res.json(assignment);
     } catch (error) {
-      console.error('Erro ao buscar checklist:', error);
+      logger.error({ err: error }, 'Erro ao buscar checklist');
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
@@ -145,17 +147,17 @@ export class ChecklistController {
         return res.status(404).json({ error: 'Checklist não encontrado ou sem permissão' });
       }
 
-      const updateData: any = {
-        status: status as any,
+      const updateData: Prisma.ChecklistItemUpdateInput = {
+        status: status as ChecklistItemStatus,
         updatedAt: new Date(),
       };
 
       if (status === 'COMPLETED') {
         updateData.completedAt = new Date();
-        updateData.completedById = userId;
+        updateData.completedBy = { connect: { id: userId } };
       } else if (status === 'PENDING') {
         updateData.completedAt = null;
-        updateData.completedById = null;
+        updateData.completedBy = { disconnect: true };
       }
 
       if (notes !== undefined) {
@@ -205,7 +207,7 @@ export class ChecklistController {
 
       res.json(updatedItem);
     } catch (error) {
-      console.error('Erro ao atualizar item do checklist:', error);
+      logger.error({ err: error }, 'Erro ao atualizar item do checklist');
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
@@ -228,8 +230,8 @@ export class ChecklistController {
         return res.status(404).json({ error: 'Checklist não encontrado ou sem permissão' });
       }
 
-      const updateData: any = {
-        status: status as any,
+      const updateData: Prisma.ChecklistAssignmentUpdateInput = {
+        status: status as ChecklistAssignmentStatus,
         updatedAt: new Date(),
       };
 
@@ -273,7 +275,7 @@ export class ChecklistController {
 
       res.json(updatedAssignment);
     } catch (error) {
-      console.error('Erro ao atualizar status do checklist:', error);
+      logger.error({ err: error }, 'Erro ao atualizar status do checklist');
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
@@ -296,7 +298,7 @@ export class ChecklistController {
           type: type || 'GENERAL',
           createdById,
           items: {
-            create: items?.map((item: any, index: number) => ({
+            create: items?.map((item: { title: string; description?: string; order?: number; isRequired?: boolean }, index: number) => ({
               title: item.title,
               description: item.description,
               order: item.order || index,
@@ -324,7 +326,7 @@ export class ChecklistController {
 
       res.status(201).json(checklist);
     } catch (error) {
-      console.error('Erro ao criar checklist:', error);
+      logger.error({ err: error }, 'Erro ao criar checklist');
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
@@ -396,7 +398,7 @@ export class ChecklistController {
         },
       });
     } catch (error) {
-      console.error('Erro ao buscar checklists:', error);
+      logger.error({ err: error }, 'Erro ao buscar checklists');
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
@@ -444,7 +446,7 @@ export class ChecklistController {
         // Criar novos itens
         if (items.length > 0) {
           await prisma.checklistItem.createMany({
-            data: items.map((item: any, index: number) => ({
+            data: items.map((item: { title: string; description?: string; order?: number; isRequired?: boolean }, index: number) => ({
               checklistId: id,
               title: item.title,
               description: item.description,
@@ -457,7 +459,7 @@ export class ChecklistController {
 
       res.json(checklist);
     } catch (error) {
-      console.error('Erro ao atualizar checklist:', error);
+      logger.error({ err: error }, 'Erro ao atualizar checklist');
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
@@ -473,7 +475,7 @@ export class ChecklistController {
 
       res.json({ message: 'Checklist deletado com sucesso' });
     } catch (error) {
-      console.error('Erro ao deletar checklist:', error);
+      logger.error({ err: error }, 'Erro ao deletar checklist');
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
@@ -499,7 +501,7 @@ export class ChecklistController {
 
       res.status(201).json(assignments);
     } catch (error) {
-      console.error('Erro ao atribuir checklist:', error);
+      logger.error({ err: error }, 'Erro ao atribuir checklist');
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
@@ -518,7 +520,7 @@ export class ChecklistController {
 
       res.json({ message: 'Atribuição removida com sucesso' });
     } catch (error) {
-      console.error('Erro ao remover atribuição:', error);
+      logger.error({ err: error }, 'Erro ao remover atribuição');
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }

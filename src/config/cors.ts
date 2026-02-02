@@ -22,12 +22,17 @@ export const allowedOrigins = [
 
 export function dynamicCors(req: Request, res: Response, next: NextFunction) {
   const origin = req.headers.origin;
+  const isProduction = process.env.NODE_ENV === 'production';
   
   // Em desenvolvimento, aceitar qualquer origem localhost
-  if (process.env.NODE_ENV !== 'production' && origin && origin.includes('localhost')) {
+  if (!isProduction && origin && origin.includes('localhost')) {
     res.header("Access-Control-Allow-Origin", origin);
   } else if (origin && allowedOrigins.includes(origin)) {
     res.header("Access-Control-Allow-Origin", origin);
+  } else if (isProduction && origin) {
+    // Em produção, logar tentativas de origens não autorizadas
+    const logger = require('./logger').default;
+    logger.warn({ origin, allowedOrigins }, 'Origem CORS não autorizada bloqueada');
   }
   
   // Sempre definir os cabeçalhos CORS

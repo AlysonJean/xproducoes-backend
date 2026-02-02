@@ -28,6 +28,7 @@ import checklistRoutes from "./checklistRoutes";
 import settingsRoutes from "./settingsRoutes";
 import newsletterRoutes from "./newsletterRoutes";
 import bannerRoutes from "./bannerRoutes";
+import calendarRoutes from "./calendarRoutes";
 
 const router: RouterType = Router();
 
@@ -35,6 +36,7 @@ const router: RouterType = Router();
 router.use(performanceMonitoringMiddleware);
 
 // Core routes
+router.use("/calendar", calendarRoutes);
 router.use("/equipment", equipmentRoutes);
 router.use("/equipments", equipmentRoutes); // alias plural
 router.use("/kit", kitRoutes);

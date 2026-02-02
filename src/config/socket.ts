@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { MessageType } from '@prisma/client';
 import { prisma } from './prisma';
 import { config } from './environment';
+import logger from './logger';
 
 let io: SocketIOServer | null = null;
 
@@ -45,14 +46,14 @@ export function initializeSocket(server: any) {
       socket.data.user = user;
       next();
     } catch (error) {
-      console.error('Erro na autenticação do socket:', error);
+      logger.error({ err: error }, 'Erro na autenticação do socket');
       next(new Error('Token inválido'));
     }
   });
 
   io.on('connection', (socket: Socket) => {
     const user = socket.data.user;
-    console.log(`Cliente conectado: ${socket.id} - Usuário: ${user.name} (${user.id})`);
+    logger.info({ socketId: socket.id, userId: user.id, userName: user.name }, 'Cliente conectado');
 
     // Registrar usuário conectado
     connectedUsers.set(user.id, socket.id);
@@ -63,12 +64,12 @@ export function initializeSocket(server: any) {
     // Eventos de chat
     socket.on('join_chat', (chatId: string) => {
       socket.join(`chat_${chatId}`);
-      console.log(`Usuário ${user.name} entrou no chat ${chatId}`);
+      logger.info({ userName: user.name, chatId }, 'Usuário entrou no chat');
     });
 
     socket.on('leave_chat', (chatId: string) => {
       socket.leave(`chat_${chatId}`);
-      console.log(`Usuário ${user.name} saiu do chat ${chatId}`);
+      logger.info({ userName: user.name, chatId }, 'Usuário saiu do chat');
     });
 
     socket.on('send_message', async (data: {
@@ -117,7 +118,7 @@ export function initializeSocket(server: any) {
         }
 
       } catch (error) {
-        console.error('Erro ao enviar mensagem:', error);
+        logger.error({ err: error }, 'Erro ao enviar mensagem');
         socket.emit('message_error', { error: 'Erro ao enviar mensagem' });
       }
     });
@@ -155,12 +156,12 @@ export function initializeSocket(server: any) {
           chatId: data.chatId
         });
       } catch (error) {
-        console.error('Erro ao marcar mensagem como lida:', error);
+        logger.error({ err: error }, 'Erro ao marcar mensagem como lida');
       }
     });
 
     socket.on('disconnect', () => {
-      console.log(`Cliente desconectado: ${socket.id} - Usuário: ${user.name}`);
+      logger.info({ socketId: socket.id, userName: user.name }, 'Cliente desconectado');
       connectedUsers.delete(user.id);
     });
   });

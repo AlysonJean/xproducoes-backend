@@ -1,4 +1,6 @@
 // Configuração de Telemetria para Monitoramento
+import logger from './logger';
+
 export interface MetricsData {
   requests: number;
   errors: number;
@@ -64,7 +66,7 @@ class MetricsCollector {
 }
 
 export function configureTelemetry() {
-  console.log("Telemetria configurada");
+  logger.info('Telemetria configurada');
   
   // Limpar alertas antigos a cada hora
   setInterval(() => {
@@ -102,6 +104,6 @@ export const observabilityMiddleware = (req: any, res: any, next: any) => {
     }
   });
   
-  console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
+  logger.info({ method: req.method, path: req.path }, 'Request received');
   next();
 };

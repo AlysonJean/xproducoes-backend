@@ -1,8 +1,13 @@
 import { prisma } from "../config/prisma";
-import type { Equipment } from "@prisma/client";
+import type { Equipment, Prisma } from "@prisma/client";
+
+interface EquipmentSearchQuery {
+  name?: string;
+  categoryId?: string;
+}
 
 export class EquipmentService {
-  async create(data: any, _file?: Express.Multer.File): Promise<Equipment> {
+  async create(data: Prisma.EquipmentCreateInput, _file?: Express.Multer.File): Promise<Equipment> {
     // imageUrl deve vir do middleware do Cloudinary
     const imageUrl = data.imageUrl || "";
     
@@ -18,7 +23,7 @@ export class EquipmentService {
 
   async update(
     id: string,
-    data: any,
+    data: Prisma.EquipmentUpdateInput,
     _file?: Express.Multer.File,
   ): Promise<Equipment | null> {
     // imageUrl deve vir do middleware do Cloudinary (se fornecido)
@@ -33,8 +38,11 @@ export class EquipmentService {
     });
   }
 
-  async findAll(): Promise<Equipment[]> {
-    return prisma.equipment.findMany();
+  async findAll(limit?: number): Promise<Equipment[]> {
+    return prisma.equipment.findMany({
+      ...(limit ? { take: limit } : {}),
+      orderBy: { name: 'asc' } // Boa prática: garantir ordem consistente
+    });
   }
 
   async findOne(id: string): Promise<Equipment | null> {
@@ -45,12 +53,12 @@ export class EquipmentService {
     await prisma.equipment.delete({ where: { id } });
   }
 
-  async search(query: any): Promise<Equipment[]> {
+  async search(query: EquipmentSearchQuery): Promise<Equipment[]> {
     // Exemplo simples de busca por nome/categoria
     const { name, categoryId } = query;
     return prisma.equipment.findMany({
       where: {
-        ...(name && { name: { contains: name, mode: "insensitive" } }),
+        ...(name && { name: { contains: name, mode: "insensitive" as const } }),
         ...(categoryId && { categoryId }),
       },
     });

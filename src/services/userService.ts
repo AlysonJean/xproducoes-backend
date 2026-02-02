@@ -154,7 +154,7 @@ export async function changePassword(userId: string, currentPassword: string, ne
 }
 
 import { prisma } from "../config/prisma";
-import type { UserRole } from "@prisma/client";
+import type { UserRole, Prisma } from "@prisma/client";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
@@ -203,7 +203,7 @@ export async function login(data: LoginInput) {
   if (!valid) throw new Error("Senha inválida");
   // Exigir verificação de e-mail se habilitado por ambiente
   if (process.env.REQUIRE_EMAIL_VERIFICATION === 'true' && !user.verified) {
-    const err: any = new Error('E-mail não verificado');
+    const err = new Error('E-mail não verificado') as Error & { code?: string };
     err.code = 'EMAIL_NOT_VERIFIED';
     throw err;
   }
@@ -268,27 +268,14 @@ export async function getProfile(userId: string) {
   return user;
 }
 
-export type UpdateProfileInput = Partial<{
-  name: string;
-  email: string;
-  passwordHash: string;
-  phone: string;
-  avatarUrl: string;
-  role: UserRole;
-  bio: string;
-  location: string;
-  website: string;
-  socialLinks: any;
-  verified: boolean;
-  profileSettings: any;
-}>;
+export type UpdateProfileInput = Prisma.UserUpdateInput;
 
 export async function updateProfile(
   userId: string,
   data: UpdateProfileInput,
   _file?: Express.Multer.File,
 ) {
-  const updateData: UpdateProfileInput = { ...data };
+  const updateData: Prisma.UserUpdateInput = { ...data };
   // avatarUrl deve vir do middleware do Cloudinary
   if (data.avatarUrl) {
     updateData.avatarUrl = data.avatarUrl;
@@ -314,8 +301,8 @@ export async function updateProfile(
       },
     });
     return user;
-  } catch (error: any) {
-    if (error.code === "P2002") {
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && error.code === "P2002") {
       throw new Error("Email já está em uso.");
     }
     throw error;

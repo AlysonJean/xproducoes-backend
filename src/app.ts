@@ -8,10 +8,23 @@ import apiV1 from "./api/v1";
 import cepRoutes from './routes/cepRoutes';
 import { securityMonitoringMiddleware } from "./config/securityMonitor";
 import { sitemapController } from "./controllers/sitemapController";
+import { initSentry, sentryErrorHandler } from "./config/sentry";
+import { requestIdMiddleware } from "./middlewares/requestIdMiddleware";
+import { healthCheck, readinessCheck, metricsEndpoint } from "./controllers/healthController";
+import { performanceMonitoringMiddleware } from "./middlewares/performanceMonitoring";
 
 dotenv.config();
 
 const app = express();
+
+// Inicializar Sentry (deve ser o primeiro)
+initSentry(app);
+
+// Request ID deve ser o segundo middleware (após Sentry) para rastreamento completo
+app.use(requestIdMiddleware);
+
+// Performance monitoring (coleta métricas de todas as requisições)
+app.use(performanceMonitoringMiddleware);
 
 // CORS middleware
 app.use(dynamicCors);
@@ -20,11 +33,16 @@ app.use(dynamicCors);
 app.use(helmet());
 // Cabeçalhos de segurança adicionais (CSP gerido aqui para maior controle)
 app.use((req, res, next) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' https:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+  // CSP mais restritivo - removido 'unsafe-inline' onde possível
+  res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' https:; font-src 'self' https:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests");
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Referrer-Policy', 'no-referrer');
-  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=()');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=()');
+  // Adiciona Strict-Transport-Security em produção
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
   next();
 });
 // Logs
@@ -68,18 +86,26 @@ if (process.env.NODE_ENV === "production") {
 // Body parser
 app.use(express.json({ limit: process.env.MAX_FILE_SIZE || "10mb" }));
 app.use(express.urlencoded({ extended: true }));
+
+// Input sanitization (após body parser, antes das rotas)
+import { inputSanitizationMiddleware } from "./middlewares/inputSanitization";
+app.use(inputSanitizationMiddleware);
+
 // Versionamento de API
 app.use('/api/cep', cepRoutes);
 app.use("/api/v1", apiV1);
 app.use("/api", apiV1); // Compatibilidade para testes e frontend
-// Health check
-app.get("/health", (req, res) => {
-  res.json({
-    status: "OK",
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
-  });
-});
+
+// Health checks - Kubernetes/Docker probes
+app.get("/health", healthCheck);
+app.get("/ready", readinessCheck);
+
+// Metrics endpoints - SRE Dashboard data
+app.get("/metrics", metricsEndpoint);
+
+// Prometheus/Grafana Cloud compatible endpoint (com autenticação)
+import { prometheusMetricsEndpoint, metricsAuthMiddleware } from "./controllers/prometheusController";
+app.get("/metrics/prometheus", metricsAuthMiddleware, prometheusMetricsEndpoint);
 
 // 404 handler
 import { allowedOrigins } from "./config/cors";
@@ -101,6 +127,9 @@ app.use((req, res) => {
     data: null,
   });
 });
+
+// Sentry error handler (deve vir antes do error handler global)
+app.use(sentryErrorHandler());
 
 // Error handler global
 import { Request, Response, NextFunction } from "express";

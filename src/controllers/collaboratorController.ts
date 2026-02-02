@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { CollaboratorService } from "../services/collaboratorService";
 import { z } from "zod";
 import { prisma } from "../config/prisma";
+import logger from "../config/logger";
 
 const collaboratorService = new CollaboratorService();
 
@@ -93,7 +94,7 @@ export class CollaboratorController {
         message: "Colaborador criado com sucesso",
       });
     } catch (error) {
-      console.error("Erro ao criar colaborador:", error);
+      logger.error({ err: error }, "Erro ao criar colaborador");
 
       if (error instanceof z.ZodError) {
         return res.status(400).json({
@@ -119,7 +120,7 @@ export class CollaboratorController {
         data: collaborators,
       });
     } catch (error) {
-      console.error("Erro ao buscar colaboradores:", error);
+      logger.error({ err: error }, "Erro ao buscar colaboradores");
       return res.status(500).json({
         success: false,
         message: "Erro ao buscar colaboradores",
@@ -152,7 +153,7 @@ export class CollaboratorController {
         data: collaborator,
       });
     } catch (error) {
-      console.error("Erro ao buscar colaborador:", error);
+      logger.error({ err: error }, "Erro ao buscar colaborador");
       return res.status(500).json({
         success: false,
         message: "Erro ao buscar colaborador",
@@ -183,7 +184,7 @@ export class CollaboratorController {
         message: "Colaborador atualizado com sucesso",
       });
     } catch (error) {
-      console.error("Erro ao atualizar colaborador:", error);
+      logger.error({ err: error }, "Erro ao atualizar colaborador");
       return res.status(500).json({
         success: false,
         message: "Erro ao atualizar colaborador",
@@ -209,7 +210,7 @@ export class CollaboratorController {
         message: "Colaborador removido com sucesso",
       });
     } catch (error) {
-      console.error("Erro ao deletar colaborador:", error);
+      logger.error({ err: error }, "Erro ao deletar colaborador");
       return res.status(500).json({
         success: false,
         message: "Erro ao deletar colaborador",
@@ -233,7 +234,7 @@ export class CollaboratorController {
         message: "Colaborador atribuído ao evento com sucesso",
       });
     } catch (error) {
-      console.error("Erro ao atribuir colaborador:", error);
+      logger.error({ err: error }, "Erro ao atribuir colaborador");
 
       if (error instanceof z.ZodError) {
         return res.status(400).json({
@@ -269,7 +270,7 @@ export class CollaboratorController {
         data: collaborators,
       });
     } catch (error) {
-      console.error("Erro ao buscar colaboradores do evento:", error);
+      logger.error({ err: error }, "Erro ao buscar colaboradores do evento");
       return res.status(500).json({
         success: false,
         message: "Erro ao buscar colaboradores do evento",
@@ -296,7 +297,7 @@ export class CollaboratorController {
         data: events,
       });
     } catch (error) {
-      console.error("Erro ao buscar eventos do colaborador:", error);
+      logger.error({ err: error }, "Erro ao buscar eventos do colaborador");
       return res.status(500).json({
         success: false,
         message: "Erro ao buscar eventos do colaborador",
@@ -321,7 +322,7 @@ export class CollaboratorController {
         message: "Atualização de colaborador em evento não implementada ainda",
       });
     } catch (error) {
-      console.error("Erro ao atualizar atribuição:", error);
+      logger.error({ err: error }, "Erro ao atualizar atribuição");
       return res.status(500).json({
         success: false,
         message: "Erro ao atualizar atribuição",
@@ -346,7 +347,7 @@ export class CollaboratorController {
         message: "Remoção de colaborador de evento não implementada ainda",
       });
     } catch (error) {
-      console.error("Erro ao remover colaborador do evento:", error);
+      logger.error({ err: error }, "Erro ao remover colaborador do evento");
       return res.status(500).json({
         success: false,
         message: "Erro ao remover colaborador do evento",
@@ -376,7 +377,7 @@ export class CollaboratorController {
         pagination: result.pagination,
       });
     } catch (error) {
-      console.error("Erro ao buscar colaboradores:", error);
+      logger.error({ err: error }, "Erro ao buscar colaboradores");
       return res.status(500).json({
         success: false,
         message: "Erro ao buscar colaboradores",
@@ -402,7 +403,7 @@ export class CollaboratorController {
         data: stats,
       });
     } catch (error) {
-      console.error("Erro ao buscar estatísticas:", error);
+      logger.error({ err: error }, "Erro ao buscar estatísticas");
       return res.status(500).json({
         success: false,
         message: "Erro ao buscar estatísticas do colaborador",
@@ -426,7 +427,7 @@ export class CollaboratorController {
       if (!collaborator) {
         // Tentar criar perfil automaticamente se não existir (mesma lógica do getMyProfile)
         try {
-          console.log(`[Dashboard] Perfil não encontrado para usuário ${userId}. Criando perfil padrão...`);
+          logger.info({ userId }, '[Dashboard] Perfil não encontrado. Criando perfil padrão...');
           collaborator = await prisma.collaborator.create({
             data: {
               userId,
@@ -437,7 +438,7 @@ export class CollaboratorController {
             include: { user: true }
           }) as any;
         } catch (createError) {
-          console.error('[Dashboard] Erro ao criar perfil automático:', createError);
+          logger.error({ err: createError }, '[Dashboard] Erro ao criar perfil automático');
           return res.status(404).json({ success: false, message: 'Colaborador não encontrado' });
         }
       }
@@ -447,7 +448,7 @@ export class CollaboratorController {
 
       return res.json({ success: true, data: stats });
     } catch (error) {
-      console.error('Erro ao buscar dashboard do colaborador:', error);
+      logger.error({ err: error }, 'Erro ao buscar dashboard do colaborador');
       return res.status(500).json({ success: false, message: 'Erro ao buscar dashboard do colaborador' });
     }
   }
@@ -469,7 +470,7 @@ export class CollaboratorController {
         // Auto-criação de perfil para usuários com role COLLABORATOR que ainda não possuem registro
         // Isso corrige o problema de "Perfil não encontrado" para usuários recém-promovidos
         try {
-          console.log(`Perfil não encontrado para usuário ${userId}. Criando perfil padrão...`);
+          logger.info({ userId }, 'Perfil não encontrado. Criando perfil padrão...');
           
           // Verificar se já existe (concorrência) ou criar
           collaborator = await prisma.collaborator.create({
@@ -494,14 +495,14 @@ export class CollaboratorController {
           }) as any;
           
         } catch (createError) {
-          console.error('Erro ao criar perfil automático:', createError);
+          logger.error({ err: createError }, 'Erro ao criar perfil automático');
           return res.status(404).json({ success: false, message: 'Colaborador não encontrado' });
         }
       }
       
       return res.json({ success: true, data: collaborator });
     } catch (error) {
-      console.error('Erro ao buscar perfil do colaborador:', error);
+      logger.error({ err: error }, 'Erro ao buscar perfil do colaborador');
       return res.status(500).json({ success: false, message: 'Erro ao buscar perfil do colaborador' });
     }
   }
@@ -525,7 +526,7 @@ export class CollaboratorController {
 
       return res.json({ success: true, data: events });
     } catch (error) {
-      console.error('Erro ao buscar eventos do colaborador:', error);
+      logger.error({ err: error }, 'Erro ao buscar eventos do colaborador');
       return res.status(500).json({ success: false, message: 'Erro ao buscar eventos do colaborador' });
     }
   }
@@ -569,7 +570,7 @@ export class CollaboratorController {
 
       return res.json({ success: true, data: updatedCollaborator });
     } catch (error) {
-      console.error('Erro ao atualizar perfil do colaborador:', error);
+      logger.error({ err: error }, 'Erro ao atualizar perfil do colaborador');
       return res.status(500).json({ success: false, message: 'Erro ao atualizar perfil do colaborador' });
     }
   }
@@ -595,7 +596,7 @@ export class CollaboratorController {
         data: collaborators,
       });
     } catch (error) {
-      console.error("Erro ao buscar colaboradores disponíveis:", error);
+      logger.error({ err: error }, "Erro ao buscar colaboradores disponíveis");
       return res.status(500).json({
         success: false,
         message: "Erro ao buscar colaboradores disponíveis",
@@ -613,7 +614,7 @@ export class CollaboratorController {
         data: availabilities,
       });
     } catch (error) {
-      console.error("Erro ao buscar disponibilidades:", error);
+      logger.error({ err: error }, "Erro ao buscar disponibilidades");
       return res.status(500).json({
         success: false,
         message: "Erro ao buscar disponibilidades",
@@ -675,7 +676,7 @@ export class CollaboratorController {
         });
       }
 
-      console.error("Erro ao criar disponibilidade:", error);
+      logger.error({ err: error }, "Erro ao criar disponibilidade");
       return res.status(500).json({
         success: false,
         message: "Erro ao criar disponibilidade",
@@ -696,7 +697,7 @@ export class CollaboratorController {
 
       const validatedData = updateSchema.parse(req.body);
       
-      const updateData: any = { ...validatedData };
+      const updateData: Record<string, unknown> = { ...validatedData };
       if (validatedData.date) {
         updateData.date = new Date(validatedData.date);
       }
@@ -717,7 +718,7 @@ export class CollaboratorController {
         });
       }
 
-      console.error("Erro ao atualizar disponibilidade:", error);
+      logger.error({ err: error }, "Erro ao atualizar disponibilidade");
       return res.status(500).json({
         success: false,
         message: "Erro ao atualizar disponibilidade",
@@ -734,7 +735,7 @@ export class CollaboratorController {
         message: "Disponibilidade removida com sucesso",
       });
     } catch (error) {
-      console.error("Erro ao remover disponibilidade:", error);
+      logger.error({ err: error }, "Erro ao remover disponibilidade");
       return res.status(500).json({
         success: false,
         message: "Erro ao remover disponibilidade",
@@ -752,7 +753,7 @@ export class CollaboratorController {
         data: availabilities,
       });
     } catch (error) {
-      console.error("Erro ao buscar disponibilidades do colaborador:", error);
+      logger.error({ err: error }, "Erro ao buscar disponibilidades do colaborador");
       return res.status(500).json({
         success: false,
         message: "Erro ao buscar disponibilidades do colaborador",
@@ -773,7 +774,7 @@ export class CollaboratorController {
         const availabilities = await collaboratorService.getCollaboratorAvailabilities(collaborator.id);
         return res.json({ success: true, data: availabilities });
       } catch (error) {
-        console.error("Erro ao buscar minha disponibilidade:", error);
+        logger.error({ err: error }, "Erro ao buscar minha disponibilidade");
         return res.status(500).json({ success: false, message: "Erro interno" });
       }
   }
@@ -789,7 +790,7 @@ export class CollaboratorController {
         const payments = await collaboratorService.getCollaboratorPayments(collaborator.id);
         return res.json({ success: true, data: payments });
       } catch (error) {
-        console.error("Erro ao buscar meus pagamentos:", error);
+        logger.error({ err: error }, "Erro ao buscar meus pagamentos");
         return res.status(500).json({ success: false, message: "Erro interno" });
       }
   }
@@ -805,7 +806,7 @@ export class CollaboratorController {
         const stats = await collaboratorService.getCollaboratorStats(collaborator.id);
         return res.json({ success: true, data: stats });
       } catch (error) {
-        console.error("Erro ao buscar minhas estatísticas:", error);
+        logger.error({ err: error }, "Erro ao buscar minhas estatísticas");
         return res.status(500).json({ success: false, message: "Erro interno" });
       }
   }
@@ -820,7 +821,7 @@ export class CollaboratorController {
         data: payments,
       });
     } catch (error) {
-      console.error("Erro ao buscar pagamentos:", error);
+      logger.error({ err: error }, "Erro ao buscar pagamentos");
       return res.status(500).json({
         success: false,
         message: "Erro ao buscar pagamentos",
@@ -866,7 +867,7 @@ export class CollaboratorController {
         });
       }
 
-      console.error("Erro ao criar pagamento:", error);
+      logger.error({ err: error }, "Erro ao criar pagamento");
       return res.status(500).json({
         success: false,
         message: "Erro ao criar pagamento",
@@ -907,7 +908,7 @@ export class CollaboratorController {
         });
       }
 
-      console.error("Erro ao atualizar pagamento:", error);
+      logger.error({ err: error }, "Erro ao atualizar pagamento");
       return res.status(500).json({
         success: false,
         message: "Erro ao atualizar pagamento",
@@ -924,7 +925,7 @@ export class CollaboratorController {
         message: "Remoção de pagamento não implementada ainda",
       });
     } catch (error) {
-      console.error("Erro ao remover pagamento:", error);
+      logger.error({ err: error }, "Erro ao remover pagamento");
       return res.status(500).json({
         success: false,
         message: "Erro ao remover pagamento",
@@ -943,7 +944,7 @@ export class CollaboratorController {
         data: payments,
       });
     } catch (error) {
-      console.error("Erro ao buscar pagamentos do colaborador:", error);
+      logger.error({ err: error }, "Erro ao buscar pagamentos do colaborador");
       return res.status(500).json({
         success: false,
         message: "Erro ao buscar pagamentos do colaborador",
@@ -962,7 +963,7 @@ export class CollaboratorController {
         data: stats,
       });
     } catch (error) {
-      console.error("Erro ao buscar estatísticas de pagamentos:", error);
+      logger.error({ err: error }, "Erro ao buscar estatísticas de pagamentos");
       return res.status(500).json({
         success: false,
         message: "Erro ao buscar estatísticas de pagamentos",
@@ -986,7 +987,7 @@ export class CollaboratorController {
 
       return res.json({ success: true, data: notifications });
     } catch (error) {
-      console.error('Erro ao buscar notificações:', error);
+      logger.error({ err: error }, 'Erro ao buscar notificações');
       return res.status(500).json({ success: false, message: 'Erro ao buscar notificações' });
     }
   }
@@ -995,14 +996,14 @@ export class CollaboratorController {
   async getAllEventCollaborators(req: Request, res: Response) {
     try {
       // Por enquanto, retornar array vazio até implementar no repository
-      const eventCollaborators: any[] = [];
+      const eventCollaborators: unknown[] = [];
 
       return res.json({
         success: true,
         data: eventCollaborators,
       });
     } catch (error) {
-      console.error("Erro ao buscar todos os event collaborators:", error);
+      logger.error({ err: error }, "Erro ao buscar todos os event collaborators");
       return res.status(500).json({
         success: false,
         message: "Erro ao buscar event collaborators",

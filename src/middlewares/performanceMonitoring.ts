@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import logger from "../config/logger";
-
+import { metricsCollector } from "../config/metricsCollector";
 
 /**
- * Middleware para capturar métricas de performance das requisições
+ * Middleware para capturar métricas de performance das requisições.
+ * Alimenta o MetricsCollector para dashboards SRE.
  */
 export function performanceMonitoringMiddleware(
   req: Request,
@@ -14,11 +15,25 @@ export function performanceMonitoringMiddleware(
 
   // Capturar resposta quando terminar
   res.on('finish', () => {
-    const responseTime = Date.now() - startTime;
-    // Monitoramento enterprise está disponível mas não tem método recordRequest
-    // por isso vou apenas logar por enquanto
-    if (responseTime > 2000) {
-      logger.info(`Slow request: ${req.method} ${req.path} - ${responseTime}ms`);
+    const duration = Date.now() - startTime;
+
+    // Registra no collector de métricas
+    metricsCollector.record({
+      method: req.method,
+      path: req.path,
+      statusCode: res.statusCode,
+      duration,
+      timestamp: Date.now(),
+    });
+
+    // Alerta para requisições lentas (> 2s)
+    if (duration > 2000) {
+      logger.warn({
+        method: req.method,
+        path: req.path,
+        duration,
+        statusCode: res.statusCode,
+      }, 'Slow request detected');
     }
   });
 

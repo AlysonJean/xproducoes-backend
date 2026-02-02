@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 
+// Importa a extensão do Request que define userRole
+import "./unifiedAuth"; // Garante que a declaração global está disponível
+
 /**
  * Middleware para checar se o usuário possui um dos papéis permitidos.
  * Exemplo de uso: app.use('/rota', roleMiddleware(['ADMIN', 'USER']))
@@ -7,7 +10,7 @@ import { Request, Response, NextFunction } from "express";
 export function roleMiddleware(roles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     // Supondo que req.userRole é preenchido pelo middleware de autenticação
-    if (!req.userRole || !roles.includes(req.userRole)) {
+    if (!req.userRole || !roles.includes(req.userRole as string)) {
       return res.status(403).json({ message: "Acesso negado" });
     }
     return next();

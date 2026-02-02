@@ -5,11 +5,13 @@ module.exports = {
   testEnvironment: "node",
   transform: {
     "^.+\\.tsx?$": ["ts-jest", {
-      tsconfig: 'tsconfig.test.json'
+      tsconfig: 'tsconfig.test.json',
+      isolatedModules: true, // Acelera a transpilação
     }],
   },
   setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
-  testTimeout: 20000,
+  testTimeout: 10000, // Reduzido de 20s para 10s
+  maxWorkers: "50%", // Usa metade dos cores para paralelizar
   // Evita rodar testes compilados em dist/ e duplicidades
   testPathIgnorePatterns: ["/node_modules/", "/dist/"],
   // Só executa testes em desenvolvimento ou quando explicitamente solicitado

@@ -69,6 +69,12 @@ location                 String?
   profileSettings          Json?
   isVip                   Boolean           @default(false)
   isActive                 Boolean           @default(true)
+  
+  // Google Calendar Integration
+  googleResourceId         String?
+  googleRefreshToken       String?
+  googleCalendarEmail      String?
+
   createdAt                DateTime          @default(now())
   updatedAt                DateTime          @updatedAt
   auditLogs                BookingAuditLog[]
@@ -518,6 +524,8 @@ model BookingAuditLog {
   @@index([userId])
   @@index([timestamp])
   @@index([action])
+  @@index([bookingId, timestamp])
+  @@index([userId, timestamp])
   @@map("booking_audit_logs")
 }
 
@@ -536,6 +544,9 @@ model WebhookLog {
 
   @@index([event])
   @@index([bookingId])
+  @@index([status])
+  @@index([event, createdAt])
+  @@index([status, createdAt])
   @@map("webhook_logs")
 }
 
@@ -691,6 +702,9 @@ model ChatMessage {
   sender      User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
   reads       ChatMessageRead[]
 
+  @@index([chatId])
+  @@index([senderId])
+  @@index([chatId, createdAt])
   @@map("chat_messages")
 }
 

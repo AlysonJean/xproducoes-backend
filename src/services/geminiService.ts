@@ -94,9 +94,10 @@ export class GeminiService {
       const text = response.text();
 
       return text;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Detect common API errors to provide actionable logs
-      logger.error({obj:typeof error === 'object' && error !== null ? error.message || error : error}, 'Erro ao comunicar com a API Gemini:');
+      const errMsg = error instanceof Error ? error.message : String(error);
+      logger.error({obj: errMsg}, 'Erro ao comunicar com a API Gemini:');
 
       // Fallback on API error if we are in DEV or configured to do so
       if (USE_MOCK_FALLBACK) {
@@ -106,7 +107,9 @@ export class GeminiService {
 
       // If the underlying error from Google contains structured details, try to surface a friendly message
       try {
-        const details = (error && error.errorDetails) || (error && error.response && error.response.data) || null;
+        const errorObj = error as Record<string, unknown>;
+        const details = errorObj?.errorDetails || 
+          (errorObj?.response as Record<string, unknown>)?.data || null;
         if (details) {
           // If the error indicates invalid API key, log a clear instruction
           const isApiKeyInvalid = JSON.stringify(details).includes('API_KEY_INVALID');
