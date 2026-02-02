@@ -8,7 +8,13 @@ import logger from './logger';
 dotenv.config();
 
 const connectionString = `${process.env.DATABASE_URL}`;
-const pool = new Pool({ connectionString });
+
+// Configuração do Pool com SSL explícito para evitar warning de segurança
+const isProduction = process.env.NODE_ENV === 'production';
+const pool = new Pool({ 
+  connectionString,
+  ssl: isProduction ? { rejectUnauthorized: false } : false,
+});
 const adapter = new PrismaPg(pool);
 
 let prisma: PrismaClient;
