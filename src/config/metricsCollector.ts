@@ -141,17 +141,21 @@ class MetricsCollector {
     lines.push('# TYPE nodejs_rss_bytes gauge');
     lines.push(`nodejs_rss_bytes ${memUsage.rss}`);
 
-    // HTTP metrics
-    const totalRequests = recentMetrics.length;
-    const totalErrors = recentMetrics.filter(m => m.statusCode >= 400).length;
+    // HTTP metrics (Counters must be monotonic increasing since start)
+    let totalRequestsAccumulated = 0;
+    let totalErrorsAccumulated = 0;
+    this.endpointStats.forEach(stats => {
+      totalRequestsAccumulated += stats.count;
+      totalErrorsAccumulated += stats.errorCount;
+    });
 
-    lines.push('# HELP http_requests_total Total HTTP requests in last 60 seconds');
+    lines.push('# HELP http_requests_total Total HTTP requests since startup');
     lines.push('# TYPE http_requests_total counter');
-    lines.push(`http_requests_total ${totalRequests}`);
+    lines.push(`http_requests_total ${totalRequestsAccumulated}`);
 
-    lines.push('# HELP http_errors_total Total HTTP errors (4xx/5xx) in last 60 seconds');
+    lines.push('# HELP http_errors_total Total HTTP errors (4xx/5xx) since startup');
     lines.push('# TYPE http_errors_total counter');
-    lines.push(`http_errors_total ${totalErrors}`);
+    lines.push(`http_errors_total ${totalErrorsAccumulated}`);
 
     // Latency percentiles
     const allDurations = recentMetrics.map(m => m.duration);
