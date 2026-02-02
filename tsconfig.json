@@ -8,13 +8,10 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
     "include": ["src/**/*"],
-    "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/*.spec.ts", "src/**/__tests__/**", "tests/**"],
-    "references": [
-      {
-        "path": "./tsconfig.test.json"
-      }
-    ]
+    "exclude": ["node_modules", "dist", "coverage", "src/**/*.test.ts", "src/**/*.spec.ts", "src/**/__tests__/**", "tests/**"]
 }
