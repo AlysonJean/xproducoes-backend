@@ -65,7 +65,6 @@ router.use("/profile", profileRoutes);
 router.use("/quotes", quoteRoutes);
 router.use("/gemini", geminiRoutes);
 router.use("/collaborators", collaboratorRoutes);
-router.use('/logo', require('./logoRoutes').default);
 
 // Admin routes
 router.use("/admin", adminRoutes);
