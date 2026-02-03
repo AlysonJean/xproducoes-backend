@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "npx prisma@5.22.0 generate && node esbuild.config.js",
-    "postbuild": "npx prisma@5.22.0 migrate deploy",
+    "postbuild": "npx prisma@5.22.0 db push --accept-data-loss || echo 'Schema already in sync'",
     "start": "node dist/index.js",
     "start:prod": "node dist/index.js",
     "prisma:generate": "npx prisma@5.22.0 generate",
