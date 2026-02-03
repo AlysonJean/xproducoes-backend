@@ -7,6 +7,7 @@ import { initializeSocket } from "./config/socket";
 import { config } from "./config/environment";
 import fs from "fs";
 import logger from "./config/logger";
+import { initializeQueues, closeQueues } from "./config/jobQueue";
 
 
 const PORT = Number(process.env.PORT) || 3001;
@@ -251,16 +252,24 @@ async function startServerWithRetries(initialPort: number, maxRetries = 10) {
 }
 
 // Iniciar servidor com tentativas
-startServerWithRetries(Number(process.env.PORT) || PORT).catch(err => {
-  logger.error({obj:err}, 'Erro fatal ao iniciar servidor:');
-  process.exit(1);
-});
+startServerWithRetries(Number(process.env.PORT) || PORT)
+  .then(async () => {
+    // Inicializar filas de jobs após servidor iniciar
+    await initializeQueues();
+  })
+  .catch(err => {
+    logger.error({obj:err}, 'Erro fatal ao iniciar servidor:');
+    process.exit(1);
+  });
 
 const gracefulShutdown = async (signal?: string) => {
   logger.info(`Recebido sinal ${signal || 'shutdown'} - encerrando a API...`);
   try {
     // Parar timers e limpeza interna
     try { securityMonitor.stop(); } catch { /* ignore */ }
+
+    // Fechar filas de jobs
+    try { await closeQueues(); } catch { /* ignore */ }
 
     // Fechar servidor HTTP para novas conexões
     await new Promise<void>((resolve, reject) => {

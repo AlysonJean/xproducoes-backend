@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { AuthService } from "../services/authService";
 import logger from "../config/logger";
 import { isAppError, getErrorMessage, getErrorCode } from "../types/common";
+import { setAuthCookies, clearAuthCookies } from "../config/cookies";
 
 // Função para validar access token do Google
 async function validateGoogleToken(accessToken: string): Promise<{
@@ -125,7 +126,18 @@ export class AuthController {
 
       try {
         const result = await this.authService.login({ email, password });
-        res.status(200).json(result);
+        
+        // Definir tokens como httpOnly cookies
+        setAuthCookies(res, result.token, result.refreshToken);
+        
+        // Retornar dados do usuário (sem tokens no body para maior segurança)
+        res.status(200).json({
+          user: result.user,
+          redirectTo: result.redirectTo,
+          // Manter tokens no response para compatibilidade com apps mobile
+          token: result.token,
+          refreshToken: result.refreshToken,
+        });
       } catch (error: unknown) {
         if (getErrorCode(error) === 'EMAIL_NOT_VERIFIED') {
           res.status(403).json({
@@ -548,8 +560,10 @@ export class AuthController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      // Para JWT, o logout é do lado do cliente (remover token)
-      // Aqui podemos implementar uma blacklist de tokens se necessário
+      // Limpar cookies httpOnly
+      clearAuthCookies(res);
+      
+      // Para JWT, o logout também pode implementar blacklist de tokens se necessário
       res.status(200).json({ message: "Logout realizado com sucesso." });
     } catch (error) {
       next(error);
@@ -562,7 +576,9 @@ export class AuthController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const { refreshToken } = req.body;
+      // Tentar pegar refresh token do cookie primeiro, depois do body
+      const refreshToken = req.cookies?.x_refresh_token || req.body.refreshToken;
+      
       if (!refreshToken) {
         res.status(400).json({ message: 'Refresh token é obrigatório' });
         return;
@@ -596,6 +612,9 @@ export class AuthController {
           { expiresIn: '7d' }
         );
 
+        // Definir novos tokens como cookies
+        setAuthCookies(res, newToken, newRefreshToken);
+
         res.status(200).json({
           accessToken: newToken,
           refreshToken: newRefreshToken,
@@ -607,6 +626,8 @@ export class AuthController {
           }
         });
       } catch (tokenError) {
+        // Limpar cookies inválidos
+        clearAuthCookies(res);
         res.status(401).json({ message: 'Refresh token inválido' });
         return;
       }

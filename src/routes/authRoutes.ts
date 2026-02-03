@@ -25,8 +25,63 @@ const resetSchema = z.object({ email: z.string().email().optional(), token: z.st
 const authRoutes: any = Router();
 const authController = new AuthController();
 
-// Rotas públicas
+/**
+ * @openapi
+ * /auth/register:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Registrar novo usuário
+ *     description: Cria uma nova conta de usuário (cliente por padrão)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/RegisterRequest'
+ *     responses:
+ *       201:
+ *         description: Usuário criado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Dados inválidos
+ *       409:
+ *         description: Email já cadastrado
+ */
 authRoutes.post("/register", validateJsonContentType, authRateLimit, validate(userRegisterSchema), authController.register);
+
+/**
+ * @openapi
+ * /auth/login:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Login de usuário
+ *     description: Autentica um usuário e retorna tokens JWT (também via cookies httpOnly)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/LoginRequest'
+ *     responses:
+ *       200:
+ *         description: Login bem-sucedido
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *         headers:
+ *           Set-Cookie:
+ *             description: Cookies httpOnly com access e refresh tokens
+ *             schema:
+ *               type: string
+ *       401:
+ *         description: Credenciais inválidas
+ *       403:
+ *         description: Email não verificado
+ */
 authRoutes.post("/login", validateJsonContentType, authRateLimit, validate(userLoginSchema), authController.login);
 // Registro público a partir de convite
 authRoutes.post('/register-from-invite', registerFromInvite);

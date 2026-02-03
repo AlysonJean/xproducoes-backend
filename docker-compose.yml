@@ -9,10 +9,9 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: x_producoes_db
-    # Porta removida para produção - apenas comunicação interna
-    # Para desenvolvimento local, descomente a linha abaixo:
-    # ports:
-    #   - "5432:5432"
+    # Porta exposta para desenvolvimento local
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

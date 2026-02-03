@@ -2,6 +2,7 @@ import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
+import cookieParser from "cookie-parser";
 import * as dotenv from "dotenv";
 import { dynamicCors } from "./config/cors";
 import apiV1 from "./api/v1";
@@ -12,6 +13,7 @@ import { initSentry, sentryErrorHandler } from "./config/sentry";
 import { requestIdMiddleware } from "./middlewares/requestIdMiddleware";
 import { healthCheck, readinessCheck, metricsEndpoint } from "./controllers/healthController";
 import { performanceMonitoringMiddleware } from "./middlewares/performanceMonitoring";
+import { setupSwagger } from "./config/swagger";
 
 dotenv.config();
 
@@ -83,6 +85,8 @@ if (process.env.NODE_ENV === "production") {
 }
 
 // Removido: não servimos uploads locais (Cloudinary apenas)
+// Cookie parser (deve vir antes das rotas que usam cookies)
+app.use(cookieParser());
 // Body parser
 app.use(express.json({ limit: process.env.MAX_FILE_SIZE || "10mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -90,6 +94,9 @@ app.use(express.urlencoded({ extended: true }));
 // Input sanitization (após body parser, antes das rotas)
 import { inputSanitizationMiddleware } from "./middlewares/inputSanitization";
 app.use(inputSanitizationMiddleware);
+
+// Swagger API Documentation
+setupSwagger(app);
 
 // Versionamento de API
 app.use('/api/cep', cepRoutes);

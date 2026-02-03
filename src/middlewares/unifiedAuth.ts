@@ -18,6 +18,7 @@ import { securityMonitor } from "../config/securityMonitor";
 import { prisma } from "../config/prisma";
 import { UserRole } from "@prisma/client";
 import logger from "../config/logger";
+import { extractToken, COOKIE_NAMES } from "../config/cookies";
 
 // ===== INTERFACES E TIPOS =====
 
@@ -78,36 +79,27 @@ const getUserContext = (req: Request) => ({
  * Valida JWT, verifica segurança, popula req.userId, req.userRole, req.authUser
  */
 export function authenticate(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
   const { ip, userAgent, endpoint } = getUserContext(req);
 
-  // 1. Verificar presença do header
-  if (!authHeader) {
+  // 1. Extrair token de cookies (prioridade) ou header (fallback)
+  const { accessToken: token, source } = extractToken(
+    req.cookies || {},
+    req.headers.authorization
+  );
+
+  // 2. Verificar presença do token
+  if (!token) {
     securityMonitor.recordInvalidToken(ip, userAgent, endpoint, {
-      reason: "missing_auth_header",
+      reason: "missing_auth_token",
     });
     return res.status(401).json({
       success: false,
       message: "Token de autorização não fornecido",
-      code: "MISSING_AUTH_HEADER",
+      code: "MISSING_AUTH_TOKEN",
     });
   }
 
-  // 2. Extrair token
-  const token = extractTokenFromHeader(authHeader);
-  
-  if (!token) {
-    securityMonitor.recordMalformedToken(ip, userAgent, endpoint, {
-      reason: "invalid_format",
-      authHeader: authHeader.substring(0, 50),
-    });
-    return res.status(401).json({
-      success: false,
-      message: "Formato de token inválido",
-      code: "INVALID_TOKEN_FORMAT",
-      details: "Use formato: Authorization: Bearer <token>",
-    });
-  }
+  logger.debug({ source, endpoint }, "Token extracted from " + source);
 
   // 3. Verificar e decodificar JWT
   try {

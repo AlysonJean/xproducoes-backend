@@ -83,19 +83,23 @@ export async function requestPasswordReset(email: string, ipAddress?: string, us
     },
   });
 
-  // Enviar email com link seguro para reset (não bloquear o fluxo se o envio falhar)
+  // Enviar email com link seguro para reset (via fila - não bloqueia o fluxo)
   try {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
     const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
-    await (await import('./emailService')).default.sendPasswordResetEmail(
-      user.email, 
-      user.name || 'Usuário', 
-      resetUrl,
-      ipAddress,
-      userAgent
-    );
+    
+    await queueEmail({
+      type: 'password-reset',
+      to: user.email,
+      templateData: {
+        name: user.name || 'Usuário',
+        resetUrl,
+        ipAddress,
+        userAgent,
+      },
+    });
   } catch (e) {
-    logger.warn({obj:e}, 'Falha ao enviar email de reset:');
+    logger.warn({obj:e}, 'Falha ao enfileirar email de reset:');
   }
 
   // Não retornar o token no corpo da resposta
@@ -123,10 +127,15 @@ export async function resendEmailVerification(userId: string) {
   const token = await generateEmailVerificationToken(userId);
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
   const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
+  
   try {
-    await (await import('./emailService')).default.sendVerificationEmail(user.email, verifyUrl);
+    await queueEmail({
+      type: 'verification',
+      to: user.email,
+      templateData: { verifyUrl },
+    });
   } catch (e) {
-    logger.warn({obj:e}, 'Falha ao enviar e-mail de verificação:');
+    logger.warn({obj:e}, 'Falha ao enfileirar e-mail de verificação:');
   }
   return { success: true };
 }
@@ -160,6 +169,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { config as envConfig } from "../config/environment";
 import logger from "../config/logger";
+import { queueEmail } from "../config/jobQueue";
 
 
 // Use centralized, cryptographically generated secret from environment config

@@ -1,21 +1,9 @@
 import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { Pool } from "pg";
 import * as dotenv from "dotenv";
 import logger from './logger';
 
 // Carregar variáveis de ambiente primeiro
 dotenv.config();
-
-const connectionString = `${process.env.DATABASE_URL}`;
-
-// Configuração do Pool com SSL explícito para evitar warning de segurança
-const isProduction = process.env.NODE_ENV === 'production';
-const pool = new Pool({ 
-  connectionString,
-  ssl: isProduction ? { rejectUnauthorized: true } : undefined,
-});
-const adapter = new PrismaPg(pool);
 
 let prisma: PrismaClient;
 
@@ -26,13 +14,11 @@ declare global {
 // Singleton pattern for database connection
 if (process.env.NODE_ENV === "production") {
   prisma = new PrismaClient({
-    adapter,
     log: ['error'], // Nível de log para produção
   });
 } else {
   if (!global.__prisma) {
     global.__prisma = new PrismaClient({
-      adapter,
       log: ['error', 'warn'], // Reduzido para evitar spam de logs
     });
   }

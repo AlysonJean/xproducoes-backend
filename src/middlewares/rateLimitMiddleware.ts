@@ -1,6 +1,80 @@
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import logger from "../config/logger";
+
+/**
+ * Gera chave combinando IP + userId (quando autenticado)
+ * Isso permite rate limiting mais preciso por usuário
+ */
+const userKeyGenerator = (req: Request): string => {
+  const userId = (req as any).userId;
+  try {
+    const ipKey = ipKeyGenerator(req as any);
+    return userId ? `user:${userId}` : `ip:${ipKey}`;
+  } catch {
+    return userId ? `user:${userId}` : `ip:${req.ip}`;
+  }
+};
+
+/**
+ * Rate limiting por usuário autenticado
+ * Usado para endpoints que requerem autenticação
+ */
+export const userRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // 100 requests por usuário
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: userKeyGenerator,
+  handler: (req: Request, res: Response) => {
+    const userId = (req as any).userId;
+    logger.warn({
+      userId,
+      ip: req.ip,
+      path: req.path,
+    }, 'Rate limit por usuário excedido');
+    res.status(429).json({
+      error: 'Too Many Requests',
+      message: 'Muitas requisições. Aguarde antes de continuar.',
+    });
+  },
+});
+
+/**
+ * Rate limiting por usuário para operações de escrita
+ */
+export const userWriteRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutos
+  max: 30, // 30 operações de escrita por usuário
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: userKeyGenerator,
+  handler: (req: Request, res: Response) => {
+    const userId = (req as any).userId;
+    logger.warn({
+      userId,
+      ip: req.ip,
+      path: req.path,
+      method: req.method,
+    }, 'Rate limit de escrita por usuário excedido');
+    res.status(429).json({
+      error: 'Too Many Requests',
+      message: 'Muitas operações. Aguarde antes de continuar.',
+    });
+  },
+});
+
+/**
+ * Middleware de rate limiting adaptativo
+ * Mais restritivo para IPs, mais permissivo para usuários autenticados
+ */
+export const adaptiveRateLimit = (req: Request, res: Response, next: NextFunction) => {
+  const userId = (req as any).userId;
+  if (userId) {
+    return userRateLimit(req, res, next);
+  }
+  return apiRateLimit(req, res, next);
+};
 
 
 // Rate limiting para autenticação - Mais restritivo
@@ -202,4 +276,7 @@ export const rateLimiters = {
   quote: quoteRateLimit,
   review: reviewRateLimit,
   dashboard: dashboardRateLimit,
+  user: userRateLimit,
+  userWrite: userWriteRateLimit,
+  adaptive: adaptiveRateLimit,
 };
