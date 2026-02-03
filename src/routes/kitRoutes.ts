@@ -9,11 +9,9 @@ const kitRoutes: Router = Router();
 const kitController = new KitController();
 
 // Rotas Públicas
-kitRoutes.get("/", kitController.findAll);
-// Alias para compatibilidade REST/testes
-kitRoutes.get("/kits", kitController.findAll);
 kitRoutes.get("/recommended", kitController.getRecommended);
 kitRoutes.get("/popular", kitController.getPopular);
+kitRoutes.get("/", kitController.findAll);
 kitRoutes.get("/:id", kitController.findOne);
 
 // Rotas de Admin com upload de imagem

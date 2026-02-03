@@ -12,16 +12,8 @@ const equipmentController = new EquipmentController();
 equipmentRoutes.get("/search", cacheMiddleware, equipmentController.search);
 equipmentRoutes.get("/category/:categoryId", cacheMiddleware, equipmentController.getByCategory);
 equipmentRoutes.get("/", cacheMiddleware, equipmentController.findAll);
+equipmentRoutes.get("/:id/availability", cacheMiddleware, equipmentController.getAvailability); // 3 min
 equipmentRoutes.get("/:id", cacheMiddleware, equipmentController.findOne); // 10 min
-equipmentRoutes.get(
-  "/:id/availability",
-  cacheMiddleware,
-  equipmentController.getAvailability,
-); // 3 min
-
-// Alias para plural (compatibilidade REST e testes)
-equipmentRoutes.get("/equipments", cacheMiddleware, equipmentController.findAll);
-equipmentRoutes.get("/equipments/:id", cacheMiddleware, equipmentController.findOne);
 
 // --- Rotas de Admin (protegidas, sem cache) ---
 equipmentRoutes.post(
