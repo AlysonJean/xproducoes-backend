@@ -614,4 +614,68 @@ export class AuthController {
       next(error);
     }
   };
+
+  /**
+   * Facebook Data Deletion Callback
+   * Endpoint exigido pelo Facebook para permitir que usuários solicitem exclusão de dados
+   * Documentação: https://developers.facebook.com/docs/development/create-an-app/app-dashboard/data-deletion-callback
+   */
+  facebookDataDeletion = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const signedRequest = req.body.signed_request;
+      
+      if (!signedRequest) {
+        res.status(400).json({ error: 'signed_request é obrigatório' });
+        return;
+      }
+
+      // Decodificar o signed_request do Facebook
+      const [encodedSig, payload] = signedRequest.split('.');
+      
+      // Decodificar o payload (base64url)
+      const data = JSON.parse(
+        Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8')
+      );
+      
+      const userId = data.user_id;
+      
+      if (!userId) {
+        res.status(400).json({ error: 'user_id não encontrado no signed_request' });
+        return;
+      }
+      
+      logger.info({ facebookUserId: userId }, 'Solicitação de exclusão de dados do Facebook recebida');
+      
+      // Gerar código de confirmação único
+      const confirmationCode = `FB-DEL-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      
+      // Nota: Como não armazenamos o Facebook ID separadamente no banco de dados,
+      // não conseguimos mapear diretamente o user_id do Facebook para nosso usuário.
+      // O login via Facebook usa o email retornado pela API, não o user_id.
+      // 
+      // Para uma implementação completa, você precisaria:
+      // 1. Adicionar um campo 'facebookId' ao schema do Prisma
+      // 2. Salvar o Facebook user_id durante o primeiro login
+      // 3. Usar esse campo para buscar e excluir o usuário aqui
+      //
+      // Por enquanto, logamos a solicitação e retornamos sucesso ao Facebook
+      logger.info({ facebookId: userId }, 'Solicitação de exclusão registrada (Facebook ID não mapeado para usuário local)');
+      
+      // Resposta no formato exigido pelo Facebook
+      const statusUrl = `${process.env.FRONTEND_URL || 'https://xproducoeseeventos.com.br'}/data-deletion-status?code=${confirmationCode}`;
+      
+      res.status(200).json({
+        url: statusUrl,
+        confirmation_code: confirmationCode
+      });
+      
+    } catch (error) {
+      logger.error({ error }, 'Erro no callback de exclusão de dados do Facebook');
+      next(error);
+    }
+  };
 }

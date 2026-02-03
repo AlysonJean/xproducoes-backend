@@ -165,7 +165,7 @@ import logger from "../config/logger";
 // Use centralized, cryptographically generated secret from environment config
 const config = { jwtSecret: envConfig.jwtSecret };
 
-export type RegisterInput = { name: string; email: string; password: string };
+export type RegisterInput = { name: string; email: string; password: string; role?: string };
 export type LoginInput = { email: string; password: string };
 
 export async function register(data: RegisterInput) {
@@ -175,7 +175,12 @@ export async function register(data: RegisterInput) {
   if (existing) throw new Error("Email já está em uso.");
   const hash = await bcrypt.hash(data.password, 10);
   const user = await prisma.user.create({
-    data: { name: data.name, email: data.email, passwordHash: hash },
+    data: { 
+      name: data.name, 
+      email: data.email, 
+      passwordHash: hash,
+      role: (data.role as any) || "CLIENT"
+    },
     select: { id: true, name: true, email: true, role: true, createdAt: true },
   });
   // Cria perfil de cliente por padrão (não bloqueante)

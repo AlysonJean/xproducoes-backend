@@ -16,6 +16,10 @@ export async function create(data: any, _file?: Express.Multer.File) {
     };
     delete kitData.equipmentIds;
   }
+
+  // Remove campos que não existem no schema do Prisma
+  delete kitData.fileName;
+
   return repo.create(kitData);
 }
 
@@ -34,8 +38,12 @@ export async function update(
     kitData.equipments = {
       set: data.equipmentIds.map((id: string) => ({ id })),
     };
-    delete data.equipmentIds;
+    delete kitData.equipmentIds;
   }
+
+  // Remove campos que não existem no schema do Prisma
+  delete kitData.fileName;
+
   return repo.update(id, kitData);
 }
 

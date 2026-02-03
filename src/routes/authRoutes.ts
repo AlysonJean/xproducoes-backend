@@ -49,6 +49,8 @@ authRoutes.get('/oauth/google/callback', authRateLimit, authController.googleCal
 // OAuth Facebook
 authRoutes.get('/oauth/facebook/authorize', authRateLimit, authController.facebookAuthorize);
 authRoutes.get('/oauth/facebook/callback', authRateLimit, authController.facebookCallback);
+// Facebook Data Deletion Callback (exigido pelo Facebook)
+authRoutes.post('/facebook/data-deletion', authController.facebookDataDeletion);
 
 // Rotas protegidas
 authRoutes.get("/me", authenticate, authController.getProfile);

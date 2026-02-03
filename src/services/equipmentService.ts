@@ -10,10 +10,12 @@ export class EquipmentService {
   async create(data: Prisma.EquipmentCreateInput, _file?: Express.Multer.File): Promise<Equipment> {
     // imageUrl deve vir do middleware do Cloudinary
     const imageUrl = data.imageUrl || "";
+    const equipmentData = { ...data } as any;
+    delete equipmentData.fileName;
     
     return prisma.equipment.create({
       data: {
-        ...data,
+        ...equipmentData,
         pricePerHour: Number(data.pricePerHour),
         quantity: Number(data.quantity),
         imageUrl,
@@ -28,11 +30,13 @@ export class EquipmentService {
   ): Promise<Equipment | null> {
     // imageUrl deve vir do middleware do Cloudinary (se fornecido)
     const imageUrl = data.imageUrl;
+    const equipmentData = { ...data } as any;
+    delete equipmentData.fileName;
     
     return prisma.equipment.update({
       where: { id },
       data: {
-        ...data,
+        ...equipmentData,
         ...(imageUrl && { imageUrl }),
       },
     });
