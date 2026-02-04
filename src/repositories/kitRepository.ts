@@ -12,7 +12,7 @@ export class KitRepository {
     });
   }
   async findOne(idOrSlug: string) {
-    return prisma.kit.findFirst({
+    const kit = await prisma.kit.findFirst({
       where: {
         OR: [
           { id: idOrSlug },
@@ -21,6 +21,34 @@ export class KitRepository {
       },
       include: { equipments: true },
     });
+
+    if (!kit) return null;
+
+    // Fetch neighbors (Previous and Next by name)
+    const [prev, next] = await Promise.all([
+      prisma.kit.findFirst({
+        where: {
+          name: { lt: kit.name },
+          isActive: true
+        },
+        orderBy: { name: 'desc' },
+        select: { slug: true }
+      }),
+      prisma.kit.findFirst({
+        where: {
+          name: { gt: kit.name },
+          isActive: true
+        },
+        orderBy: { name: 'asc' },
+        select: { slug: true }
+      })
+    ]);
+
+    return {
+      ...kit,
+      prevSlug: prev?.slug || null,
+      nextSlug: next?.slug || null
+    };
   }
   async update(id: string, data: any) {
     return prisma.kit.update({ where: { id }, data });
