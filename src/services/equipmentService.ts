@@ -63,9 +63,9 @@ export class EquipmentService {
     });
   }
 
-  async findOne(idOrSlug: string): Promise<Equipment | null> {
-    return prisma.equipment.findFirst({ 
-      where: { 
+  async findOne(idOrSlug: string): Promise<Equipment & { prevSlug?: string | null; nextSlug?: string | null } | null> {
+    const equipment = await prisma.equipment.findFirst({
+      where: {
         OR: [
           { id: idOrSlug },
           { slug: idOrSlug }
@@ -73,6 +73,36 @@ export class EquipmentService {
       },
       include: { category: true }
     });
+
+    if (!equipment) return null;
+
+    // Fetch neighbors (Previous and Next by name in the same category)
+    const [prev, next] = await Promise.all([
+      prisma.equipment.findFirst({
+        where: {
+          categoryId: equipment.categoryId,
+          name: { lt: equipment.name },
+          isAvailable: true // Optional behavior: navigate only available items?
+        },
+        orderBy: { name: 'desc' },
+        select: { slug: true }
+      }),
+      prisma.equipment.findFirst({
+        where: {
+          categoryId: equipment.categoryId,
+          name: { gt: equipment.name },
+          isAvailable: true
+        },
+        orderBy: { name: 'asc' },
+        select: { slug: true }
+      })
+    ]);
+
+    return {
+      ...equipment,
+      prevSlug: prev?.slug || null,
+      nextSlug: next?.slug || null
+    };
   }
 
   async delete(id: string): Promise<void> {
