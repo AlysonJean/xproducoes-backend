@@ -32,6 +32,7 @@ model Portfolio {
   description String
   eventDate   DateTime
   imageUrl    String
+  slug        String?  @unique
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -385,6 +386,7 @@ model Review {
   id              String        @id @default(cuid())
   rating          Int
   comment         String?
+  slug            String?       @unique
   photos          String[]
   tags            String[]
   punctuality     Int?
