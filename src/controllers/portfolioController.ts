@@ -60,4 +60,19 @@ export class PortfolioController {
       return next(error);
     }
   };
+
+  reorder = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { items } = req.body; // Espera { items: [{id, sortOrder}, ...] }
+      
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ message: "Formato inválido. Esperado array de itens." });
+      }
+
+      await portfolioService.updateOrder(items);
+      return res.json({ message: "Ordem atualizada com sucesso" });
+    } catch (error) {
+      return next(error);
+    }
+  };
 }

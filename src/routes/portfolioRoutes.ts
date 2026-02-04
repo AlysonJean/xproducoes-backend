@@ -14,6 +14,12 @@ portfolioRoutes.get("/", portfolioController.findAll);
 portfolioRoutes.get("/portfolio", portfolioController.findAll);
 
 // Rotas de Admin para gerir o portfólio
+portfolioRoutes.put(
+  "/reorder",
+  authenticate,
+  roleMiddleware(["ADMIN"]),
+  portfolioController.reorder
+);
 portfolioRoutes.post(
   "/",
   authenticate,
