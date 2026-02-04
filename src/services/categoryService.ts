@@ -3,13 +3,18 @@ import { createAppError } from "../types/common";
 
 const repo = new CategoryRepository();
 
-export async function create(data: { name: string }) {
+export async function create(data: { name: string; imageUrl?: string; imageAlt?: string }) {
   // Slug automático
   const slug = data.name.toLowerCase().replace(/\s+/g, "-");
-  return repo.create({ name: data.name, slug });
+  return repo.create({ 
+    name: data.name, 
+    slug,
+    imageUrl: data.imageUrl,
+    imageAlt: data.imageAlt || data.name
+  });
 }
 
-export async function update(id: string, data: { name: string }) {
+export async function update(id: string, data: { name: string; imageUrl?: string; imageAlt?: string }) {
   return repo.update(id, data);
 }
 

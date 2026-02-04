@@ -9,12 +9,12 @@ import { cacheService, CacheService } from "../services/cacheService";
 export class CategoryController {
   create = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (req.userRole !== "ADMIN") {
-        return res.status(403).json({ message: "Acesso negado" });
-      }
+      console.log('DEBUG Category Create:', {
+        body: req.body
+      });
       categoryCreateSchema.parse(req.body);
-      const { name } = req.body;
-      const category = await categoryService.create({ name });
+      const { name, imageUrl, imageAlt } = req.body;
+      const category = await categoryService.create({ name, imageUrl, imageAlt });
 
       // Invalidar cache após criar categoria
       await cacheService.deletePattern("category:*");
@@ -46,7 +46,7 @@ export class CategoryController {
       }
       categoryUpdateSchema.parse(req.body);
       const { id } = req.params as { id: string };
-      const { name } = req.body;
+      const { name, imageUrl, imageAlt } = req.body;
 
       if (!id) {
         return res
@@ -54,7 +54,7 @@ export class CategoryController {
           .json({ message: "ID da categoria é obrigatório." });
       }
 
-      const category = await categoryService.update(id, { name });
+      const category = await categoryService.update(id, { name, imageUrl, imageAlt });
 
       // Invalidar cache após atualizar categoria
       await cacheService.deletePattern("category:*");

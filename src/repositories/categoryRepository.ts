@@ -2,15 +2,15 @@ import { prisma } from "../config/prisma";
 
 export class CategoryRepository {
   async create(
-    data: { name: string; slug: string }
-  ): Promise<{ id: string; name: string; slug: string }> {
+    data: { name: string; slug: string; imageUrl?: string; imageAlt?: string }
+  ): Promise<{ id: string; name: string; slug: string; imageUrl: string | null }> {
     return prisma.category.create({ data });
   }
 
   async update(
     id: string,
-    data: { name: string }
-  ): Promise<{ id: string; name: string; slug: string }> {
+    data: { name: string; imageUrl?: string; imageAlt?: string }
+  ): Promise<{ id: string; name: string; slug: string; imageUrl: string | null }> {
     return prisma.category.update({
       where: { id },
       data,

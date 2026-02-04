@@ -54,6 +54,20 @@ export class EquipmentService {
   }
 
   async delete(id: string): Promise<void> {
+    // Verificar se existem reservas associadas
+    const bookingsCount = await prisma.booking.count({
+      where: {
+        equipments: {
+          some: { id }
+        }
+      }
+    });
+
+    if (bookingsCount > 0) {
+      throw new Error(`Este equipamento possui ${bookingsCount} reservas registradas e não pode ser excluído. Considere torná-lo 'IsAvailable = false' para mantê-lo no histórico.`);
+    }
+
+    // Se estiver em Kits, o relacionamento será removido automaticamente (Cascade em tabela pivot implícita)
     await prisma.equipment.delete({ where: { id } });
   }
 

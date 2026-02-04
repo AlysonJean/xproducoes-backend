@@ -83,6 +83,10 @@ router.use('/settings', settingsRoutes);
 router.use('/newsletter', newsletterRoutes);
 router.use('/banners', bannerRoutes);
 
+// Recommendation routes (optional auth - better results when authenticated)
+import recommendationRoutes from './recommendationRoutes';
+router.use('/recommendations', recommendationRoutes);
+
 // Health endpoint
 router.get("/health", (req, res) => {
   res.json({

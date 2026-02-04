@@ -92,6 +92,8 @@ app.use(express.json({ limit: process.env.MAX_FILE_SIZE || "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // Input sanitization (após body parser, antes das rotas)
+
+
 import { inputSanitizationMiddleware } from "./middlewares/inputSanitization";
 app.use(inputSanitizationMiddleware);
 
