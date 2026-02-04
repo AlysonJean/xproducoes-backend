@@ -11,9 +11,14 @@ export class KitRepository {
       ...(limit ? { take: limit } : {})
     });
   }
-  async findOne(id: string) {
-    return prisma.kit.findUnique({
-      where: { id },
+  async findOne(idOrSlug: string) {
+    return prisma.kit.findFirst({
+      where: {
+        OR: [
+          { id: idOrSlug },
+          { slug: idOrSlug }
+        ]
+      },
       include: { equipments: true },
     });
   }

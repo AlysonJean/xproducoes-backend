@@ -152,7 +152,6 @@ export async function create(data: {
       email: data.email,
       passwordHash: data.passwordHash,
       role: data.role || 'CLIENT',
-      phone: data.phone,
     },
     select: userSelect,
   });

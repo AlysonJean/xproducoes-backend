@@ -4,6 +4,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: xproducoes_redis
+    command: redis-server --appendonly yes --maxmemory-policy noeviction
     restart: unless-stopped
     ports:
       - "6379:6379"

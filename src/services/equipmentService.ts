@@ -1,5 +1,7 @@
 import { prisma } from "../config/prisma";
 import type { Equipment, Prisma } from "@prisma/client";
+import { generateSlug } from "../utils/slug";
+import { randomBytes } from "crypto";
 
 interface EquipmentSearchQuery {
   name?: string;
@@ -13,12 +15,22 @@ export class EquipmentService {
     const equipmentData = { ...data } as any;
     delete equipmentData.fileName;
     
+    // Gerar slug a partir do nome
+    let slug = generateSlug(equipmentData.name);
+    
+    // Verificar se slug existe e adicionar sufixo se necessário
+    const slugExists = await prisma.equipment.findUnique({ where: { slug } });
+    if (slugExists) {
+        slug = `${slug}-${randomBytes(2).toString('hex')}`;
+    }
+
     return prisma.equipment.create({
       data: {
         ...equipmentData,
         pricePerHour: Number(data.pricePerHour),
         quantity: Number(data.quantity),
         imageUrl,
+        slug,
       },
     });
   }
@@ -51,9 +63,14 @@ export class EquipmentService {
     });
   }
 
-  async findOne(id: string): Promise<Equipment | null> {
-    return prisma.equipment.findUnique({ 
-      where: { id },
+  async findOne(idOrSlug: string): Promise<Equipment | null> {
+    return prisma.equipment.findFirst({ 
+      where: { 
+        OR: [
+          { id: idOrSlug },
+          { slug: idOrSlug }
+        ]
+      },
       include: { category: true }
     });
   }

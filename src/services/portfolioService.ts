@@ -48,6 +48,7 @@ export async function create(
     description: string;
     eventDate: Date;
     imageUrl: string;
+    sortOrder: number;
   } = {
     title: data.title.trim(),
     description: data.description.trim(),

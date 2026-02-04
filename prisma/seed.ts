@@ -179,9 +179,9 @@ async function ensureEquipmentsAndKits() {
 	const cat = categories[0];
 
 	const equipmentsData = [
-		{ name: 'Caixa de som ativa JBL EON', description: 'Speaker 15" com 1000W', pricePerHour: '120.00', quantity: 6 },
-		{ name: 'Mesa de Som Allen & Heath', description: '24 canais', pricePerHour: '200.00', quantity: 2 },
-		{ name: 'Projetor 5000 lúmens', description: 'Projetor para eventos', pricePerHour: '180.00', quantity: 3 },
+		{ name: 'Caixa de som ativa JBL EON', slug: 'caixa-de-som-ativa-jbl-eon', description: 'Speaker 15" com 1000W', pricePerHour: '120.00', quantity: 6 },
+		{ name: 'Mesa de Som Allen & Heath', slug: 'mesa-de-som-allen-heath', description: '24 canais', pricePerHour: '200.00', quantity: 2 },
+		{ name: 'Projetor 5000 lúmens', slug: 'projetor-5000-lumens', description: 'Projetor para eventos', pricePerHour: '180.00', quantity: 3 },
 	];
 
 	const createdEquipments: any[] = [];
@@ -194,6 +194,7 @@ async function ensureEquipmentsAndKits() {
 		const created = await prisma.equipment.create({
 			data: {
 				name: e.name,
+				slug: (e as any).slug,
 				description: e.description,
 				imageUrl: 'https://res.cloudinary.com/demo/image/upload/sample.jpg',
 			pricePerHour: new Prisma.Decimal(e.pricePerHour),
@@ -211,6 +212,7 @@ async function ensureEquipmentsAndKits() {
 		await prisma.kit.create({
 			data: {
 				name: kitName,
+				slug: 'kit-pa-basico',
 				description: 'Kit de sonorização básico para eventos pequenos',
 			price: new Prisma.Decimal('450.00'),
 				imageUrl: 'https://res.cloudinary.com/demo/image/upload/kit-pa.png',

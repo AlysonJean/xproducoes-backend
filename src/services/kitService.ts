@@ -1,4 +1,6 @@
 import { KitRepository } from "../repositories/kitRepository";
+import { generateSlug } from "../utils/slug";
+import { randomBytes } from "crypto";
 
 const repo = new KitRepository();
 
@@ -19,6 +21,19 @@ export async function create(data: any, _file?: Express.Multer.File) {
 
   // Remove campos que não existem no schema do Prisma
   delete kitData.fileName;
+
+  // Gerar slug
+  let slug = generateSlug(kitData.name);
+  try {
+    const existing = await repo.findOne(slug);
+    if (existing) {
+      slug = `${slug}-${randomBytes(2).toString('hex')}`;
+    }
+  } catch (e) {
+    // Se findOne falhar (ex: erro de banco), prosseguir com slug original ou lançar erro
+    // Assumindo que findOne retorna null se não achar
+  }
+  kitData.slug = slug;
 
   return repo.create(kitData);
 }

@@ -169,6 +169,7 @@ model Equipment {
   name                  String
   description           String
   imageUrl              String
+  slug                  String           @unique
   pricePerHour          Decimal          @db.Decimal(10, 2)
   quantity              Int
   isAvailable           Boolean          @default(true)
@@ -235,6 +236,7 @@ model Kit {
   description           String
   price                 Decimal     @db.Decimal(10, 2)
   imageUrl              String
+  slug                  String      @unique
   category              String?
   tags                  String[]
   minimumRentalDuration Int?
