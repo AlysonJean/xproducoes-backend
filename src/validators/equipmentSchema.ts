@@ -5,4 +5,5 @@ export const equipmentCreateSchema = z.object({
   description: z.string().min(5, "Descrição obrigatória"),
   pricePerHour: z.coerce.number().positive("Preço deve ser positivo"),
   quantity: z.coerce.number().int().positive("Quantidade deve ser positiva"),
+  categoryId: z.string().min(1, "Categoria é obrigatória"),
 });

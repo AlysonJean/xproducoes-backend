@@ -39,18 +39,23 @@ export class EquipmentService {
         ...equipmentData,
         ...(imageUrl && { imageUrl }),
       },
+      include: { category: true }
     });
   }
 
   async findAll(limit?: number): Promise<Equipment[]> {
     return prisma.equipment.findMany({
       ...(limit ? { take: limit } : {}),
-      orderBy: { name: 'asc' } // Boa prática: garantir ordem consistente
+      orderBy: { name: 'asc' },
+      include: { category: true }
     });
   }
 
   async findOne(id: string): Promise<Equipment | null> {
-    return prisma.equipment.findUnique({ where: { id } });
+    return prisma.equipment.findUnique({ 
+      where: { id },
+      include: { category: true }
+    });
   }
 
   async delete(id: string): Promise<void> {
@@ -79,6 +84,7 @@ export class EquipmentService {
         ...(name && { name: { contains: name, mode: "insensitive" as const } }),
         ...(categoryId && { categoryId }),
       },
+      include: { category: true }
     });
   }
 
