@@ -39,6 +39,19 @@ export async function create(data: any, _file?: Express.Multer.File) {
 
   // Remove campos que não existem no schema do Prisma
   delete kitData.fileName;
+  
+  // Experience Levels - processar se enviado
+  if (Array.isArray(data.experienceLevels) && data.experienceLevels.length > 0) {
+    kitData.experienceLevels = {
+      create: data.experienceLevels.map((level: any) => ({
+        level: level.level,
+        price: typeof level.price === 'number' ? level.price : parseFloat(level.price) || 0,
+        description: level.description || null,
+        includes: Array.isArray(level.includes) ? level.includes : [],
+        isPopular: level.isPopular === true,
+      })),
+    };
+  }
 
   // Gerar slug
   let slug = generateSlug(kitData.name);
@@ -92,6 +105,20 @@ export async function update(
 
   // Remove campos que não existem no schema do Prisma
   delete kitData.fileName;
+  
+  // Experience Levels - processar se enviado
+  if (Array.isArray(data.experienceLevels)) {
+    kitData.experienceLevels = {
+      deleteMany: {}, // Remove todos os níveis existentes
+      create: data.experienceLevels.map((level: any) => ({
+        level: level.level,
+        price: typeof level.price === 'number' ? level.price : parseFloat(level.price) || 0,
+        description: level.description || null,
+        includes: Array.isArray(level.includes) ? level.includes : [],
+        isPopular: level.isPopular === true,
+      })),
+    };
+  }
 
   return repo.update(id, kitData);
 }
