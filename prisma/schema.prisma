@@ -165,6 +165,17 @@ model Collaborator {
   @@map("collaborators")
 }
 
+// ================================
+// ENUMS GERAIS
+// ================================
+
+enum ItemStatus {
+  ACTIVE        // Ativo e visível
+  INACTIVE      // Inativo (escondido)
+  MAINTENANCE   // Em manutenção (escondido ou aviso)
+  COMING_SOON   // Em breve (visível)
+}
+
 model Equipment {
   id                    String           @id @default(cuid())
   name                  String
@@ -173,7 +184,7 @@ model Equipment {
   slug                  String?           @unique
   pricePerHour          Decimal          @db.Decimal(10, 2)
   quantity              Int
-  isAvailable           Boolean          @default(true)
+  status                ItemStatus       @default(ACTIVE)
   tags                  String[]
   specifications        Json?
   weight                Decimal?         @db.Decimal(8, 2)
@@ -202,6 +213,7 @@ model Equipment {
   @@index([categoryId, condition])
   @@index([pricePerHour])
   @@index([name, categoryId])
+  @@index([status])
   @@map("equipments")
 }
 
@@ -247,7 +259,7 @@ model Kit {
   estimatedSetupTime    Int?
   weight                Decimal?    @db.Decimal(8, 2)
   transportRequirements String?
-  isAvailable           Boolean     @default(true)
+  status                ItemStatus  @default(ACTIVE)
   coverImage            String?
   images                String[]
   setupGuides           String[]
@@ -264,6 +276,7 @@ model Kit {
 
   @@index([recommended])
   @@index([popular])
+  @@index([status])
   @@map("kits")
 }
 
@@ -273,7 +286,7 @@ model Service {
   description String
   price       Decimal   @db.Decimal(10, 2)
   duration    Int       @default(60) // Duration in minutes
-  isActive    Boolean   @default(true)
+  status      ItemStatus @default(ACTIVE)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   

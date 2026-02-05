@@ -1,4 +1,5 @@
 import { KitRepository } from "../repositories/kitRepository";
+import { prisma } from "../config/prisma";
 import { generateSlug } from "../utils/slug";
 import { randomBytes } from "crypto";
 
@@ -123,8 +124,18 @@ export async function update(
   return repo.update(id, kitData);
 }
 
-export async function findAll(limit?: number) {
-  return repo.findAll(limit);
+export async function findAll(limit?: number, publicView = true) {
+  return prisma.kit.findMany({
+    where: {
+      ...(publicView ? { status: { in: ['ACTIVE', 'MAINTENANCE', 'COMING_SOON'] } } : {})
+    },
+    ...(limit ? { take: limit } : {}),
+    orderBy: { createdAt: 'desc' },
+    include: { 
+      experienceLevels: true,
+      items: { include: { equipment: true, service: true } }
+    }
+  });
 }
 
 export async function findOne(id: string) {

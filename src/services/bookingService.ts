@@ -101,17 +101,21 @@ export class BookingService {
         description: true,
         price: true,
         imageUrl: true,
-        equipments: {
+        items: {
           select: {
-            id: true,
-            name: true,
-            description: true,
-            pricePerHour: true,
-            imageUrl: true,
-            category: {
+            equipment: {
               select: {
                 id: true,
-                name: true
+                name: true,
+                description: true,
+                pricePerHour: true,
+                imageUrl: true,
+                category: {
+                  select: {
+                    id: true,
+                    name: true
+                  }
+                }
               }
             }
           }

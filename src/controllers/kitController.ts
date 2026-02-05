@@ -56,9 +56,11 @@ export class KitController {
       // Limite de segurança para produção (512MB RAM)
       // Em DEV: Ilimitado (undefined)
       // Em PROD: Max 150 kits (segurança contra OOM)
+      // Em PROD: Max 150 kits (segurança contra OOM)
       const limit = process.env.NODE_ENV === 'production' ? 150 : undefined;
+      const publicView = req.userRole !== 'ADMIN';
       
-      const kits = await kitService.findAll(limit);
+      const kits = await kitService.findAll(limit, publicView);
       return res.json(kits);
     } catch (error) {
       return next(error);

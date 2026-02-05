@@ -6,7 +6,8 @@ const repo = new ServiceRepository();
 export class ServiceController {
   async list(req: Request, res: Response) {
     try {
-      const services = await repo.findAll();
+      const publicView = req.userRole !== 'ADMIN';
+      const services = await repo.findAll(publicView);
       return res.json(services);
     } catch (error) {
       console.error(error);

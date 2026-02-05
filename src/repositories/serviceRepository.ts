@@ -2,12 +2,18 @@ import { prisma } from "../config/prisma";
 
 export class ServiceRepository {
   async create(data: any) {
+    // Ensure status is valid or default
+    if (!data.status) data.status = 'ACTIVE';
     return prisma.service.create({ data });
   }
 
-  async findAll(activeOnly = false) {
+  async findAll(publicView = false) {
+    const where = publicView 
+      ? { status: { in: ['ACTIVE', 'MAINTENANCE', 'COMING_SOON'] } } 
+      : {};
+      
     return prisma.service.findMany({
-      where: activeOnly ? { isActive: true } : {},
+      where,
       orderBy: { name: 'asc' }
     });
   }

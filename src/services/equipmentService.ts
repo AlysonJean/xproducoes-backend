@@ -55,8 +55,11 @@ export class EquipmentService {
     });
   }
 
-  async findAll(limit?: number): Promise<Equipment[]> {
+  async findAll(limit?: number, publicView = true): Promise<Equipment[]> {
     return prisma.equipment.findMany({
+      where: {
+        ...(publicView ? { status: { in: ['ACTIVE', 'MAINTENANCE', 'COMING_SOON'] } } : {})
+      },
       ...(limit ? { take: limit } : {}),
       orderBy: { name: 'asc' },
       include: { category: true }
@@ -82,7 +85,7 @@ export class EquipmentService {
         where: {
           categoryId: equipment.categoryId,
           name: { lt: equipment.name },
-          isAvailable: true // Optional behavior: navigate only available items?
+          status: { in: ['ACTIVE', 'MAINTENANCE', 'COMING_SOON'] }
         },
         orderBy: { name: 'desc' },
         select: { slug: true }
@@ -91,7 +94,7 @@ export class EquipmentService {
         where: {
           categoryId: equipment.categoryId,
           name: { gt: equipment.name },
-          isAvailable: true
+          status: { in: ['ACTIVE', 'COMING_SOON'] }
         },
         orderBy: { name: 'asc' },
         select: { slug: true }

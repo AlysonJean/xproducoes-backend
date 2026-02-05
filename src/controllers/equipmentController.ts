@@ -90,9 +90,11 @@ export class EquipmentController {
       // Se mudar de ambiente, deve-se limpar o cache (Redis flush ou reiniciar server se for in-memory)
       const limit = process.env.NODE_ENV === 'production' ? 300 : undefined;
 
+      const publicView = req.userRole !== 'ADMIN';
+      
       const equipments = await cacheService.getOrSet(
-        cacheKey,
-        () => equipmentService.findAll(limit),
+        `${cacheKey}:${publicView ? 'public' : 'admin'}`, // Cache key differentiation
+        () => equipmentService.findAll(limit, publicView),
         CacheService.TTL.MEDIUM
       );
       return res.json(equipments);
