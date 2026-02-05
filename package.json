@@ -22,6 +22,7 @@
     "test:watch": "jest --watch",
     "test:force": "NODE_ENV=test jest --runInBand",
     "seed": "ts-node prisma/seed.ts",
+    "migrate:slugs": "tsx src/scripts/migrate-slugs.ts",
     "backfill:slugs": "tsx src/scripts/backfill-slugs.ts",
     "check-forbidden": "node ../scripts/check_forbidden_files.js",
     "scan-history-secrets": "node ../scripts/scan_history_secrets.js",
