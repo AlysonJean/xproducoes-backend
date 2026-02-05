@@ -64,4 +64,19 @@ export class ServiceController {
       return res.status(400).json({ message: 'Erro ao deletar serviço' });
     }
   }
+
+  async duplicate(req: Request, res: Response) {
+    try {
+      if (req.userRole !== 'ADMIN') {
+        return res.status(403).json({ message: 'Acesso negado' });
+      }
+
+      const { id } = req.params;
+      const duplicate = await service.duplicate(String(id));
+      return res.status(201).json({ service: duplicate, message: 'Serviço duplicado com sucesso' });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: 'Erro ao duplicar serviço' });
+    }
+  }
 }

@@ -223,4 +223,25 @@ export class EquipmentController {
       return next(error);
     }
   };
+
+  duplicate = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<any> => {
+    try {
+      if (req.userRole !== "ADMIN") {
+        return res.status(403).json({ message: "Acesso negado" });
+      }
+
+      const { id } = req.params;
+      const duplicate = await equipmentService.duplicate(id as string);
+
+      await cacheService.invalidateEquipmentCaches();
+
+      return res.status(201).json({ equipment: duplicate, message: "Equipamento duplicado com sucesso" });
+    } catch (error) {
+      return next(error);
+    }
+  };
 }

@@ -168,6 +168,24 @@ export async function updateOrder(items: { id: string; sortOrder: number }[]) {
 }
 
 export async function deletePortfolio(id: string) {
+  // Get portfolio with all media URLs before deletion
+  const portfolio = await prisma.portfolio.findUnique({
+    where: { id },
+    select: { media: { select: { url: true } } }
+  });
+
+  // Delete all media files from Cloudinary
+  if (portfolio?.media && portfolio.media.length > 0) {
+    const { UploadService } = await import('./uploadService');
+    const uploadService = new UploadService();
+    
+    for (const media of portfolio.media) {
+      if (media.url) {
+        await uploadService.deleteFile(media.url);
+      }
+    }
+  }
+
   return prisma.portfolio.delete({ where: { id } });
 }
 

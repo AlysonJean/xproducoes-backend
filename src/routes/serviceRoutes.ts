@@ -10,5 +10,6 @@ router.get('/:id', controller.get);
 router.post('/', uploadSingle('image'), processUpload, controller.create);
 router.put('/:id', uploadSingle('image'), processUpload, controller.update);
 router.delete('/:id', controller.delete);
+router.post('/:id/duplicate', controller.duplicate);
 
 export default router;

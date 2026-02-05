@@ -122,6 +122,19 @@ export class EquipmentService {
       throw new Error(`Este equipamento possui ${bookingsCount} reservas registradas e não pode ser excluído. Considere torná-lo 'IsAvailable = false' para mantê-lo no histórico.`);
     }
 
+    // Get equipment to retrieve image URL before deletion
+    const equipment = await prisma.equipment.findUnique({
+      where: { id },
+      select: { imageUrl: true }
+    });
+
+    // Delete from Cloudinary if has image
+    if (equipment?.imageUrl) {
+      const { UploadService } = await import('./uploadService');
+      const uploadService = new UploadService();
+      await uploadService.deleteFile(equipment.imageUrl);
+    }
+
     // Se estiver em Kits, o relacionamento será removido automaticamente (Cascade em tabela pivot implícita)
     await prisma.equipment.delete({ where: { id } });
   }
@@ -154,5 +167,54 @@ export class EquipmentService {
 
   async getTotalEquipments(): Promise<number> {
     return prisma.equipment.count();
+  }
+
+  async duplicate(id: string): Promise<Equipment> {
+    // Get original equipment
+    const original = await prisma.equipment.findUnique({
+      where: { id },
+      include: { category: true }
+    });
+
+    if (!original) {
+      throw new Error('Equipment not found');
+    }
+
+    // Create copy with modified name
+    const copyName = `${original.name} (Cópia)`;
+    let slug = generateSlug(copyName);
+
+    // Ensure unique slug
+    const slugExists = await prisma.equipment.findUnique({ where: { slug } });
+    if (slugExists) {
+      slug = `${slug}-${randomBytes(2).toString('hex')}`;
+    }
+
+    // Create duplicate (excluding id, createdAt, updatedAt, slug)
+    const duplicateData: any = {
+      name: copyName,
+      description: original.description,
+      imageUrl: original.imageUrl,
+      slug,
+      pricePerHour: original.pricePerHour,
+      quantity: original.quantity,
+      status: original.status,
+      tags: original.tags,
+      specifications: original.specifications,
+      weight: original.weight,
+      dimensions: original.dimensions,
+      powerRequirements: original.powerRequirements,
+      maintenanceNotes: original.maintenanceNotes,
+      condition: original.condition,
+      location: original.location,
+      minimumRentalDuration: original.minimumRentalDuration,
+      replacementCost: original.replacementCost,
+      categoryId: original.categoryId
+    };
+
+    return prisma.equipment.create({
+      data: duplicateData,
+      include: { category: true }
+    });
   }
 }

@@ -198,4 +198,62 @@ export class UploadService {
       uploadStream.end(file.buffer);
     });
   }
+
+  /**
+   * Delete a file from Cloudinary
+   * @param imageUrl - Full Cloudinary URL or public_id
+   */
+  async deleteFile(imageUrl: string): Promise<void> {
+    try {
+      if (!imageUrl) {
+        logger.warn('[UploadService] No image URL provided for deletion');
+        return;
+      }
+
+      // Extract public_id from Cloudinary URL
+      const publicId = this.extractPublicId(imageUrl);
+      
+      if (!publicId) {
+        logger.warn({obj: { imageUrl }}, '[UploadService] Could not extract public_id from URL');
+        return;
+      }
+
+      logger.info({obj: { publicId }}, '[UploadService] Deleting file from Cloudinary');
+
+      // Determine if it's a video or image
+      const isVideo = imageUrl.includes('/video/upload/');
+      const resourceType = isVideo ? 'video' : 'image';
+
+      await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+      
+      logger.info({obj: { publicId, resourceType }}, '[UploadService] File deleted successfully');
+    } catch (error: any) {
+      logger.error({obj: { 
+        imageUrl, 
+        error: error.message 
+      }}, '[UploadService] Error deleting file from Cloudinary');
+      // Don't throw - deletion failure shouldn't block database deletion
+    }
+  }
+
+  /**
+   * Extract public_id from Cloudinary URL
+   * Example: https://res.cloudinary.com/xxx/image/upload/v123/x-producoes/folder/filename.jpg
+   * Returns: x-producoes/folder/filename
+   */
+  private extractPublicId(url: string): string | null {
+    try {
+      // Match pattern: /upload/v{version}/path/to/file.ext or /upload/path/to/file.ext
+      const match = url.match(/\/upload\/(?:v\d+\/)?(.+?)(?:\.[^.]+)?$/);
+      
+      if (match && match[1]) {
+        return match[1];
+      }
+      
+      return null;
+    } catch (error) {
+      logger.error({obj: { url, error }}, '[UploadService] Error extracting public_id');
+      return null;
+    }
+  }
 }

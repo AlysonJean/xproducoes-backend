@@ -31,5 +31,6 @@ equipmentRoutes.put(
   equipmentController.update,
 );
 equipmentRoutes.delete("/:id", authenticate, equipmentController.delete);
+equipmentRoutes.post("/:id/duplicate", authenticate, equipmentController.duplicate);
 
 export default equipmentRoutes;

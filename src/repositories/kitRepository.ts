@@ -74,6 +74,25 @@ export class KitRepository {
     return prisma.kit.update({ where: { id }, data });
   }
   async delete(id: string) {
+    // Get kit to retrieve image URLs before deletion
+    const kit = await prisma.kit.findUnique({
+      where: { id },
+      select: { imageUrl: true, coverImage: true }
+    });
+
+    // Delete images from Cloudinary if they exist
+    if (kit) {
+      const { UploadService } = await import('../services/uploadService');
+      const uploadService = new UploadService();
+      
+      if (kit.imageUrl) {
+        await uploadService.deleteFile(kit.imageUrl);
+      }
+      if (kit.coverImage) {
+        await uploadService.deleteFile(kit.coverImage);
+      }
+    }
+
     return prisma.kit.delete({ where: { id } });
   }
 
@@ -134,6 +153,61 @@ export class KitRepository {
         },
       ],
       take: 6,
+    });
+  }
+
+  async duplicate(id: string) {
+    // Get original kit with relations
+    const original = await prisma.kit.findUnique({
+      where: { id },
+      include: { items: true, experienceLevels: true }
+    });
+
+    if (!original) {
+      throw new Error('Kit not found');
+    }
+
+    // Create copy with modified name
+    const copyName = `${original.name} (Cópia)`;
+    const { generateSlug } = await import('../utils/slug');
+    const { randomBytes } = await import('crypto');
+    let slug = generateSlug(copyName);
+
+    // Ensure unique slug
+    const slugExists = await prisma.kit.findUnique({ where: { slug } });
+    if (slugExists) {
+      slug = `${slug}-${randomBytes(2).toString('hex')}`;
+    }
+
+    // Create duplicate
+    return prisma.kit.create({
+      data: {
+        name: copyName,
+        slug,
+        description: original.description,
+        price: original.price,
+        discount: original.discount,
+        imageUrl: original.imageUrl,
+        coverImage: original.coverImage,
+        status: original.status,
+        items: {
+          create: original.items.map(item => ({
+            equipmentId: item.equipmentId,
+            serviceId: item.serviceId,
+            quantity: item.quantity
+          }))
+        },
+        experienceLevels: {
+          create: original.experienceLevels.map(level => ({
+            level: level.level,
+            price: level.price,
+            description: level.description,
+            includes: level.includes,
+            isPopular: level.isPopular
+          }))
+        }
+      },
+      include: { items: true, experienceLevels: true }
     });
   }
 }

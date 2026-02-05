@@ -70,8 +70,55 @@ export class ServiceService {
   }
 
   async delete(id: string): Promise<void> {
+    // Get service to retrieve image URL before deletion
+    const service = await prisma.service.findUnique({
+      where: { id },
+      select: { imageUrl: true }
+    });
+
+    // Delete image from Cloudinary if exists
+    if (service?.imageUrl) {
+      const { UploadService } = await import('./uploadService');
+      const uploadService = new UploadService();
+      await uploadService.deleteFile(service.imageUrl);
+    }
+
     await prisma.service.delete({
       where: { id }
+    });
+  }
+
+  async duplicate(id: string): Promise<Service> {
+    // Get original service
+    const original = await prisma.service.findUnique({
+      where: { id }
+    });
+
+    if (!original) {
+      throw new Error('Service not found');
+    }
+
+    // Create copy with modified name
+    const copyName = `${original.name} (Cópia)`;
+    let slug = generateSlug(copyName);
+
+    // Ensure unique slug
+    const slugExists = await prisma.service.findUnique({ where: { slug } });
+    if (slugExists) {
+      slug = `${slug}-${randomBytes(2).toString('hex')}`;
+    }
+
+    // Create duplicate
+    return prisma.service.create({
+      data: {
+        name: copyName,
+        slug,
+        description: original.description,
+        price: original.price,
+        duration: original.duration,
+        status: original.status,
+        imageUrl: original.imageUrl
+      }
     });
   }
 }
