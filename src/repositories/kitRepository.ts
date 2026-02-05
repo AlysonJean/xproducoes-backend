@@ -7,7 +7,14 @@ export class KitRepository {
   }
   async findAll(limit?: number) {
     return prisma.kit.findMany({ 
-      include: { equipments: true },
+      include: { 
+        items: {
+          include: {
+            equipment: true,
+            service: true
+          }
+        } 
+      },
       ...(limit ? { take: limit } : {})
     });
   }
@@ -19,7 +26,14 @@ export class KitRepository {
           { slug: idOrSlug }
         ]
       },
-      include: { equipments: true },
+      include: { 
+        items: {
+          include: {
+            equipment: true,
+            service: true
+          }
+        }
+      },
     });
 
     if (!kit) return null;
@@ -58,18 +72,23 @@ export class KitRepository {
   }
 
   async findRecommended() {
-    // Retorna kits com maior quantidade de equipamentos
+    // Retorna kits com maior quantidade de items
     return prisma.kit.findMany({
       include: { 
-        equipments: true,
+        items: {
+          include: {
+            equipment: true,
+            service: true
+          }
+        },
         _count: {
           select: {
-            equipments: true,
+            items: true,
           },
         },
       },
       orderBy: {
-        equipments: {
+        items: {
           _count: 'desc',
         },
       },
@@ -81,7 +100,11 @@ export class KitRepository {
     // Retorna kits mais utilizados em bookings
     return prisma.kit.findMany({
       include: { 
-        equipments: true,
+        items: {
+          include: {
+            equipment: true
+          }
+        },
         _count: {
           select: {
             bookings: true,

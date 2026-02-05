@@ -299,4 +299,131 @@ Se você não reconhece esta atividade, entre em contato conosco IMEDIATAMENTE e
       text
     };
   }
+
+  /**
+   * Template para notificação de atribuição de colaborador
+   */
+  static assignmentNotification(
+    collaboratorName: string,
+    eventName: string,
+    eventDate: string,
+    eventTime: string,
+    role: string,
+    location: string,
+    bookingUrl: string
+  ): EmailTemplate {
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nova Escala de Trabalho</title>
+</head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background-color:#f3f4f6;">
+  <table role="presentation" style="width:100%;border-collapse:collapse;border:0;border-spacing:0;background:#f3f4f6;">
+    <tr>
+      <td align="center" style="padding:40px 0;">
+        <table role="presentation" style="width:600px;border-collapse:collapse;background:#ffffff;border-radius:16px;box-shadow:0 4px 6px rgba(0,0,0,0.05);">
+          
+          <tr>
+            <td style="padding:40px 40px 20px;text-align:center;background:linear-gradient(135deg, ${this.PRIMARY_COLOR} 0%, #4f46e5 100%);border-radius:16px 16px 0 0;">
+              <h1 style="margin:0;font-size:24px;font-weight:700;color:#ffffff;">
+                📅 Nova Escala
+              </h1>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:40px;">
+              <p style="margin:0 0 20px;font-size:16px;color:#111827;">
+                Olá <strong>${collaboratorName}</strong>,
+              </p>
+              
+              <p style="margin:0 0 20px;font-size:16px;color:#374151;">
+                Você foi escalado(a) para um novo evento pela <strong>${this.COMPANY_NAME}</strong>.
+              </p>
+
+              <div style="background-color:#f3f4f6;border-radius:8px;padding:24px;margin-bottom:24px;">
+                <h2 style="margin:0 0 16px;font-size:18px;color:#111827;">Detalhes do Evento</h2>
+                
+                <table style="width:100%;">
+                  <tr>
+                    <td style="padding-bottom:12px;color:#6b7280;font-size:14px;width:100px;">Evento:</td>
+                    <td style="padding-bottom:12px;color:#111827;font-weight:500;">${eventName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-bottom:12px;color:#6b7280;font-size:14px;">Data:</td>
+                    <td style="padding-bottom:12px;color:#111827;font-weight:500;">${eventDate}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-bottom:12px;color:#6b7280;font-size:14px;">Horário:</td>
+                    <td style="padding-bottom:12px;color:#111827;font-weight:500;">${eventTime}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-bottom:12px;color:#6b7280;font-size:14px;">Função:</td>
+                    <td style="padding-bottom:12px;color:#111827;font-weight:500;">${role}</td>
+                  </tr>
+                  <tr>
+                    <td style="color:#6b7280;font-size:14px;">Local:</td>
+                    <td style="color:#111827;font-weight:500;">${location}</td>
+                  </tr>
+                </table>
+              </div>
+
+              <table role="presentation" style="width:100%;border-collapse:collapse;border:0;border-spacing:0;margin-bottom:30px;">
+                <tr>
+                  <td align="center">
+                    <a href="${bookingUrl}" 
+                       style="display:inline-block;padding:14px 32px;background-color:${this.PRIMARY_COLOR};color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;">
+                      Ver Detalhes
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0;font-size:14px;color:#6b7280;text-align:center;">
+                Se houver algum impedimento, entre em contato com a administração o mais breve possível.
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:30px 40px;background-color:#f9fafb;border-radius:0 0 16px 16px;border-top:1px solid #e5e7eb;">
+              <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">
+                © ${new Date().getFullYear()} ${this.COMPANY_NAME}
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const text = `
+Olá ${collaboratorName},
+
+Você foi escalado(a) para um novo evento:
+
+Evento: ${eventName}
+Data: ${eventDate}
+Horário: ${eventTime}
+Função: ${role}
+Local: ${location}
+
+Acesse o painel para mais detalhes: ${bookingUrl}
+
+Se houver algum impedimento, entre em contato imediatamente.
+    `.trim();
+
+    return {
+      subject: `📅 Nova Escala: ${eventName} - ${eventDate}`,
+      html,
+      text
+    };
+  }
 }

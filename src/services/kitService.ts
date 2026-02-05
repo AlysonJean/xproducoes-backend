@@ -11,13 +11,31 @@ export async function create(data: any, _file?: Express.Multer.File) {
     kitData.imageUrl = data.imageUrl;
   }
   
-  // Relacionamento com equipamentos
-  if (Array.isArray(data.equipmentIds)) {
-    kitData.equipments = {
-      connect: data.equipmentIds.map((id: string) => ({ id })),
+  // Relacionamento com itens (equips ou serviços) via KitItem
+  if (Array.isArray(data.items)) {
+    kitData.items = {
+      create: data.items.map((item: any) => {
+        // Assume que o item tem 'type' ou tentamos inferir
+        // O frontend deve mandar: { id, quantity, type: 'EQUIPMENT' | 'SERVICE' }
+        const isService = item.type === 'SERVICE';
+        return {
+          equipmentId: isService ? undefined : item.id,
+          serviceId: isService ? item.id : undefined,
+          quantity: typeof item.quantity === 'number' ? item.quantity : 1
+        };
+      }),
+    };
+  } else if (Array.isArray(data.equipmentIds)) {
+    // Backward compatibility (legacy)
+    kitData.items = {
+      create: data.equipmentIds.map((id: string) => ({
+        equipmentId: id,
+        quantity: 1
+      })),
     };
     delete kitData.equipmentIds;
   }
+
 
   // Remove campos que não existem no schema do Prisma
   delete kitData.fileName;
@@ -31,7 +49,6 @@ export async function create(data: any, _file?: Express.Multer.File) {
     }
   } catch (e) {
     // Se findOne falhar (ex: erro de banco), prosseguir com slug original ou lançar erro
-    // Assumindo que findOne retorna null se não achar
   }
   kitData.slug = slug;
 
@@ -49,9 +66,26 @@ export async function update(
     kitData.imageUrl = data.imageUrl;
   }
   
-  if (Array.isArray(data.equipmentIds)) {
-    kitData.equipments = {
-      set: data.equipmentIds.map((id: string) => ({ id })),
+  if (Array.isArray(data.items)) {
+    kitData.items = {
+      deleteMany: {}, // Remove todos os itens existentes
+      create: data.items.map((item: any) => {
+        const isService = item.type === 'SERVICE';
+        return {
+          equipmentId: isService ? undefined : item.id,
+          serviceId: isService ? item.id : undefined,
+          quantity: typeof item.quantity === 'number' ? item.quantity : 1
+        };
+      }),
+    };
+  } else if (Array.isArray(data.equipmentIds)) {
+    // Backward compatibility
+    kitData.items = {
+      deleteMany: {},
+      create: data.equipmentIds.map((id: string) => ({
+        equipmentId: id,
+        quantity: 1
+      })),
     };
     delete kitData.equipmentIds;
   }

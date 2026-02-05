@@ -1,0 +1,66 @@
+import { Request, Response } from 'express';
+import { ServiceRepository } from '../repositories/serviceRepository';
+
+const repo = new ServiceRepository();
+
+export class ServiceController {
+  async list(req: Request, res: Response) {
+    try {
+      const services = await repo.findAll();
+      return res.json(services);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: 'Erro ao buscar serviços' });
+    }
+  }
+
+  async get(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const service = await repo.findOne(String(id));
+      if (!service) return res.status(404).json({ message: 'Serviço não encontrado' });
+      return res.json(service);
+    } catch {
+      return res.status(500).json({ message: 'Erro ao buscar serviço' });
+    }
+  }
+
+  async create(req: Request, res: Response) {
+    try {
+      const data = { ...req.body };
+      // Ensure numeric types
+      if (data.price) data.price = Number(data.price);
+      if (data.duration) data.duration = Number(data.duration);
+      
+      const service = await repo.create(data);
+      return res.status(201).json(service);
+    } catch (error) {
+      console.error(error);
+      return res.status(400).json({ message: 'Erro ao criar serviço' });
+    }
+  }
+
+  async update(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const data = { ...req.body };
+      if (data.price) data.price = Number(data.price);
+      if (data.duration) data.duration = Number(data.duration);
+
+      const service = await repo.update(String(id), data);
+      return res.json(service);
+    } catch {
+      return res.status(400).json({ message: 'Erro ao atualizar serviço' });
+    }
+  }
+
+  async delete(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      await repo.delete(String(id));
+      return res.status(204).send();
+    } catch {
+      return res.status(400).json({ message: 'Erro ao deletar serviço' });
+    }
+  }
+}

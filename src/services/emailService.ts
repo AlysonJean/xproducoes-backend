@@ -142,6 +142,31 @@ export class EmailService {
     const text = `Verifique seu e-mail: ${verifyUrl}`;
     return this.sendMail(email, subject, html, text);
   }
+
+  async sendAssignmentNotification(
+    email: string,
+    collaboratorName: string,
+    eventDetails: {
+      eventName: string;
+      eventDate: string;
+      eventTime: string;
+      role: string;
+      location: string;
+      bookingUrl: string;
+    }
+  ) {
+    const template = EmailTemplates.assignmentNotification(
+      collaboratorName,
+      eventDetails.eventName,
+      eventDetails.eventDate,
+      eventDetails.eventTime,
+      eventDetails.role,
+      eventDetails.location,
+      eventDetails.bookingUrl
+    );
+
+    return this.sendMail(email, template.subject, template.html, template.text);
+  }
 }
 
 const emailServiceInstance = new EmailService();

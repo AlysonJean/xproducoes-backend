@@ -3,6 +3,7 @@ import { CollaboratorService } from "../services/collaboratorService";
 import { z } from "zod";
 import { prisma } from "../config/prisma";
 import logger from "../config/logger";
+import emailServiceInstance from "../services/emailService";
 
 const collaboratorService = new CollaboratorService();
 
@@ -227,6 +228,46 @@ export class CollaboratorController {
         ...validatedData,
         bookingId: validatedData.eventId,
       });
+
+      // Buscar dados para envio de notificação
+      try {
+        const collaborator = await prisma.collaborator.findUnique({
+          where: { id: validatedData.collaboratorId },
+          include: { user: true }
+        });
+
+        const booking = await prisma.booking.findUnique({
+          where: { id: validatedData.eventId },
+          include: { client: { include: { user: true } } }
+        });
+
+        if (collaborator?.user?.email && booking) {
+          const eventDate = new Date(booking.eventDate).toLocaleDateString('pt-BR');
+          const eventTime = new Date(booking.eventDate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          const street = booking.street || 'Endereço não informado';
+          const number = booking.addressNumber ? `, ${booking.addressNumber}` : '';
+          const city = booking.city ? ` - ${booking.city}` : '';
+          const location = `${street}${number}${city}`;
+          
+          const clientName = booking.clientName || booking.client?.companyName || booking.client?.user?.name || 'Cliente';
+
+          await emailServiceInstance.sendAssignmentNotification(
+            collaborator.user.email,
+            collaborator.user.name || 'Colaborador',
+            {
+              eventName: booking.eventTitle || `Evento de ${clientName}`,
+              eventDate,
+              eventTime,
+              role: validatedData.role,
+              location,
+              bookingUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/collaborator/events`
+            }
+          );
+          logger.info({ collaboratorId: collaborator.id }, 'Notificação de escalação enviada com sucesso');
+        }
+      } catch (emailError: any) {
+        logger.error({ err: emailError }, 'Falha ao enviar notificação de escalação (atribuição concluída)');
+      }
 
       return res.status(201).json({
         success: true,
@@ -760,6 +801,8 @@ export class CollaboratorController {
       });
     }
   }
+
+
 
   // --- MÉTODOS /ME (Usuário Autenticado) ---
 

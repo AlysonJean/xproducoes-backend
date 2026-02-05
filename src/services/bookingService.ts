@@ -683,16 +683,15 @@ export class BookingService {
       }
 
       // Atualiza reserva com preço e status por último
-      return await this.prisma.booking.update({ where: { id }, data, include: this.bookingInclude });
+      const updatedBooking = await this.prisma.booking.update({ where: { id }, data, include: this.bookingInclude });
 
       // Disparar notificações: email para o cliente e webhook externo (se configurado)
       try {
         const EmailService = (await import('./emailService')).default;
-        const bookingFull = await this.getBookingById(id);
-        const clientEmail = bookingFull.client?.user?.email || bookingFull.clientEmail || (bookingFull as any).clientContact;
-        const clientName = bookingFull.client?.user?.name || bookingFull.clientName || '';
+        const clientEmail = updatedBooking.client?.user?.email || updatedBooking.clientEmail || (updatedBooking as any).clientContact;
+        const clientName = updatedBooking.client?.user?.name || updatedBooking.clientName || '';
         if (clientEmail) {
-          await EmailService.sendBookingConfirmation({ email: clientEmail, name: clientName }, bookingFull);
+          await EmailService.sendBookingConfirmation({ email: clientEmail, name: clientName }, updatedBooking);
         }
       } catch (e) {
         logger.warn({ error: e }, 'Erro ao enviar email de confirmação');
@@ -701,13 +700,12 @@ export class BookingService {
       // Webhook: delegate to WebhookService for dispatching & persistence
       try {
         const WebhookService = (await import('./webhookService')).default;
-        const bookingFull = await this.getBookingById(id);
-        void WebhookService.dispatchBookingConfirmed(bookingFull);
+        void WebhookService.dispatchBookingConfirmed(updatedBooking);
       } catch (e) {
         logger.warn({ error: e }, 'Erro ao disparar webhook de confirmação (delegado)');
       }
 
-      return await this.getBookingById(id);
+      return updatedBooking;
     } catch (error) {
       throw error;
     }

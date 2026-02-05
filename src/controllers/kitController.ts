@@ -9,6 +9,14 @@ export class KitController {
         price: Number(req.body.price),
       };
 
+      if (typeof data.items === 'string') {
+        try {
+          data.items = JSON.parse(data.items);
+        } catch (e) {
+          console.error("Failed to parse items JSON", e);
+        }
+      }
+
       const kit = await kitService.create(data, req.file);
       return res.status(201).json(kit);
     } catch (error) {
@@ -21,6 +29,14 @@ export class KitController {
       const data = { ...req.body };
       if (data.price) {
         data.price = Number(data.price);
+      }
+
+      if (typeof data.items === 'string') {
+        try {
+          data.items = JSON.parse(data.items);
+        } catch (e) {
+          console.error("Failed to parse items JSON", e);
+        }
       }
 
       const { id } = req.params as { id: string };

@@ -194,7 +194,7 @@ model Equipment {
   clientFavorites       ClientFavorite[]
   category              Category         @relation(fields: [categoryId], references: [id])
   bookings              Booking[]        @relation("BookingEquipments")
-  kits                  Kit[]            @relation("KitEquipments")
+  kitItems              KitItem[]
 
   @@index([categoryId])
   @@index([name])
@@ -257,11 +257,28 @@ model Kit {
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
   bookings              Booking[]
-  equipments            Equipment[] @relation("KitEquipments")
+  items                 KitItem[]
+
+
 
   @@index([recommended])
   @@index([popular])
   @@map("kits")
+}
+
+model Service {
+  id          String    @id @default(cuid())
+  name        String
+  description String
+  price       Decimal   @db.Decimal(10, 2)
+  duration    Int       @default(60) // Duration in minutes
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  items       KitItem[]
+
+  @@map("services")
 }
 
 model Booking {
@@ -771,6 +788,23 @@ model Checklist {
   assignments ChecklistAssignment[]
 
   @@map("checklists")
+}
+
+model KitItem {
+  id          String    @id @default(cuid())
+  kitId       String
+  equipmentId String?
+  serviceId   String?
+  quantity    Int       @default(1)
+
+  kit         Kit       @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  equipment   Equipment? @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  service     Service?   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([kitId])
+  @@index([equipmentId])
+  @@index([serviceId])
+  @@map("kit_items")
 }
 
 model ChecklistItem {

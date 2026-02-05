@@ -227,12 +227,7 @@ export class CollaboratorService {
   }
 
   async assignCollaboratorToEvent(data: any) {
-    // Implementação simples - expandir conforme necessário
-    return {
-      id: `assignment_${Date.now()}`,
-      ...data,
-      createdAt: new Date()
-    };
+    return repo.assignToEvent(data);
   }
 
   async getEventCollaborators(eventId: string) {
@@ -260,8 +255,8 @@ export class CollaboratorService {
     return getCollaboratorDashboard(id);
   }
 
-  async getAvailableCollaborators(data: any) {
-    return [];
+  async getAvailableCollaborators(data: { date: string; role?: string }) {
+    return repo.getAvailableCollaborators(new Date(data.date), data.role);
   }
 
   async getAllAvailabilities() {

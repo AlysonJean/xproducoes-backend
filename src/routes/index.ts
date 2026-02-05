@@ -23,12 +23,13 @@ import collaboratorMessagesRoutes from "./collaboratorMessagesRoutes";
 import enterpriseMonitoringRoutes from "./enterpriseMonitoringRoutes";
 import { cacheService } from "../services/cacheService";
 import { performanceMonitoringMiddleware } from "../middlewares/performanceMonitoring";
-import collaboratorProfileRoutes from "./collaboratorProfileRoutes";
+
 import checklistRoutes from "./checklistRoutes";
 import settingsRoutes from "./settingsRoutes";
 import newsletterRoutes from "./newsletterRoutes";
 import bannerRoutes from "./bannerRoutes";
 import calendarRoutes from "./calendarRoutes";
+import serviceRoutes from "./serviceRoutes";
 
 const router: RouterType = Router();
 
@@ -56,6 +57,9 @@ router.use("/dashboard", dashboardRoutes);
 
 // Auth routes
 router.use("/auth", authRoutes);
+
+// Services
+router.use("/services", serviceRoutes);
 
 // Feature routes
 router.use("/payments", paymentRoutes);

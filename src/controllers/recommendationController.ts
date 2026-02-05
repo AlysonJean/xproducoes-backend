@@ -124,7 +124,7 @@ export const getSimilarRecommendations = async (req: Request, res: Response) => 
       const kit = await prisma.kit.findUnique({
         where: { id: itemId },
         include: { 
-          equipments: { include: { category: true } }
+          items: { include: { equipment: { include: { category: true } } } }
         }
       });
 
@@ -134,7 +134,7 @@ export const getSimilarRecommendations = async (req: Request, res: Response) => 
 
       const similar = await prisma.kit.findMany({
         where: { id: { not: itemId } },
-        include: { equipments: { include: { category: true } } },
+        include: { items: { include: { equipment: { include: { category: true } } } } },
         orderBy: { createdAt: 'desc' },
         take: limit
       });

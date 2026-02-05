@@ -72,6 +72,7 @@ router.get("/:collaboratorId/events", getCollaboratorEvents);
 // Rotas de disponibilidades (CRUD genérico)
 router.post("/availabilities", ensureAdmin, createAvailability);
 router.get("/events/:eventId/collaborators", getEventCollaborators);
+router.post("/event-assignments", ensureAdmin, assignCollaboratorToEvent); // Rota adicionada
 router.put("/event-assignments/:id", ensureAdmin, updateEventCollaborator);
 router.delete(
   "/event-assignments/:id",
