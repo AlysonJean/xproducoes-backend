@@ -6,6 +6,7 @@ import { randomBytes } from "crypto";
 interface EquipmentSearchQuery {
   name?: string;
   categoryId?: string;
+  status?: string;
 }
 
 export class EquipmentService {
@@ -140,12 +141,13 @@ export class EquipmentService {
   }
 
   async search(query: EquipmentSearchQuery): Promise<Equipment[]> {
-    // Exemplo simples de busca por nome/categoria
-    const { name, categoryId } = query;
+    // Exemplo simples de busca por nome/categoria/status
+    const { name, categoryId, status } = query;
     return prisma.equipment.findMany({
       where: {
         ...(name && { name: { contains: name, mode: "insensitive" as const } }),
         ...(categoryId && { categoryId }),
+        ...(status && { status: status as any }),
       },
       include: { category: true }
     });
