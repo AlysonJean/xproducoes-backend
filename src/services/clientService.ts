@@ -16,7 +16,7 @@ export async function getClientProfileByUserId(userId: string) {
     where: { userId },
     include: {
       user: true,
-      favoriteEquipments: { include: { equipment: true } },
+      favorites: { include: { equipment: true, kit: true, service: true } },
       notifications: true,
       bookings: true,
     },
@@ -29,7 +29,7 @@ export async function updateClientProfileByUserId(userId: string, data: Prisma.C
     data,
     include: {
       user: true,
-      favoriteEquipments: { include: { equipment: true } },
+      favorites: { include: { equipment: true, kit: true, service: true } },
       notifications: true,
       bookings: true,
     },
@@ -53,7 +53,7 @@ export async function listClientsWithProfiles(filter: any = {}) {
     where: whereClause,
     include: {
       user: true,
-      favoriteEquipments: { include: { equipment: true } },
+      favorites: { include: { equipment: true, kit: true, service: true } },
       notifications: true,
       bookings: true,
     },
@@ -102,7 +102,7 @@ export async function getClientById(clientId: string) {
     where: { id: clientId },
     include: {
       user: true,
-      favoriteEquipments: { include: { equipment: true } },
+      favorites: { include: { equipment: true, kit: true, service: true } },
       notifications: true,
       bookings: true,
     },

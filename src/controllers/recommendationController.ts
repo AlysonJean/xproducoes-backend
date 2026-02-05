@@ -70,7 +70,7 @@ export const getPersonalizedRecommendations = async (req: Request, res: Response
     const recommendations = await prisma.equipment.findMany({
       where: {
         AND: [
-          { isAvailable: true },
+          { status: 'ACTIVE' },
           { id: { notIn: alreadyBookedIds.length > 0 ? alreadyBookedIds : ['none'] } },
           { categoryId: { in: topCategories } }
         ]
@@ -111,7 +111,7 @@ export const getSimilarRecommendations = async (req: Request, res: Response) => 
           AND: [
             { id: { not: itemId } },
             { categoryId: equipment.categoryId },
-            { isAvailable: true }
+            { status: 'ACTIVE' }
           ]
         },
         include: { category: true },
@@ -198,7 +198,7 @@ export const getFrequentlyBoughtTogether = async (req: Request, res: Response) =
             AND: [
               { categoryId: item.categoryId },
               { id: { not: itemId } },
-              { isAvailable: true }
+              { status: 'ACTIVE' }
             ]
           },
           include: { category: true },
@@ -233,7 +233,7 @@ export const getTrendingRecommendations = async (req: Request, res: Response) =>
     const limit = parseInt(req.query.limit as string) || 8;
     const category = req.query.category as string | undefined;
 
-    const whereBase: Record<string, unknown> = { isAvailable: true };
+    const whereBase: Record<string, unknown> = { status: 'ACTIVE' };
     if (category) {
       whereBase.categoryId = category;
     }
@@ -295,7 +295,7 @@ export const getNewRecommendations = async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 8;
     const category = req.query.category as string | undefined;
 
-    const where: Record<string, unknown> = { isAvailable: true };
+    const where: Record<string, unknown> = { status: 'ACTIVE' };
     if (category) {
       where.categoryId = category;
     }
@@ -336,7 +336,7 @@ export const getSeasonalRecommendations = async (req: Request, res: Response) =>
     const recommendations = await prisma.equipment.findMany({
       where: {
         AND: [
-          { isAvailable: true },
+          { status: 'ACTIVE' },
           { OR: seasonalTags.map(tag => ({ tags: { has: tag } })) }
         ]
       },
@@ -384,15 +384,15 @@ export const getRecommendationsBasedOnFavorites = async (req: Request, res: Resp
     }
 
     const categoryIds = userFavorites
-      .map(f => f.equipment.categoryId)
+      .map(f => f.equipment?.categoryId)
       .filter(Boolean) as string[];
     
-    const favoriteIds = userFavorites.map(f => f.equipmentId);
+    const favoriteIds = userFavorites.map(f => f.equipmentId).filter(Boolean) as string[];
 
     const recommendations = await prisma.equipment.findMany({
       where: {
         AND: [
-          { isAvailable: true },
+          { status: 'ACTIVE' },
           { id: { notIn: favoriteIds } },
           categoryIds.length > 0 ? { categoryId: { in: categoryIds } } : {}
         ]
@@ -421,7 +421,7 @@ export const getRecommendationsByCategory = async (req: Request, res: Response) 
       where: {
         AND: [
           { categoryId },
-          { isAvailable: true }
+          { status: 'ACTIVE' }
         ]
       },
       include: { category: true },
@@ -448,7 +448,7 @@ export const getRecommendationsByBudget = async (req: Request, res: Response) =>
     const recommendations = await prisma.equipment.findMany({
       where: {
         AND: [
-          { isAvailable: true },
+          { status: 'ACTIVE' },
           { pricePerHour: { gte: min, lte: max } }
         ]
       },

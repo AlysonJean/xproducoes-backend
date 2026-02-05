@@ -27,11 +27,11 @@ export class SitemapController {
           select: { slug: true, updatedAt: true } 
         }),
         prisma.equipment.findMany({ 
-          where: { isAvailable: true }, 
+          where: { status: 'ACTIVE' }, 
           select: { id: true, updatedAt: true } 
         }),
         prisma.kit.findMany({ 
-          where: { isAvailable: true }, 
+          where: { status: 'ACTIVE' }, 
           select: { id: true, updatedAt: true } 
         }),
         prisma.portfolio.findMany({ 

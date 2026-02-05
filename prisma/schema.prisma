@@ -123,7 +123,7 @@ model Client {
   updatedAt           DateTime         @updatedAt
   userId              String           @unique
   bookings            Booking[]        @relation("ClientBookings")
-  favoriteEquipments  ClientFavorite[]
+  favorites           ClientFavorite[]
   user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   notifications       Notification[]
 
@@ -271,6 +271,7 @@ model Kit {
   bookings              Booking[]
   items                 KitItem[]
   experienceLevels      KitExperienceLevel[]
+  clientFavorites       ClientFavorite[]
 
 
 
@@ -291,6 +292,7 @@ model Service {
   updatedAt   DateTime  @updatedAt
   
   items       KitItem[]
+  clientFavorites ClientFavorite[]
 
   @@map("services")
 }
@@ -404,11 +406,17 @@ model ClientFavorite {
   id          String    @id @default(cuid())
   createdAt   DateTime  @default(now())
   clientId    String
-  equipmentId String
-  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  equipmentId String?
+  kitId       String?
+  serviceId   String?
+  client      Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  equipment   Equipment? @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  kit         Kit?       @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  service     Service?   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
   @@unique([clientId, equipmentId])
+  @@unique([clientId, kitId])
+  @@unique([clientId, serviceId])
   @@index([clientId])
   @@map("client_favorites")
 }
