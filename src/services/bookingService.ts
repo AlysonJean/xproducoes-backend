@@ -129,7 +129,7 @@ export class BookingService {
         description: true,
         pricePerHour: true,
         imageUrl: true,
-        isAvailable: true,
+        status: true,
         category: {
           select: {
             id: true,

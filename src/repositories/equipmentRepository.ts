@@ -4,7 +4,7 @@
  */
 
 import { prisma } from '../config/prisma';
-import { Prisma } from '@prisma/client';
+import { Prisma, ItemStatus } from '@prisma/client';
 
 // Tipos
 export interface EquipmentFilters {
@@ -12,7 +12,7 @@ export interface EquipmentFilters {
   categoryId?: string;
   minPrice?: number;
   maxPrice?: number;
-  isAvailable?: boolean;
+  status?: ItemStatus; 
   condition?: string;
 }
 
@@ -34,7 +34,7 @@ const equipmentSelect = {
   pricePerHour: true,
   imageUrl: true,
   quantity: true,
-  isAvailable: true,
+  status: true,
   condition: true,
   tags: true,
   categoryId: true,
@@ -84,7 +84,7 @@ export async function findMany(
   pagination: PaginationOptions = { page: 1, limit: 20 },
   sort: SortOptions = { field: 'createdAt', order: 'desc' }
 ) {
-  const { search, categoryId, minPrice, maxPrice, isAvailable, condition } = filters;
+  const { search, categoryId, minPrice, maxPrice, status, condition } = filters;
   const { page, limit } = pagination;
   const skip = (page - 1) * limit;
 
@@ -109,8 +109,8 @@ export async function findMany(
     where.pricePerHour = { ...where.pricePerHour as object, lte: maxPrice };
   }
 
-  if (isAvailable !== undefined) {
-    where.isAvailable = isAvailable;
+  if (status) {
+    where.status = status;
   }
 
   if (condition) {
@@ -177,7 +177,7 @@ export async function remove(id: string) {
  */
 export async function findAvailable(limit = 20) {
   return prisma.equipment.findMany({
-    where: { isAvailable: true },
+    where: { status: 'ACTIVE' },
     select: equipmentSelect,
     take: limit,
     orderBy: { createdAt: 'desc' },
@@ -191,7 +191,7 @@ export async function findByCategory(
   categoryId: string,
   pagination: PaginationOptions = { page: 1, limit: 20 }
 ) {
-  return findMany({ categoryId, isAvailable: true }, pagination);
+  return findMany({ categoryId, status: 'ACTIVE' }, pagination);
 }
 
 /**
@@ -202,7 +202,7 @@ export async function findRelated(equipmentId: string, categoryId: string, limit
     where: {
       id: { not: equipmentId },
       categoryId,
-      isAvailable: true,
+      status: 'ACTIVE',
     },
     select: equipmentSelect,
     take: limit,
@@ -216,11 +216,11 @@ export async function findRelated(equipmentId: string, categoryId: string, limit
 export async function checkQuantity(id: string, requestedQuantity: number) {
   const equipment = await prisma.equipment.findUnique({
     where: { id },
-    select: { quantity: true, isAvailable: true },
+    select: { quantity: true, status: true },
   });
 
   if (!equipment) return { available: false, reason: 'not_found' };
-  if (!equipment.isAvailable) return { available: false, reason: 'unavailable' };
+  if (equipment.status !== 'ACTIVE') return { available: false, reason: 'unavailable' };
   if (equipment.quantity < requestedQuantity) return { available: false, reason: 'insufficient_quantity' };
 
   return { available: true, quantity: equipment.quantity };
@@ -245,7 +245,7 @@ export async function updateQuantity(id: string, quantity: number, operation: 'i
 export async function countByCategory() {
   const counts = await prisma.equipment.groupBy({
     by: ['categoryId'],
-    where: { isAvailable: true },
+    where: { status: 'ACTIVE' },
     _count: { id: true },
   });
 
