@@ -1,13 +1,13 @@
 import { Request, Response } from 'express';
-import { ServiceRepository } from '../repositories/serviceRepository';
+import { ServiceService } from '../services/serviceService';
 
-const repo = new ServiceRepository();
+const service = new ServiceService();
 
 export class ServiceController {
   async list(req: Request, res: Response) {
     try {
       const publicView = req.userRole !== 'ADMIN';
-      const services = await repo.findAll(publicView);
+      const services = await service.findAll(undefined, publicView);
       return res.json(services);
     } catch (error) {
       console.error(error);
@@ -18,9 +18,9 @@ export class ServiceController {
   async get(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const service = await repo.findOne(String(id));
-      if (!service) return res.status(404).json({ message: 'Serviço não encontrado' });
-      return res.json(service);
+      const serviceData = await service.findOne(String(id));
+      if (!serviceData) return res.status(404).json({ message: 'Serviço não encontrado' });
+      return res.json(serviceData);
     } catch {
       return res.status(500).json({ message: 'Erro ao buscar serviço' });
     }
@@ -33,13 +33,8 @@ export class ServiceController {
       if (data.price) data.price = Number(data.price);
       if (data.duration) data.duration = Number(data.duration);
       
-      // Handle single image upload
-      if (data.imageUrl) {
-        // imageUrl already set by middleware
-      }
-      
-      const service = await repo.create(data);
-      return res.status(201).json(service);
+      const serviceData = await service.create(data);
+      return res.status(201).json(serviceData);
     } catch (error) {
       console.error(error);
       return res.status(400).json({ message: 'Erro ao criar serviço' });
@@ -53,13 +48,8 @@ export class ServiceController {
       if (data.price) data.price = Number(data.price);
       if (data.duration) data.duration = Number(data.duration);
 
-      // Handle single image upload
-      if (data.imageUrl) {
-        // imageUrl already set by middleware
-      }
-
-      const service = await repo.update(String(id), data);
-      return res.json(service);
+      const serviceData = await service.update(String(id), data);
+      return res.json(serviceData);
     } catch {
       return res.status(400).json({ message: 'Erro ao atualizar serviço' });
     }
@@ -68,7 +58,7 @@ export class ServiceController {
   async delete(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      await repo.delete(String(id));
+      await service.delete(String(id));
       return res.status(204).send();
     } catch {
       return res.status(400).json({ message: 'Erro ao deletar serviço' });
