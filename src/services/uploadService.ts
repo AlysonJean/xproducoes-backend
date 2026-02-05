@@ -11,44 +11,56 @@ export class UploadService {
   getCloudinaryMulterConfig() {
     return multer({
       storage: multer.memoryStorage(),
-      fileFilter: this.imageFilter,
+      fileFilter: this.mediaFilter,
       limits: { 
-        fileSize: 5 * 1024 * 1024, // 5MB
-        files: 1
+        fileSize: 50 * 1024 * 1024, // 50MB for videos
+        files: 10 // Allow more files
       }
     });
   }
 
-  private imageFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  private mediaFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     logger.info({obj:{
       originalname: file.originalname,
       mimetype: file.mimetype,
       size: file.size
-    }}, '[ImageFilter] Checking file:');
+    }}, '[MediaFilter] Checking file:');
     
-    const isValidImage = file.mimetype.startsWith("image/") || 
-                        file.originalname.toLowerCase().endsWith('.svg') ||
-                        file.mimetype === 'text/xml' ||
-                        file.mimetype === 'application/xml' ||
-                        file.mimetype === 'application/svg+xml';
+    // Allow images and videos
+    const isImage = file.mimetype.startsWith("image/") || 
+                    file.originalname.toLowerCase().endsWith('.svg') ||
+                    file.mimetype === 'text/xml' || // legacy svg support
+                    file.mimetype === 'application/xml' ||
+                    file.mimetype === 'application/svg+xml';
+    
+    const isVideo = file.mimetype.startsWith("video/");
+
+    const isValid = isImage || isVideo;
     
     logger.info({obj:{
-      isValidImage,
+      isValid,
+      isImage,
+      isVideo,
       mimetype: file.mimetype,
       originalname: file.originalname
-    }}, '[ImageFilter] File validation result:');
+    }}, '[MediaFilter] File validation result:');
     
-    if (isValidImage) {
+    if (isValid) {
       cb(null, true);
     } else {
-      logger.error({obj:file.mimetype}, '[ImageFilter] File rejected:');
-      cb(new Error("Apenas arquivos de imagem são permitidos (PNG, JPEG, SVG)"));
+      logger.error({obj:file.mimetype}, '[MediaFilter] File rejected:');
+      cb(new Error("Apenas arquivos de imagem e vídeo são permitidos"));
     }
   };
 
   // Upload sempre para Cloudinary
-  async uploadImage(file: Express.Multer.File, folder: string = "portfolio", fileName?: string): Promise<string> {
+  async uploadFile(file: Express.Multer.File, folder: string = "portfolio", fileName?: string): Promise<string> {
     return this.uploadToCloudinary(file, folder, fileName);
+  }
+
+  // Deprecated alias
+  async uploadImage(file: Express.Multer.File, folder: string = "portfolio", fileName?: string): Promise<string> {
+    return this.uploadFile(file, folder, fileName);
   }
 
   // Upload para Cloudinary (sempre)
@@ -57,29 +69,31 @@ export class UploadService {
       const isSvg =
         file.mimetype === 'image/svg+xml' ||
         (file.originalname && file.originalname.toLowerCase().endsWith('.svg'));
+      
+      const isVideo = file.mimetype.startsWith("video/");
 
       logger.info({obj:{
         originalname: file.originalname,
         mimetype: file.mimetype,
         size: file.size,
-        isSvg: isSvg
+        isSvg: isSvg,
+        isVideo: isVideo
       }}, '[UploadService] File info:');
 
       // Base options
       const baseOptions: any = {
         folder: `x-producoes/${folder}`,
-        resource_type: 'image',
+        resource_type: 'auto', // Auto-detect image or video
         use_filename: true,
-        unique_filename: !fileName, // Se fileName for fornecido, não usar unique_filename (tentar usar o nome exato)
-        overwrite: true, // Permitir sobrescrever se o nome for o mesmo (atualizar imagem)
+        unique_filename: !fileName,
+        overwrite: true,
         ...(fileName ? { public_id: fileName } : {}),
       };
 
       // Para SVG: não aplicar transformações que forcem rasterização ou conversão
       const svgOptions: any = {
         ...baseOptions,
-        format: 'svg', // garante extensão/entrega como SVG
-        // Sem 'fetch_format', 'quality' ou 'resize'
+        format: 'svg',
       };
 
       // Para imagens raster: aplicar otimizações seguras
@@ -92,12 +106,26 @@ export class UploadService {
         ],
       };
 
+      // Para vídeos
+      const videoOptions: any = {
+        ...baseOptions,
+        resource_type: 'video',
+        transformation: [
+          { quality: 'auto' },
+          { fetch_format: 'auto' }
+        ]
+      };
+
+      let optionsToUse = baseOptions;
+      if (isSvg) optionsToUse = svgOptions;
+      else if (isVideo) optionsToUse = videoOptions;
+      else optionsToUse = rasterOptions;
+
       // Prepare buffer for upload; sanitize SVGs synchronously before creating stream
       let bufferToSend = file.buffer;
       if (isSvg) {
         logger.info('[UploadService] Processing SVG file');
         try {
-          // dynamic import but executed before upload stream and using promise chain
           const jsdomMod = require('jsdom');
           const dompurifyMod = require('dompurify');
           const JSDOM = jsdomMod.JSDOM;
@@ -116,10 +144,10 @@ export class UploadService {
         }
       }
 
-      logger.info({obj:isSvg ? svgOptions : rasterOptions}, '[UploadService] Starting Cloudinary upload with options:');
+      logger.info({obj:optionsToUse}, '[UploadService] Starting Cloudinary upload with options:');
 
       const uploadStream = cloudinary.uploader.upload_stream(
-        isSvg ? svgOptions : rasterOptions,
+        optionsToUse,
         (error: UploadApiErrorResponse | undefined, result: UploadApiResponse | undefined) => {
           if (error) {
             // Log detalhado do erro do Cloudinary para diagnóstico
@@ -129,7 +157,7 @@ export class UploadService {
               message: error?.message,
               http_code: error?.http_code,
             }}, '[Cloudinary] Upload error:');
-            const message = error?.message || 'Erro no upload da imagem';
+            const message = error?.message || 'Erro no upload do arquivo';
             reject(new Error(message));
             return;
           }

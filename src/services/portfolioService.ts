@@ -3,7 +3,7 @@ import logger from "../config/logger";
 import type { Prisma } from "@prisma/client";
 
 
-export async function updatePortfolio(id: string, data: Partial<{ title: string; description: string; eventDate: string | Date; imageUrl?: string; }>) {
+export async function updatePortfolio(id: string, data: Partial<{ title: string; description: string; eventDate: string | Date; imageUrl?: string; uploadedFiles?: any[]; coverIndex?: string | number }>) {
   const updateData: Prisma.PortfolioUpdateInput = {};
   if (data.title) updateData.title = data.title.trim();
   if (data.description) updateData.description = data.description.trim();
@@ -11,8 +11,46 @@ export async function updatePortfolio(id: string, data: Partial<{ title: string;
     const eventDate = typeof data.eventDate === 'string' ? new Date(data.eventDate) : data.eventDate;
     if (!isNaN(eventDate.getTime())) updateData.eventDate = eventDate;
   }
-  if (data.imageUrl) updateData.imageUrl = data.imageUrl;
-  return prisma.portfolio.update({ where: { id }, data: updateData });
+  
+  // If uploadedFiles present, add them
+  if (data.uploadedFiles && data.uploadedFiles.length > 0) {
+    await prisma.$transaction(async (tx) => {
+      // Create media items
+      for (let i = 0; i < data.uploadedFiles.length; i++) {
+        const file = data.uploadedFiles[i];
+        const isCover = typeof data.coverIndex !== 'undefined' && Number(data.coverIndex) === i;
+        
+        await tx.portfolioMedia.create({
+          data: {
+            portfolioId: id,
+            url: file.url,
+            type: file.mimetype.startsWith('video/') ? 'VIDEO' : 'IMAGE',
+            filename: file.filename,
+            mimeType: file.mimetype,
+            isCover: isCover
+          }
+        });
+
+        // If this is the cover, update the parent
+        if (isCover) {
+             updateData.imageUrl = file.url;
+             updateData.coverImage = file.url;
+        }
+      }
+    });
+
+    // If imageUrl was passed (legacy or explicit existing cover), it overrides
+    if (data.imageUrl) {
+      updateData.imageUrl = data.imageUrl;
+      updateData.coverImage = data.imageUrl;
+    }
+  }
+
+  return prisma.portfolio.update({ 
+    where: { id }, 
+    data: updateData,
+    include: { media: { orderBy: { sortOrder: 'asc' } } }
+  });
 }
 
 export async function create(
@@ -21,16 +59,13 @@ export async function create(
     description: string;
     eventDate: string | Date;
     imageUrl?: string;
+    uploadedFiles?: Array<{ url: string; filename: string; mimetype: string; size: number }>;
+    coverIndex?: string | number;
   }
 ) {
   // Validação dos dados
   if (!data.title || !data.description || !data.eventDate) {
     throw new Error('Dados obrigatórios não fornecidos: title, description, eventDate');
-  }
-
-  // Validar se imageUrl está presente (vindo do middleware do Cloudinary)
-  if (!data.imageUrl) {
-    throw new Error('Imagem é obrigatória');
   }
 
   let eventDate: Date;
@@ -43,20 +78,23 @@ export async function create(
     throw new Error('Erro ao processar data do evento');
   }
 
-  const portfolioData: {
-    title: string;
-    description: string;
-    eventDate: Date;
-    imageUrl: string;
-    sortOrder: number;
-  } = {
-    title: data.title.trim(),
-    description: data.description.trim(),
-    eventDate: eventDate,
-    imageUrl: data.imageUrl, // URL do Cloudinary
-    sortOrder: 0, // Será atualizado abaixo
-  };
-  
+  // Determine cover image and media items
+  const mediaItems = data.uploadedFiles || [];
+  let coverUrl = data.imageUrl || '';
+  let coverIndex = data.coverIndex ? Number(data.coverIndex) : 0;
+
+  // Use the first file as cover if no imageUrl provided and files exist
+  if (!coverUrl && mediaItems.length > 0) {
+    // If coverIndex is out of bounds, use 0
+    if (coverIndex < 0 || coverIndex >= mediaItems.length) coverIndex = 0;
+    
+    // Only set coverUrl if it's an image, or generic placeholder if video?
+    // For now, use the url. Frontend handles video thumbnails? 
+    // Usually videos on cloudinary have a .jpg thumbnail url. 
+    // But let's just use the url.
+    coverUrl = mediaItems[coverIndex].url;
+  }
+
   try {
     // Obter o último sortOrder para colocar no fim da lista
     const lastItem = await prisma.portfolio.findFirst({
@@ -64,9 +102,40 @@ export async function create(
       select: { sortOrder: true }
     });
     
-    portfolioData.sortOrder = (lastItem?.sortOrder ?? 0) + 1;
+    const sortOrder = (lastItem?.sortOrder ?? 0) + 1;
 
-    return await prisma.portfolio.create({ data: portfolioData });
+    // Transaction to create Portfolio and Media
+    const result = await prisma.$transaction(async (tx) => {
+      const portfolio = await tx.portfolio.create({
+        data: {
+          title: data.title.trim(),
+          description: data.description.trim(),
+          eventDate: eventDate,
+          imageUrl: coverUrl,
+          coverImage: coverUrl,
+          sortOrder: sortOrder,
+        }
+      });
+
+      if (mediaItems.length > 0) {
+        await tx.portfolioMedia.createMany({
+          data: mediaItems.map((file, index) => ({
+            portfolioId: portfolio.id,
+            url: file.url,
+            type: file.mimetype.startsWith('video/') ? 'VIDEO' : 'IMAGE',
+            filename: file.filename,
+            mimeType: file.mimetype,
+            isCover: index === coverIndex,
+            sortOrder: index
+          }))
+        });
+      }
+
+      return portfolio;
+    });
+
+    return result;
+
   } catch (error) {
     logger.error({obj:error}, 'Erro ao criar portfólio no banco de dados:');
     throw new Error('Erro interno ao salvar portfólio');
@@ -75,6 +144,11 @@ export async function create(
 
 export async function findAll() {
   return prisma.portfolio.findMany({ 
+    include: {
+      media: {
+        orderBy: { sortOrder: 'asc' }
+      }
+    },
     orderBy: [
       { sortOrder: "asc" },
       { eventDate: "desc" }
@@ -95,4 +169,31 @@ export async function updateOrder(items: { id: string; sortOrder: number }[]) {
 
 export async function deletePortfolio(id: string) {
   return prisma.portfolio.delete({ where: { id } });
+}
+
+// New method to set cover
+export async function setCoverVideo(portfolioId: string, mediaId: string) {
+    // Transaction to unset old cover and set new one
+    await prisma.$transaction([
+        prisma.portfolioMedia.updateMany({
+            where: { portfolioId },
+            data: { isCover: false }
+        }),
+        prisma.portfolioMedia.update({
+            where: { id: mediaId },
+            data: { isCover: true }
+        })
+    ]);
+    
+    // Update parent cache
+    const media = await prisma.portfolioMedia.findUnique({ where: { id: mediaId } });
+    if (media) {
+        await prisma.portfolio.update({
+            where: { portfolioId },
+            data: { 
+                imageUrl: media.url,
+                coverImage: media.url
+            }
+        });
+    }
 }

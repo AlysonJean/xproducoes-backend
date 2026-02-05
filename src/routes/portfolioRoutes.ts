@@ -2,7 +2,7 @@ import { Router } from "express";
 import { PortfolioController } from "../controllers/portfolioController";
 import { authenticate } from "../middlewares/unifiedAuth";
 import { roleMiddleware } from "../middlewares/roleMiddleware";
-import { uploadSingle } from "../middlewares/upload";
+import { uploadMultiple } from "../middlewares/upload";
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
 
 const portfolioRoutes: Router = Router();
@@ -24,7 +24,7 @@ portfolioRoutes.post(
   "/",
   authenticate,
   roleMiddleware(["ADMIN"]),
-  uploadRateLimit, uploadSingle("image"),
+  uploadRateLimit, uploadMultiple("media"),
   require("../middlewares/upload").processUpload,
   portfolioController.create,
 );
@@ -32,7 +32,7 @@ portfolioRoutes.put(
   "/:id",
   authenticate,
   roleMiddleware(["ADMIN"]),
-  uploadRateLimit, uploadSingle("image"),
+  uploadRateLimit, uploadMultiple("media"),
   require("../middlewares/upload").processUpload,
   portfolioController.update,
 );

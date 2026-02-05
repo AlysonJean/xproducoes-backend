@@ -69,21 +69,36 @@ export const processUpload = async (req: Request, res: Response, next: NextFunct
     
     if (req.file) {
       // Upload de arquivo único
-      const imageUrl = await uploadService.uploadImage(req.file, folder, fileName);
-      req.body.imageUrl = imageUrl;
+      const url = await uploadService.uploadFile(req.file, folder, fileName);
+      req.body.imageUrl = url;
+      req.body.uploadedFile = {
+        url,
+        filename: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size
+      };
     } else if (req.files && Array.isArray(req.files)) {
       // Upload de múltiplos arquivos
       const imageUrls: string[] = [];
-      const imageCount = req.files.length;
+      const uploadedFiles: any[] = [];
+      const fileCount = req.files.length;
       
-      for (let i = 0; i < imageCount; i++) {
+      for (let i = 0; i < fileCount; i++) {
         const file = req.files[i];
         // Se for múltiplos arquivos, adicionar índice ao nome para manter SEO mas único
         const currentFileName = fileName ? `${fileName}-${i + 1}` : undefined;
-        const imageUrl = await uploadService.uploadImage(file, folder, currentFileName);
-        imageUrls.push(imageUrl);
+        const url = await uploadService.uploadFile(file, folder, currentFileName);
+        
+        imageUrls.push(url);
+        uploadedFiles.push({
+          url,
+          filename: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size
+        });
       }
       req.body.imageUrls = imageUrls;
+      req.body.uploadedFiles = uploadedFiles;
     }
     next();
   } catch (error) {

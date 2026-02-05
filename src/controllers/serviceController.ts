@@ -33,6 +33,11 @@ export class ServiceController {
       if (data.price) data.price = Number(data.price);
       if (data.duration) data.duration = Number(data.duration);
       
+      // Handle single image upload
+      if (data.imageUrl) {
+        // imageUrl already set by middleware
+      }
+      
       const service = await repo.create(data);
       return res.status(201).json(service);
     } catch (error) {
@@ -47,6 +52,11 @@ export class ServiceController {
       const data = { ...req.body };
       if (data.price) data.price = Number(data.price);
       if (data.duration) data.duration = Number(data.duration);
+
+      // Handle single image upload
+      if (data.imageUrl) {
+        // imageUrl already set by middleware
+      }
 
       const service = await repo.update(String(id), data);
       return res.json(service);

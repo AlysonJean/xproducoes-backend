@@ -32,12 +32,37 @@ model Portfolio {
   description String
   eventDate   DateTime
   imageUrl    String
+  coverImage  String?  // Cache for the cover image
   slug        String?  @unique
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
+  media       PortfolioMedia[]
 
   @@map("portfolios")
+}
+
+model PortfolioMedia {
+  id          String     @id @default(cuid())
+  portfolioId String
+  url         String
+  type        MediaType  @default(IMAGE)
+  filename    String?
+  mimeType    String?
+  isCover     Boolean    @default(false)
+  sortOrder   Int        @default(0)
+  createdAt   DateTime   @default(now())
+  
+  portfolio   Portfolio  @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@index([portfolioId])
+  @@map("portfolio_media")
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
 }
 
 model Faq {
@@ -293,6 +318,8 @@ model Service {
   
   items       KitItem[]
   clientFavorites ClientFavorite[]
+  
+  imageUrl    String?
 
   @@map("services")
 }
