@@ -13,7 +13,10 @@ export class KitRepository {
             equipment: true,
             service: true
           }
-        } 
+        },
+        experienceLevels: {
+          orderBy: { level: 'asc' }
+        }
       },
       ...(limit ? { take: limit } : {})
     });
@@ -32,6 +35,9 @@ export class KitRepository {
             equipment: true,
             service: true
           }
+        },
+        experienceLevels: {
+          orderBy: { level: 'asc' }
         }
       },
     });
@@ -81,6 +87,9 @@ export class KitRepository {
             service: true
           }
         },
+        experienceLevels: {
+          orderBy: { level: 'asc' }
+        },
         _count: {
           select: {
             items: true,
@@ -104,6 +113,9 @@ export class KitRepository {
           include: {
             equipment: true
           }
+        },
+        experienceLevels: {
+          orderBy: { level: 'asc' }
         },
         _count: {
           select: {

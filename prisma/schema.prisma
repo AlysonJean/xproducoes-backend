@@ -258,6 +258,7 @@ model Kit {
   updatedAt             DateTime    @updatedAt
   bookings              Booking[]
   items                 KitItem[]
+  experienceLevels      KitExperienceLevel[]
 
 
 
@@ -924,4 +925,32 @@ model Banner {
   updatedAt      DateTime  @updatedAt
 
   @@map("banners")
+}
+
+// ================================
+// NÍVEIS DE EXPERIÊNCIA DOS KITS
+// ================================
+
+enum ExperienceLevel {
+  SILVER    // Self-service (apenas equipamentos)
+  GOLD      // Com montagem e desmontagem profissional
+  PLATINUM  // Solução completa (técnico + DJ)
+}
+
+model KitExperienceLevel {
+  id          String          @id @default(cuid())
+  level       ExperienceLevel
+  price       Decimal         @db.Decimal(10, 2)
+  description String?
+  includes    String[]        // Lista do que está incluído
+  isPopular   Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  kitId       String
+  kit         Kit             @relation(fields: [kitId], references: [id], onDelete: Cascade)
+
+  @@unique([kitId, level])
+  @@index([kitId])
+  @@index([level])
+  @@map("kit_experience_levels")
 }
