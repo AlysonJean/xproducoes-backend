@@ -95,7 +95,7 @@ export class EquipmentController {
       const equipments = await cacheService.getOrSet(
         `${cacheKey}:${publicView ? 'public' : 'admin'}`, // Cache key differentiation
         () => equipmentService.findAll(limit, publicView),
-        CacheService.TTL.MEDIUM
+        CacheService.TTL.SHORT
       );
       return res.json(equipments);
     } catch (error) {

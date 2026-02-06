@@ -324,6 +324,10 @@ export class CacheService {
       patterns.push(`equipment:${equipmentId}:*`);
     }
 
+    // Explicitly invalidate list caches
+    patterns.push('equipment:all:public');
+    patterns.push('equipment:all:admin');
+
     await Promise.all(patterns.map((pattern) => this.deletePattern(pattern)));
   }
 
