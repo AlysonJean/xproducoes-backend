@@ -217,7 +217,12 @@ async function ensureEquipmentsAndKits() {
 			price: new Prisma.Decimal('450.00'),
 				imageUrl: 'https://res.cloudinary.com/demo/image/upload/kit-pa.png',
 				tags: ['pa', 'som', 'evento'],
-				equipments: { connect: createdEquipments.slice(0, 2).map((eq) => ({ id: eq.id })) },
+				items: {
+					create: createdEquipments.slice(0, 2).map((eq) => ({
+						equipmentId: eq.id,
+						quantity: 1
+					}))
+				},
 			},
 		});
 	}

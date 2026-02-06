@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import socialController from '../controllers/socialController';
 import { authenticate } from '../middlewares/unifiedAuth';
-// import { requireAdmin } from '../middlewares/roleMiddleware'; // Assuming this exists
+import multer from 'multer';
 
+const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
 
 // --- Admin Routes ---
@@ -20,6 +21,18 @@ router.post('/admin/social/create', authenticate, socialController.createWall);
 
 // GET /api/admin/social/walls (List)
 router.get('/admin/social/walls', authenticate, socialController.listWalls);
+
+// GET /api/admin/social/walls/:id (Detail)
+router.get('/admin/social/walls/:id', authenticate, socialController.getWall);
+
+// PUT /api/admin/social/walls/:id (Update)
+router.put('/admin/social/walls/:id', authenticate, socialController.updateWall);
+
+// DELETE /api/admin/social/walls/:id (Delete)
+router.delete('/admin/social/walls/:id', authenticate, socialController.deleteWall);
+
+// GET /api/admin/social/leaderboard
+router.get('/admin/social/leaderboard', authenticate, socialController.getLeaderboard);
 
 
 // --- Announcement Routes ---
@@ -39,5 +52,8 @@ router.post('/tv/pair', authenticate, socialController.pairDevice); // Admin pai
 
 // GET /api/tv/config - Public but requires code
 router.get('/tv/config', socialController.getDeviceConfig);
+
+// Public upload from QR Code
+router.post('/public/social/upload/:slug', upload.single('image'), socialController.directUpload);
 
 export default router;

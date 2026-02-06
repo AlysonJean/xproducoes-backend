@@ -26,7 +26,8 @@ export function initializeSocket(server: any) {
       const token = socket.handshake.auth.token || socket.handshake.query.token;
 
       if (!token) {
-        return next(new Error('Token de autenticação necessário'));
+        // Permitir conexões públicas (ex: TV/Telão) sem token
+        return next();
       }
 
       // Verificar token JWT
@@ -38,28 +39,43 @@ export function initializeSocket(server: any) {
         select: { id: true, name: true, email: true, role: true }
       });
 
-      if (!user) {
-        return next(new Error('Usuário não encontrado'));
+      if (user) {
+        // Anexar dados do usuário ao socket
+        socket.data.user = user;
       }
-
-      // Anexar dados do usuário ao socket
-      socket.data.user = user;
+      
       next();
     } catch (error) {
-      logger.error({ err: error }, 'Erro na autenticação do socket');
-      next(new Error('Token inválido'));
+      // Em caso de erro no token, apenas ignora o usuário mas permite a conexão como público
+      logger.warn({ err: error }, 'Falha na autenticação do socket, conectando como público');
+      next();
     }
   });
 
   io.on('connection', (socket: Socket) => {
     const user = socket.data.user;
-    logger.info({ socketId: socket.id, userId: user.id, userName: user.name }, 'Cliente conectado');
+    
+    if (user) {
+      logger.info({ socketId: socket.id, userId: user.id, userName: user.name }, 'Cliente autenticado conectado');
+      // Registrar usuário conectado
+      connectedUsers.set(user.id, socket.id);
+      // Entrar na sala do usuário
+      socket.join(`user_${user.id}`);
+    } else {
+      logger.info({ socketId: socket.id }, 'Dispositivo público conectado');
+    }
 
-    // Registrar usuário conectado
-    connectedUsers.set(user.id, socket.id);
-
-    // Entrar na sala do usuário
-    socket.join(`user_${user.id}`);
+    // Evento genérico de Join (usado pela TV para murais)
+    socket.on('join', (room: string) => {
+      // Segurança: Permitir apenas salas de murais ou eventos publicamente
+      if (room.startsWith('wall:') || room.startsWith('event:')) {
+        socket.join(room);
+        logger.info({ socketId: socket.id, room }, 'Dispositivo entrou na sala do mural');
+      } else if (user) {
+        // Usuários autenticados podem entrar em outras salas
+        socket.join(room);
+      }
+    });
 
     // Eventos de chat
     socket.on('join_chat', (chatId: string) => {
@@ -161,8 +177,12 @@ export function initializeSocket(server: any) {
     });
 
     socket.on('disconnect', () => {
-      logger.info({ socketId: socket.id, userName: user.name }, 'Cliente desconectado');
-      connectedUsers.delete(user.id);
+      if (user) {
+        logger.info({ socketId: socket.id, userName: user.name }, 'Cliente autenticado desconectado');
+        connectedUsers.delete(user.id);
+      } else {
+        logger.info({ socketId: socket.id }, 'Dispositivo público desconectado');
+      }
     });
   });
 

@@ -4,6 +4,9 @@ import logger from '../config/logger';
 import { getSocketIO } from '../config/socket'; // Assuming this exists or similar getter
 import { triggerImmediateSync } from '../config/jobQueue';
 import { SocialPostStatus } from '@prisma/client';
+import { UploadService } from '../services/uploadService';
+
+const uploadService = new UploadService();
 
 export class SocialController {
     
@@ -299,12 +302,114 @@ export class SocialController {
         try {
             const walls = await prisma.eventSocialSetting.findMany({
                 orderBy: { createdAt: 'desc' },
-                include: { booking: { select: { eventTitle: true, eventDate: true } } }
+                include: {
+                    booking: { select: { eventTitle: true, eventDate: true } },
+                    sponsors: true
+                }
             });
 
             res.json({ data: walls });
         } catch {
              res.status(500).json({ error: 'Failed to list walls' });
+        }
+    }
+
+    async getWall(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const wall = await prisma.eventSocialSetting.findUnique({
+                where: { id: String(id) },
+                include: { 
+                    sponsors: true,
+                    announcements: true,
+                    booking: true
+                }
+            });
+            if (!wall) return res.status(404).json({ error: 'Wall not found' });
+            res.json({ data: wall });
+        } catch {
+            res.status(500).json({ error: 'Failed to fetch wall' });
+        }
+    }
+
+    async updateWall(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const data = req.body;
+            logger.info({ id, data }, '[updateWall] Recebido update de mural');
+
+            // Check slug uniqueness if changed
+            if (data.slug) {
+                const existing = await prisma.eventSocialSetting.findFirst({
+                    where: { 
+                        slug: data.slug,
+                        NOT: { id: String(id) }
+                    }
+                });
+                if (existing) {
+                    logger.warn({ slug: data.slug }, '[updateWall] Slug já em uso');
+                    return res.status(400).json({ error: 'Este link (slug) já está em uso por outro mural.' });
+                }
+            }
+
+            const wall = await prisma.eventSocialSetting.update({
+                where: { id: String(id) },
+                data: {
+                    name: data.name,
+                    slug: data.slug || undefined,
+                    hashtag: data.hashtag,
+                    autoApprove: data.autoApprove !== undefined ? Boolean(data.autoApprove) : undefined,
+                    layoutMode: data.layoutMode,
+                    enableQrCode: data.enableQrCode !== undefined ? Boolean(data.enableQrCode) : undefined,
+                    qrCodeText: data.qrCodeText,
+                    enableMosaic: data.enableMosaic !== undefined ? Boolean(data.enableMosaic) : undefined,
+                    mosaicFrequency: data.mosaicFrequency ? Number(data.mosaicFrequency) : undefined,
+                    enableGamification: data.enableGamification !== undefined ? Boolean(data.enableGamification) : undefined,
+                    sponsors: data.sponsorIds ? {
+                        set: data.sponsorIds.map((sid: string) => ({ id: sid }))
+                    } : undefined
+                },
+                include: { sponsors: true }
+            });
+
+            logger.info({ wall }, '[updateWall] Mural atualizado');
+
+            // Emit real-time configuration update
+            const io = getSocketIO();
+            if (io) {
+                io.to(`wall:${wall.id}`).emit('config:update', wall);
+                if (wall.bookingId) {
+                    io.to(`event:${wall.bookingId}`).emit('config:update', wall);
+                }
+                logger.info({ wallId: wall.id }, 'Broadcasted config:update event');
+            }
+
+            res.json({ data: wall });
+        } catch (error) {
+            logger.error({ error, id, data }, '[updateWall] Erro ao atualizar mural');
+            res.status(500).json({ error: 'Failed to update wall' });
+        }
+    }
+
+    async deleteWall(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            // Busca todos os posts do mural
+            const posts = await prisma.socialPost.findMany({ where: { settingId: String(id) } });
+            // Apaga arquivos dos posts no Cloudinary
+            for (const post of posts) {
+                if (post.mediaUrl) {
+                    await uploadService.deleteFile(post.mediaUrl);
+                }
+            }
+            // Apaga os posts do mural
+            await prisma.socialPost.deleteMany({ where: { settingId: String(id) } });
+            // Apaga o mural (EventSocialSetting)
+            await prisma.eventSocialSetting.delete({ where: { id: String(id) } });
+            res.json({ success: true });
+        } catch (error) {
+            logger.error({ error }, 'Failed to delete wall');
+            res.status(500).json({ error: 'Failed to delete wall' });
         }
     }
 
@@ -437,30 +542,40 @@ export class SocialController {
             }
 
             if (!targetSettingId) {
-                return res.status(400).json({ error: 'Either eventId or settingId must be provided for pairing.' });
+                return res.status(400).json({ error: 'É necessário fornecer o ID do evento ou do mural para o pareamento.' });
+            }
+
+            // Verify if the setting actually exists
+            const existingSetting = await prisma.eventSocialSetting.findUnique({
+                where: { id: targetSettingId }
+            });
+
+            if (!existingSetting) {
+                return res.status(404).json({ error: 'A configuração do mural social não foi encontrada.' });
             }
 
             // Implementing the Admin side of pairing here:
             const device = await prisma.tVDevice.upsert({
-                where: { pairingCode },
+                where: { pairingCode: String(pairingCode) },
                 update: {
-                    bookingId: eventId || null, // Optional
+                    bookingId: eventId || null,
                     settingId: targetSettingId,
-                    name: deviceName,
+                    name: deviceName || 'TV Evento',
                     lastSeen: new Date()
                 },
                 create: {
-                    pairingCode,
+                    pairingCode: String(pairingCode),
                     bookingId: eventId || null,
                     settingId: targetSettingId,
-                    name: deviceName || 'New TV'
+                    name: deviceName || 'TV Evento'
                 }
             });
             
+            logger.info({ deviceId: device.id, pairingCode, settingId: targetSettingId }, 'TV Device successfully paired');
             res.json({ data: device });
-        } catch (error) {
-             logger.error({ error }, 'Error pairing device');
-             res.status(500).json({ error: 'Pairing failed' });
+        } catch (error: any) {
+             logger.error({ error: error.message, stack: error.stack, body: req.body }, 'Error pairing device');
+             res.status(500).json({ error: 'Falha interna ao parear TV. Tente novamente.' });
         }
     }
 
@@ -477,7 +592,8 @@ export class SocialController {
             // 1. Support Public Slug Access
             if (slug) {
                 const setting = await prisma.eventSocialSetting.findUnique({ 
-                    where: { slug: String(slug) } 
+                    where: { slug: String(slug) },
+                    include: { sponsors: true }
                 });
                 
                 if (!setting) {
@@ -488,7 +604,15 @@ export class SocialController {
                     linked: true,
                     settingId: setting.id,
                     slug: setting.slug,
-                    eventName: setting.name || 'Mural Social'
+                    eventName: setting.name || 'Mural Social',
+                    hashtag: setting.hashtag,
+                    layoutMode: setting.layoutMode,
+                    sponsors: setting.sponsors,
+                    enableQrCode: setting.enableQrCode,
+                    qrCodeText: setting.qrCodeText,
+                    mosaicFrequency: setting.mosaicFrequency,
+                    enableMosaic: setting.enableMosaic,
+                    enableGamification: setting.enableGamification
                 });
             }
 
@@ -507,39 +631,108 @@ export class SocialController {
             }
 
             let settingId = device.settingId;
-            let eventName = device.booking?.eventTitle || device.name || 'Evento';
-            let settingSlug = null;
+            // let eventName = device.booking?.eventTitle || device.name || 'Evento';
+            // let settingSlug = null;
+            let fullSetting = null;
 
-            // Resolve Setting if only bookingId is present (legacy)
+            // Resolve Setting
             if (!settingId && device.bookingId) {
-                 const setting = await prisma.eventSocialSetting.findFirst({ where: { bookingId: device.bookingId } });
-                 if (setting) {
-                     settingId = setting.id;
-                     settingSlug = setting.slug;
+                 fullSetting = await prisma.eventSocialSetting.findFirst({ 
+                    where: { bookingId: device.bookingId },
+                    include: { sponsors: true }
+                 });
+                 if (fullSetting) {
+                     settingId = fullSetting.id;
                      // Auto-heal
                      await prisma.tVDevice.update({ where: { id: device.id }, data: { settingId } });
                  }
             } else if (settingId) {
-                 const setting = await prisma.eventSocialSetting.findUnique({ where: { id: settingId } });
-                 if (setting) {
-                     eventName = setting.name || eventName;
-                     settingSlug = setting.slug;
-                 }
+                 fullSetting = await prisma.eventSocialSetting.findUnique({ 
+                    where: { id: settingId },
+                    include: { sponsors: true }
+                 });
             }
 
-            // Return the long-lived token (deviceToken) and event info
+            if (!fullSetting) {
+                return res.json({ linked: false, error: 'Configuração não encontrada para este dispositivo' });
+            }
+
+            // Return full config for the TV
             res.json({ 
                 linked: true,
                 deviceToken: device.deviceToken,
-                eventId: device.bookingId, // Keep for legacy
-                settingId: settingId,      // New standard
-                slug: settingSlug,
-                eventName: eventName
+                settingId: settingId,
+                slug: fullSetting.slug,
+                eventName: fullSetting.name || device.booking?.eventTitle || 'Mural Social',
+                hashtag: fullSetting.hashtag,
+                layoutMode: fullSetting.layoutMode,
+                sponsors: fullSetting.sponsors,
+                enableQrCode: fullSetting.enableQrCode,
+                qrCodeText: fullSetting.qrCodeText,
+                mosaicFrequency: fullSetting.mosaicFrequency,
+                enableMosaic: fullSetting.enableMosaic,
+                enableGamification: fullSetting.enableGamification
             });
 
-        } catch {
+        } catch (error) {
+             logger.error({ error }, 'Error fetching device config');
              res.status(500).json({ error: 'Falha ao carregar configuração' });
          }
+    }
+
+    /**
+     * POST /api/public/social/upload/:slug
+     * Direct upload from guest
+     */
+    async directUpload(req: Request, res: Response) {
+        try {
+            const { slug } = req.params;
+            const { author, caption } = req.body;
+            const file = req.file;
+
+            if (!file) {
+                return res.status(400).json({ error: 'Nenhuma imagem enviada' });
+            }
+
+            const setting = await prisma.eventSocialSetting.findUnique({
+                where: { slug: String(slug) }
+            });
+
+            if (!setting) {
+                return res.status(404).json({ error: 'Mural não encontrado' });
+            }
+
+            // Upload to Cloudinary
+            const imageUrl = await uploadService.uploadFile(file, 'social_direct');
+
+            // Create post
+            const post = await prisma.socialPost.create({
+                data: {
+                    author: author || 'Convidado',
+                    caption: caption || '',
+                    mediaUrl: imageUrl,
+                    platformId: `direct_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    permalink: imageUrl,
+                    status: setting.autoApprove ? 'APPROVED' : 'PENDING',
+                    settingId: setting.id,
+                    postedAt: new Date(),
+                }
+            });
+
+            // Emit socket event if approved
+            if (post.status === 'APPROVED') {
+                const io = getSocketIO();
+                if (io) {
+                    io.to(`wall:${setting.id}`).emit('post:new', post);
+                    logger.info({ postId: post.id, wallId: setting.id }, 'Broadcasted approved direct post');
+                }
+            }
+
+            res.json({ success: true, post });
+        } catch (error) {
+            logger.error({ error }, 'Error in direct upload');
+            res.status(500).json({ error: 'Falha ao enviar foto' });
+        }
     }
 }
 

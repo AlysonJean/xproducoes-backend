@@ -14,7 +14,6 @@ import { requestIdMiddleware } from "./middlewares/requestIdMiddleware";
 import { healthCheck, readinessCheck, metricsEndpoint } from "./controllers/healthController";
 import { performanceMonitoringMiddleware } from "./middlewares/performanceMonitoring";
 import { setupSwagger } from "./config/swagger";
-import sponsorRoutes from './routes/sponsorRoutes';
 
 dotenv.config();
 
@@ -104,7 +103,6 @@ setupSwagger(app);
 // Versionamento de API
 app.use("/api/v1", apiV1);
 app.use('/api/v1/cep', cepRoutes);
-app.use('/api/admin/sponsors', sponsorRoutes); // Register Sponsor Routes
 app.use("/sitemap.xml", sitemapController.getSitemap);
 app.use("/api", apiV1); // Compatibilidade para testes e frontend
 

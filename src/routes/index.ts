@@ -31,6 +31,7 @@ import bannerRoutes from "./bannerRoutes";
 import calendarRoutes from "./calendarRoutes";
 import serviceRoutes from "./serviceRoutes";
 import socialRoutes from "./socialRoutes";
+import sponsorRoutes from "./sponsorRoutes";
 
 const router: RouterType = Router();
 
@@ -73,6 +74,7 @@ router.use("/collaborators", collaboratorRoutes);
 
 // Admin routes
 router.use("/admin", adminRoutes);
+router.use("/admin/sponsors", sponsorRoutes);
 
 // Enterprise Monitoring routes (Admin only)
 router.use("/monitoring", enterpriseMonitoringRoutes);

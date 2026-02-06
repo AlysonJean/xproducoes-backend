@@ -17,6 +17,9 @@ const bookingController = new BookingController();
 const uploadService = new UploadService();
 
 adminRoutes.use(authenticate, requireAdmin);
+import socialRoutes from './socialRoutes';
+// Rotas de Social Wall (admin)
+adminRoutes.use('/social', socialRoutes);
 
 // Rotas de Clientes
 adminRoutes.get("/clients", adminController.listClients);

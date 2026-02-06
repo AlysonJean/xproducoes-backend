@@ -23,14 +23,16 @@ export class SponsorController {
                 return res.status(400).json({ error: 'Sponsor name is required' });
             }
 
+            // Gera nome SEO para o arquivo
+            const seoFilename = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
             // Upload via service (Buffer -> Cloudinary)
-            const imageUrl = await uploadService.uploadFile(file, 'sponsors');
-            
+            const imageUrl = await uploadService.uploadFile(file, 'sponsors', seoFilename);
+
             const sponsor = await prisma.sponsorLogo.create({
                 data: {
                     name,
-                    imageUrl: imageUrl, // It returns the URL string directly
-                    userId: (req as any).user.id
+                    imageUrl: imageUrl,
+                    userId: req.userId!
                 }
             });
 
@@ -48,7 +50,7 @@ export class SponsorController {
     async list(req: Request, res: Response) {
         try {
             const sponsors = await prisma.sponsorLogo.findMany({
-                where: { userId: (req as any).user.id },
+                where: { userId: req.userId },
                 orderBy: { createdAt: 'desc' }
             });
             res.json(sponsors);
@@ -65,8 +67,7 @@ export class SponsorController {
     async delete(req: Request, res: Response) {
         try {
             const { id } = req.params;
-            const userId = (req as any).user.id;
-
+            const userId = req.userId;
             // Ensure ownership
             const sponsor = await prisma.sponsorLogo.findFirst({
                 where: { id: String(id), userId }
