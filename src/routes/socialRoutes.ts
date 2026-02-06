@@ -22,6 +22,17 @@ router.post('/admin/social/create', authenticate, socialController.createWall);
 router.get('/admin/social/walls', authenticate, socialController.listWalls);
 
 
+// --- Announcement Routes ---
+// GET /api/events/:id/social/announcements
+router.get('/events/:id/social/announcements', authenticate, socialController.getAnnouncements);
+// POST /api/events/:id/social/announcements
+router.post('/events/:id/social/announcements', authenticate, socialController.createAnnouncement);
+// PUT /api/announcements/:id
+router.put('/announcements/:id', authenticate, socialController.updateAnnouncement);
+// DELETE /api/announcements/:id
+router.delete('/announcements/:id', authenticate, socialController.deleteAnnouncement);
+
+
 // --- TV Routes (Public/Token based) ---
 // POST /api/tv/pair
 router.post('/tv/pair', authenticate, socialController.pairDevice); // Admin pairs it?

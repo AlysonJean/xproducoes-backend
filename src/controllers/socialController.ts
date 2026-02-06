@@ -15,7 +15,15 @@ export class SocialController {
      */
     async getPosts(req: Request, res: Response) {
         try {
-            const { eventId, slug, status, page = 1, limit = 50 } = req.query;
+            const getParam = (p: any): string | undefined => typeof p === 'string' ? p : undefined;
+            
+            const page = Number(req.query.page) || 1;
+            const limit = Number(req.query.limit) || 50;
+            const status = req.query.status as SocialPostStatus | undefined;
+            
+            const eventId = getParam(req.query.eventId);
+            const slug = getParam(req.query.slug);
+            const querySettingId = getParam(req.query.settingId);
             
             const where: any = {};
             
@@ -24,33 +32,33 @@ export class SocialController {
 
             if (eventId) {
                 const setting = await prisma.eventSocialSetting.findFirst({
-                    where: { bookingId: eventId as string }
+                    where: { bookingId: eventId }
                 });
                 if (setting) settingId = setting.id;
             } else if (slug) {
                 const setting = await prisma.eventSocialSetting.findUnique({
-                    where: { slug: slug as string }
+                    where: { slug }
                 });
                 if (setting) settingId = setting.id;
-            } else if (req.query.settingId) {
-                settingId = req.query.settingId as string;
+            } else if (querySettingId) {
+                settingId = querySettingId;
             }
 
             if (!settingId) {
                  return res.json({ data: [], meta: { total: 0, page: 1 } });
             }
 
-            where.settingId = settingId;
+            where.settingId = String(settingId);
             
             if (status) {
-                where.status = status as SocialPostStatus;
+                where.status = status;
             }
 
             const posts = await prisma.socialPost.findMany({
                 where,
                 orderBy: { postedAt: 'desc' },
-                skip: (Number(page) - 1) * Number(limit),
-                take: Number(limit),
+                skip: (page - 1) * limit,
+                take: limit,
             });
 
             const total = await prisma.socialPost.count({ where });
@@ -60,14 +68,92 @@ export class SocialController {
                 settingId, // Return for frontend context
                 meta: {
                     total,
-                    page: Number(page),
-                    limit: Number(limit),
-                    totalPages: Math.ceil(total / Number(limit))
+                    page,
+                    limit,
+                    totalPages: Math.ceil(total / limit)
                 }
             });
         } catch (error) {
             logger.error({ error }, 'Error fetching social posts');
             res.status(500).json({ error: 'Failed to fetch posts' });
+        }
+    }
+
+    /**
+     * GET /api/social/leaderboard
+     * Get top contributors
+     */
+    async getLeaderboard(req: Request, res: Response) {
+        try {
+            const getParam = (p: any): string | undefined => typeof p === 'string' ? p : undefined;
+            const eventId = getParam(req.query.eventId);
+            const slug = getParam(req.query.slug);
+            const settingId = getParam(req.query.settingId);
+
+            let targetSettingId: string | undefined = settingId;
+
+            if (!targetSettingId) {
+                if (eventId) {
+                    const setting = await prisma.eventSocialSetting.findFirst({ where: { bookingId: eventId } });
+                    if (setting) targetSettingId = setting.id;
+                } else if (slug) {
+                    const setting = await prisma.eventSocialSetting.findUnique({ where: { slug } });
+                    if (setting) targetSettingId = setting.id;
+                }
+            }
+
+            if (!targetSettingId) return res.status(400).json({ error: 'Setting context required' });
+
+            // Group by author and count posts
+            const groupResult = await prisma.socialPost.groupBy({
+                by: ['author'],
+                where: { 
+                    settingId: targetSettingId,
+                    status: 'APPROVED'
+                },
+                _count: {
+                    id: true
+                },
+                orderBy: {
+                    _count: {
+                        id: 'desc'
+                    }
+                },
+                take: 5
+            });
+
+            // Now we need to fetch the latest avatar for each author
+            // This is N+1 but for top 5 it's negligible.
+            const leaderboard = await Promise.all(groupResult.map(async (item) => {
+                const recentPost = await prisma.socialPost.findFirst({
+                    where: { 
+                        settingId: targetSettingId,
+                        author: item.author,
+                        status: 'APPROVED'
+                    },
+                    orderBy: { postedAt: 'desc' },
+                    select: { mediaUrl: true } // We don't have authorImage field! We have to infer or use recent post image as avatar?
+                    // Actually, Instagram Graph API returns User Info, but we might not store it explicitly as `authorImage`.
+                    // Checking schema... Schema has `author` but no `authorAvatar`.
+                    // Plan: Use the image of their LATEST post as the "Avatar" for now, or use a placeholder.
+                    // Ideally we should have stored authorAvatar. 
+                    // For now, let's use a generic avatar or the post image itself if we want to be fancy?
+                    // Let's use the mediaUrl of their latest post as the "background" of their badge, or no avatar.
+                    // User Request: "Leaderboard of Contributors".
+                    // I will return the latest post image as a proxy for visual interest.
+                });
+
+                return {
+                    username: item.author,
+                    avatarUrl: recentPost?.mediaUrl, // Using latest post visual
+                    count: item._count.id
+                };
+            }));
+
+            res.json({ data: leaderboard });
+        } catch (error) {
+            logger.error({ error }, 'Error fetching leaderboard');
+            res.status(500).json({ error: 'Failed to fetch leaderboard' });
         }
     }
 
@@ -78,14 +164,14 @@ export class SocialController {
     async moderatePost(req: Request, res: Response) {
         try {
             const { id } = req.params;
-            const status = req.body.status as string; // APPROVED | REJECTED
+            const status = String(req.body.status); // APPROVED | REJECTED
 
             if (!['APPROVED', 'REJECTED', 'PENDING'].includes(status)) {
                 return res.status(400).json({ error: 'Invalid status' });
             }
 
             const post = await prisma.socialPost.update({
-                where: { id },
+                where: { id: String(id) },
                 data: { 
                     status: status as SocialPostStatus,
                     moderatedBy: (req as any).user?.id,
@@ -180,8 +266,21 @@ export class SocialController {
                     slug: slug || undefined,
                     hashtag,
                     autoApprove: !!autoApprove,
+                    layoutMode: req.body.layoutMode || 'LANDSCAPE',
+                    
+                    // Mosaic Features
+                    enableMosaic: req.body.enableMosaic !== undefined ? req.body.enableMosaic : true,
+                    mosaicFrequency: Number(req.body.mosaicFrequency) || 15,
+
+                    // Gamification
+                    enableGamification: req.body.enableGamification !== undefined ? Boolean(req.body.enableGamification) : false,
+
                     bookingId: null, // Explicitly null for standalone
-                    userId: (req as any).user?.id // Link to creator
+                    userId: (req as any).user?.id, // Link to creator
+
+                    sponsors: req.body.sponsorIds ? {
+                        connect: req.body.sponsorIds.map((id: string) => ({ id }))
+                    } : undefined
                 }
             });
 
@@ -204,8 +303,112 @@ export class SocialController {
             });
 
             res.json({ data: walls });
-        } catch (error) {
+        } catch {
              res.status(500).json({ error: 'Failed to list walls' });
+        }
+    }
+
+    // --- Announcement Endpoints ---
+
+    /**
+     * GET /api/events/:id/social/announcements
+     * List announcements for a setting
+     */
+    async getAnnouncements(req: Request, res: Response) {
+        try {
+            const { id } = req.params; // Can be eventId or settingId or slug? Plan said :id
+            // Logic to resovle settingId similar to getPosts
+            
+            let settingId = String(id);
+
+            // Check if it looks like an EventID (UUID vs CUID) or just try both
+            const settingByEvent = await prisma.eventSocialSetting.findFirst({ where: { bookingId: String(id) } });
+            if (settingByEvent) settingId = settingByEvent.id;
+
+            const announcements = await prisma.socialAnnouncement.findMany({
+                where: { settingId },
+                orderBy: { createdAt: 'desc' }
+            });
+
+            res.json({ data: announcements });
+        } catch (error) {
+            logger.error({ error }, 'Error fetching announcements');
+            res.status(500).json({ error: 'Failed to fetch announcements' });
+        }
+    }
+
+    /**
+     * POST /api/events/:id/social/announcements
+     * Create announcement
+     */
+    async createAnnouncement(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const { title, message, type, imageUrl, duration, frequency, isActive } = req.body;
+
+            let settingId = String(id);
+            const settingByEvent = await prisma.eventSocialSetting.findFirst({ where: { bookingId: String(id) } });
+            if (settingByEvent) settingId = settingByEvent.id;
+
+            const announcement = await prisma.socialAnnouncement.create({
+                data: {
+                    settingId,
+                    title,
+                    message,
+                    type: type || 'TEXT',
+                    imageUrl,
+                    duration: Number(duration) || 10,
+                    frequency: Number(frequency) || 10,
+                    isActive: isActive !== undefined ? isActive : true
+                }
+            });
+
+            res.json({ data: announcement });
+        } catch (error) {
+             logger.error({ error }, 'Error creating announcement');
+             res.status(500).json({ error: 'Failed to create announcement' });
+        }
+    }
+
+    /**
+     * PUT /api/announcements/:id
+     * Update announcement
+     */
+    async updateAnnouncement(req: Request, res: Response) {
+         try {
+            const { id } = req.params;
+            const data = req.body;
+
+            const announcement = await prisma.socialAnnouncement.update({
+                where: { id: String(id) },
+                data: {
+                    title: data.title,
+                    message: data.message,
+                    type: data.type,
+                    imageUrl: data.imageUrl,
+                    duration: data.duration ? Number(data.duration) : undefined,
+                    frequency: data.frequency ? Number(data.frequency) : undefined,
+                    isActive: data.isActive
+                }
+            });
+
+            res.json({ data: announcement });
+         } catch {
+             res.status(500).json({ error: 'Failed to update announcement' });
+         }
+    }
+
+    /**
+     * DELETE /api/announcements/:id
+     * Delete announcement
+     */
+    async deleteAnnouncement(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            await prisma.socialAnnouncement.delete({ where: { id: String(id) } });
+            res.json({ success: true });
+        } catch {
+            res.status(500).json({ error: 'Failed to delete announcement' });
         }
     }
 
@@ -267,7 +470,9 @@ export class SocialController {
      */
     async getDeviceConfig(req: Request, res: Response) {
          try {
-            const { pairingCode, slug } = req.query;
+            const getParam = (p: any): string | undefined => typeof p === 'string' ? p : undefined;
+            const pairingCode = getParam(req.query.pairingCode);
+            const slug = getParam(req.query.slug);
             
             // 1. Support Public Slug Access
             if (slug) {

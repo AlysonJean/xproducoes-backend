@@ -125,6 +125,7 @@ location                 String?
   // Relations for Social Wall (Standalone & Moderation)
   socialSettings           EventSocialSetting[]
   moderatedPosts           SocialPost[]
+  sponsorLogos             SponsorLogo[]
 
   @@index([email])
   @@index([role])
@@ -821,6 +822,8 @@ enum ChatType {
   SUPPORT     // Chat de suporte
 }
 
+
+
 enum ChatRole {
   ADMIN       // Administrador do chat
   MODERATOR   // Moderador
@@ -1046,6 +1049,21 @@ model EventSocialSetting {
   
   hashtag      String
   autoApprove  Boolean  @default(false)
+  layoutMode   LayoutMode @default(LANDSCAPE)
+
+  // UX / Interactivity Features
+  enableQrCode Boolean  @default(true)
+  qrCodeText   String?  // Custom text for QR (e.g. "Scan to Post") or URL override
+  
+  // Mosaic / Grid View
+  enableMosaic    Boolean @default(true)
+  mosaicFrequency Int     @default(15) // Show mosaic every N slides
+  
+  // Gamification
+  enableGamification Boolean @default(false)
+  
+  sponsors     SponsorLogo[]
+  announcements SocialAnnouncement[]
   
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -1109,4 +1127,54 @@ model TVDevice {
   @@index([pairingCode])
   @@index([settingId])
   @@map("tv_devices")
+}
+
+model SponsorLogo {
+  id           String   @id @default(cuid())
+  name         String
+  imageUrl     String   // Cloudinary URL
+  createdAt    DateTime @default(now())
+  
+  // Ownership
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Relations: Many-to-Many with EventSocialSetting
+  settings     EventSocialSetting[]
+
+  @@index([userId])
+  @@map("sponsor_logos")
+}
+
+enum LayoutMode {
+  LANDSCAPE // Default: Sidebars if vertical content
+  PORTRAIT  // Fullscreen vertical
+}
+
+model SocialAnnouncement {
+  id           String   @id @default(cuid())
+  settingId    String
+  
+  title        String
+  message      String   @db.Text
+  type         AnnouncementType @default(TEXT)
+  imageUrl     String?  // For IMAGE type
+  
+  duration     Int      @default(10) // Seconds to show
+  frequency    Int      @default(10) // Show every N slides
+  isActive     Boolean  @default(true)
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  setting      EventSocialSetting @relation(fields: [settingId], references: [id], onDelete: Cascade)
+
+  @@index([settingId])
+  @@map("social_announcements")
+}
+
+enum AnnouncementType {
+  TEXT
+  IMAGE
+  ALERT
 }
