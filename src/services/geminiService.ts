@@ -41,39 +41,30 @@ function getMockSuggestion() {
   return MOCK_SUGGESTIONS[randomIndex];
 }
 
+// Importação dinâmica ou require para evitar falhas se a lib não estiver presente em builds legados
+// Mas como já instalamos, vamos usar import direto se possível, ou require dentro do método para segurança
+import { HfInference } from "@huggingface/inference";
+
+// ... (código existente)
+
 export class GeminiService {
   private async callHuggingFace(prompt: string): Promise<string> {
     if (!HF_KEY) throw new Error("Chave HF ausente");
 
     try {
-        const response = await fetch(
-            "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3",
-            {
-                headers: {
-                    Authorization: `Bearer ${HF_KEY}`,
-                    "Content-Type": "application/json",
-                },
-                method: "POST",
-                body: JSON.stringify({
-                    inputs: `<s>[INST] ${prompt} [/INST]`,
-                    parameters: {
-                        max_new_tokens: 200,
-                        return_full_text: false,
-                        temperature: 0.7
-                    }
-                }),
-            }
-        );
+        const hf = new HfInference(HF_KEY);
+        // Usar Meta-Llama-3-8B-Instruct que validamos funcionar bem
+        const response = await hf.chatCompletion({
+            model: 'meta-llama/Meta-Llama-3-8B-Instruct',
+            messages: [
+                { role: "user", content: prompt }
+            ],
+            max_tokens: 300,
+            temperature: 0.7
+        });
 
-        if (!response.ok) {
-           const errText = await response.text();
-           throw new Error(`HF API Error: ${response.status} - ${errText}`);
-        }
-
-        const result = await response.json();
-        // Hugging Face inference API returns array of object with 'generated_text'
-        if (Array.isArray(result) && result.length > 0 && result[0].generated_text) {
-             return result[0].generated_text.trim();
+        if (response.choices && response.choices.length > 0 && response.choices[0].message.content) {
+             return response.choices[0].message.content.trim();
         }
         return "Sugestão gerada com sucesso!";
 
