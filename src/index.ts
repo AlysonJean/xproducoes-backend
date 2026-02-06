@@ -8,6 +8,7 @@ import { config } from "./config/environment";
 import fs from "fs";
 import logger from "./config/logger";
 import { initializeQueues, closeQueues } from "./config/jobQueue";
+import { startSocialScheduler } from "./cron/socialScheduler";
 
 
 const PORT = Number(process.env.PORT) || 3001;
@@ -256,6 +257,8 @@ startServerWithRetries(Number(process.env.PORT) || PORT)
   .then(async () => {
     // Inicializar filas de jobs após servidor iniciar
     await initializeQueues();
+    // Iniciar agendador de redes sociais
+    startSocialScheduler();
   })
   .catch(err => {
     logger.error({obj:err}, 'Erro fatal ao iniciar servidor:');

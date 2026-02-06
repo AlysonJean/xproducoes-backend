@@ -30,6 +30,7 @@ import newsletterRoutes from "./newsletterRoutes";
 import bannerRoutes from "./bannerRoutes";
 import calendarRoutes from "./calendarRoutes";
 import serviceRoutes from "./serviceRoutes";
+import socialRoutes from "./socialRoutes";
 
 const router: RouterType = Router();
 
@@ -86,6 +87,7 @@ router.use('/collaborator/checklists', checklistRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/newsletter', newsletterRoutes);
 router.use('/banners', bannerRoutes);
+router.use(socialRoutes);
 
 // Recommendation routes (optional auth - better results when authenticated)
 import recommendationRoutes from './recommendationRoutes';

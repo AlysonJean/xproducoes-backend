@@ -52,14 +52,22 @@ export interface NotificationJobData {
   data?: Record<string, unknown>;
 }
 
+export interface SocialJobData {
+  settingId: string;
+  hashtag: string;
+}
+
 // ==========================================
 // FILAS
 // ==========================================
 
 let emailQueue: Queue<EmailJobData> | null = null;
 let notificationQueue: Queue<NotificationJobData> | null = null;
+let socialQueue: Queue<SocialJobData> | null = null;
+
 let emailWorker: Worker<EmailJobData> | null = null;
 let notificationWorker: Worker<NotificationJobData> | null = null;
+let socialWorker: Worker<SocialJobData> | null = null;
 
 // Inicializar filas apenas se Redis estiver disponível
 export async function initializeQueues(): Promise<void> {
@@ -84,6 +92,16 @@ export async function initializeQueues(): Promise<void> {
     notificationQueue = new Queue<NotificationJobData>('notifications', {
       connection,
       defaultJobOptions,
+    });
+
+    // Fila de Social Media (Instagram Polling)
+    socialQueue = new Queue<SocialJobData>('social', {
+      connection,
+      defaultJobOptions: {
+        ...defaultJobOptions,
+        attempts: 1, // Não retentar agressivamente para evitar rate limit
+        removeOnComplete: { count: 100 },
+      }
     });
 
     logger.info('Job queues initialized successfully');
@@ -187,6 +205,31 @@ async function initializeWorkers(connection: IORedis): Promise<void> {
     }
   );
 
+  // Worker de Social Media
+  socialWorker = new Worker<SocialJobData>(
+    'social',
+    async (job: Job<SocialJobData>) => {
+      logger.info({ jobId: job.id, settingId: job.data.settingId }, 'Processing social media sync');
+      
+      try {
+        const instagramService = (await import('../services/social/InstagramService')).default;
+        const count = await instagramService.fetchRecentMedia(job.data.settingId);
+        return { processed: true, newPosts: count };
+      } catch (error: any) {
+        logger.error({ error: error.message, settingId: job.data.settingId }, 'Social sync failed');
+        throw error;
+      }
+    },
+    {
+      connection,
+      concurrency: 2, // Limite para não estourar rate limits
+      limiter: {
+        max: 10, // Max 10 requests
+        duration: 1000 * 60, // per minute
+      }
+    }
+  );
+
   logger.info('Job workers started');
 }
 
@@ -255,6 +298,7 @@ export async function queueNotification(data: NotificationJobData): Promise<void
 export async function getQueueStats(): Promise<{
   email: { waiting: number; active: number; completed: number; failed: number } | null;
   notifications: { waiting: number; active: number; completed: number; failed: number } | null;
+  social: { waiting: number; active: number; completed: number; failed: number } | null;
 }> {
   const getStats = async (queue: Queue | null) => {
     if (!queue) return null;
@@ -272,7 +316,33 @@ export async function getQueueStats(): Promise<{
   return {
     email: await getStats(emailQueue),
     notifications: await getStats(notificationQueue),
+    social: await getStats(socialQueue),
   };
+}
+
+/**
+ * Adiciona um job de sincronização social à fila
+ */
+export async function queueSocialSync(data: SocialJobData): Promise<void> {
+  if (socialQueue) {
+    await socialQueue.add('sync-instagram', data, {
+      repeat: {
+        every: 10 * 60 * 1000, // A cada 10 minutos
+      },
+      jobId: `sync-${data.settingId}` // Prevent duplicates
+    });
+    logger.debug({ settingId: data.settingId }, 'Social sync job scheduled (recurring)');
+  }
+}
+
+/**
+ * Trigger immediate sync (one-off)
+ */
+export async function triggerImmediateSync(data: SocialJobData): Promise<void> {
+    if (socialQueue) {
+        await socialQueue.add('sync-instagram-now', data);
+        logger.debug({ settingId: data.settingId }, 'Immediate social sync triggered');
+    }
 }
 
 /**
@@ -285,6 +355,8 @@ export async function closeQueues(): Promise<void> {
   if (notificationWorker) closeTasks.push(notificationWorker.close());
   if (emailQueue) closeTasks.push(emailQueue.close());
   if (notificationQueue) closeTasks.push(notificationQueue.close());
+  if (socialQueue) closeTasks.push(socialQueue.close());
+  if (socialWorker) closeTasks.push(socialWorker.close());
   
   await Promise.all(closeTasks);
   logger.info('Job queues closed');

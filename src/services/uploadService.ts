@@ -175,6 +175,37 @@ export class UploadService {
     });
   }
 
+  /**
+   * Upload media directly from a remote URL (e.g., Instagram)
+   * Cloudinary handles the fetching.
+   */
+  async uploadFromUrl(url: string, folder: string = "social", fileName?: string): Promise<string> {
+      try {
+          const options: any = {
+              folder: `x-producoes/${folder}`,
+              resource_type: 'auto',
+              use_filename: true,
+              unique_filename: !fileName,
+              overwrite: true,
+              ...(fileName ? { public_id: fileName } : {})
+          };
+
+          logger.info({ obj: { url, folder } }, '[UploadService] Starting URL upload');
+          
+          const result = await cloudinary.uploader.upload(url, options);
+          
+          if (!result.secure_url) {
+              throw new Error('No secure_url received from Cloudinary');
+          }
+
+          logger.info({ obj: result.secure_url }, '[UploadService] URL upload successful');
+          return result.secure_url;
+      } catch (error: any) {
+          logger.error({ obj: { error: error.message, url } }, '[UploadService] URL upload failed');
+          throw new Error(`Failed to upload from URL: ${error.message}`);
+      }
+  }
+
   // Upload de avatar sempre para Cloudinary
   async uploadAvatar(userId: string, file: Express.Multer.File): Promise<string> {
     return new Promise((resolve, reject) => {

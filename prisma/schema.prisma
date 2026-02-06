@@ -119,6 +119,12 @@ location                 String?
   completedChecklistItems  ChecklistItem[]       @relation("ChecklistItemCompleter")
   assignedChecklists       ChecklistAssignment[] @relation("ChecklistAssignee")
   assignedByChecklists     ChecklistAssignment[] @relation("ChecklistAssigner")
+  
+  // Social Media Integration
+  socialCredentials        SocialCredential[]
+  // Relations for Social Wall (Standalone & Moderation)
+  socialSettings           EventSocialSetting[]
+  moderatedPosts           SocialPost[]
 
   @@index([email])
   @@index([role])
@@ -372,6 +378,10 @@ model Booking {
   messages           Message[]
   review             Review?
   equipments         Equipment[]         @relation("BookingEquipments")
+
+  // Social Wall
+  socialSetting      EventSocialSetting?
+  tvDevices          TVDevice[]
 
   @@index([clientId])
   @@index([creatorId])
@@ -1002,4 +1012,101 @@ model KitExperienceLevel {
   @@index([kitId])
   @@index([level])
   @@map("kit_experience_levels")
+}
+
+// ================================
+// SOCIAL WALL MODULE
+// ================================
+
+model SocialCredential {
+  id           String   @id @default(cuid())
+  userId       String
+  platform     String   @default("INSTAGRAM")
+  accessToken  String   // Long-lived token
+  pageId       String?  // Facebook Page ID for business discovery
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("social_credentials")
+}
+
+model EventSocialSetting {
+  id           String   @id @default(cuid())
+  
+  // Decoupling: Booking is now optional
+  bookingId    String?   @unique
+  userId       String?   // New: Owner of the standalone wall (for credentials)
+  
+  // Standalone fields
+  name         String?   // Friendly name (e.g. "Casamento Joao")
+  slug         String?   @unique // Public URL slug
+  
+  hashtag      String
+  autoApprove  Boolean  @default(false)
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  booking      Booking?  @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  user         User?     @relation(fields: [userId], references: [id])
+  posts        SocialPost[]
+  devices      TVDevice[]
+
+  @@index([userId])
+  @@map("event_social_settings")
+}
+
+model SocialPost {
+  id           String           @id @default(cuid())
+  settingId    String
+  platformId   String           @unique // Instagram Media ID
+  mediaUrl     String           // Optimized URL
+  permalink    String
+  caption      String?
+  author       String
+  status       SocialPostStatus @default(PENDING)
+  postedAt     DateTime
+  fetchedAt    DateTime         @default(now())
+  
+  // Moderation Audit
+  moderatedAt  DateTime?
+  moderatedBy  String?
+  moderator    User?            @relation(fields: [moderatedBy], references: [id])
+  
+  setting      EventSocialSetting @relation(fields: [settingId], references: [id], onDelete: Cascade)
+
+  @@index([settingId])
+  @@index([status])
+  @@map("social_posts")
+}
+
+enum SocialPostStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model TVDevice {
+  id           String   @id @default(cuid())
+  pairingCode  String   @unique // Short 4-char code for input
+  deviceToken  String   @unique @default(uuid()) // Long auth token
+  name         String?  // e.g. "Main Stage TV"
+  
+  // Relink to EventSocialSetting directly
+  settingId    String?
+  bookingId    String?  // Deprecated/Optional legacy or redundant? Keeping for now but settingId is primary source of truth for "what to show"
+  
+  lastSeen     DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  setting      EventSocialSetting? @relation(fields: [settingId], references: [id])
+  booking      Booking? @relation(fields: [bookingId], references: [id])
+
+  @@index([pairingCode])
+  @@index([settingId])
+  @@map("tv_devices")
 }
