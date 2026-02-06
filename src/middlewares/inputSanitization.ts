@@ -142,10 +142,10 @@ function sanitizeString(str: string): string {
       pre: [],
       a: ['href', 'title', 'target', 'rel'],
     },
-    stripIgnoreTag: true,
-    stripIgnoreTagBody: ['script', 'style'],
+    // stripIgnoreTag: true, // Conflita com onIgnoreTag
+    // stripIgnoreTagBody: ['script', 'style'], // Conflita com onIgnoreTag
     allowCommentTag: false,
-    onIgnoreTag: (tag, html, options) => {
+    onIgnoreTag: (tag, html, _options) => {
       // Log de tags removidas para análise de segurança
       if (tag === 'script' || tag === 'iframe') {
         logger.warn({
