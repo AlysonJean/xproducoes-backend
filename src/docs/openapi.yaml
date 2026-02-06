@@ -1,0 +1,1017 @@
+openapi: 3.0.3
+info:
+  title: X Produçoes e Eventos - API Backend
+  version: 1.0.0
+  description: >
+    API REST para sistema de locação de equipamentos audiovisuais, eventos e gestão de usuários.
+    
+    Documentação gerada automaticamente.
+servers:
+  - url: http://localhost:3000/api
+    description: Local
+  - url: https://api.xproducoes.com.br
+    description: Produção
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        avatarUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    Equipment:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        imageUrl:
+          type: string
+        pricePerHour:
+          type: number
+        quantity:
+          type: integer
+        isAvailable:
+          type: boolean
+        categoryId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+        eventTitle:
+          type: string
+        eventDate:
+          type: string
+          format: date-time
+        totalPrice:
+          type: number
+        status:
+          type: string
+        clientId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    Kit:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        imageUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    Faq:
+      type: object
+      properties:
+        id:
+          type: string
+        question:
+          type: string
+        answer:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    Portfolio:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        eventDate:
+          type: string
+          format: date-time
+        imageUrl:
+          type: string
+    Review:
+      type: object
+      properties:
+        id:
+          type: string
+        rating:
+          type: integer
+        comment:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    Contact:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        message:
+          type: string
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        type:
+          type: string
+        read:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+security:
+  - BearerAuth: []
+
+paths:
+  /users/register:
+    post:
+      summary: Registro de novo usuário
+      tags: [User]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '201':
+          description: Usuário criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /users/login:
+    post:
+      summary: Login de usuário
+      tags: [User]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login bem-sucedido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  token:
+                    type: string
+  /users/profile:
+    get:
+      summary: Perfil do usuário autenticado
+      tags: [User]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Dados do usuário
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    put:
+      summary: Atualizar perfil do usuário
+      tags: [User]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+                avatar:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Perfil atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /users:
+    get:
+      summary: Listar todos os usuários
+      tags: [User]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista de usuários
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+# Equipment
+  /equipments:
+    get:
+      summary: Listar todos os equipamentos
+      tags: [Equipment]
+      responses:
+        '200':
+          description: Lista de equipamentos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Equipment'
+    post:
+      summary: Criar novo equipamento
+      tags: [Equipment]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                image:
+                  type: string
+                  format: binary
+                pricePerHour:
+                  type: number
+                quantity:
+                  type: integer
+                categoryId:
+                  type: string
+      responses:
+        '201':
+          description: Equipamento criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Equipment'
+  /equipments/{id}:
+    get:
+      summary: Buscar equipamento por ID
+      tags: [Equipment]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Equipamento encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Equipment'
+    put:
+      summary: Atualizar equipamento
+      tags: [Equipment]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                image:
+                  type: string
+                  format: binary
+                pricePerHour:
+                  type: number
+                quantity:
+                  type: integer
+                categoryId:
+                  type: string
+      responses:
+        '200':
+          description: Equipamento atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Equipment'
+    delete:
+      summary: Remover equipamento
+      tags: [Equipment]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Equipamento removido
+
+# Booking
+  /bookings:
+    get:
+      summary: Listar todas as reservas
+      tags: [Booking]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista de reservas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Booking'
+    post:
+      summary: Criar nova reserva
+      tags: [Booking]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Booking'
+      responses:
+        '201':
+          description: Reserva criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+  /bookings/{id}:
+    get:
+      summary: Buscar reserva por ID
+      tags: [Booking]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reserva encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+    put:
+      summary: Atualizar reserva
+      tags: [Booking]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Booking'
+      responses:
+        '200':
+          description: Reserva atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+    delete:
+      summary: Remover reserva
+      tags: [Booking]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Reserva removida
+
+# Category
+  /categories:
+    get:
+      summary: Listar categorias
+      tags: [Category]
+      responses:
+        '200':
+          description: Lista de categorias
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+    post:
+      summary: Criar categoria
+      tags: [Category]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Category'
+      responses:
+        '201':
+          description: Categoria criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+  /categories/{id}:
+    put:
+      summary: Atualizar categoria
+      tags: [Category]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Category'
+      responses:
+        '200':
+          description: Categoria atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+    delete:
+      summary: Remover categoria
+      tags: [Category]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Categoria removida
+
+# Kit
+  /kits:
+    get:
+      summary: Listar kits
+      tags: [Kit]
+      responses:
+        '200':
+          description: Lista de kits
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Kit'
+    post:
+      summary: Criar kit
+      tags: [Kit]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Kit'
+      responses:
+        '201':
+          description: Kit criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Kit'
+  /kits/{id}:
+    put:
+      summary: Atualizar kit
+      tags: [Kit]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Kit'
+      responses:
+        '200':
+          description: Kit atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Kit'
+    delete:
+      summary: Remover kit
+      tags: [Kit]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Kit removido
+
+# Faq
+  /faqs:
+    get:
+      summary: Listar FAQs
+      tags: [Faq]
+      responses:
+        '200':
+          description: Lista de FAQs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Faq'
+    post:
+      summary: Criar FAQ
+      tags: [Faq]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Faq'
+      responses:
+        '201':
+          description: FAQ criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Faq'
+  /faqs/{id}:
+    put:
+      summary: Atualizar FAQ
+      tags: [Faq]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Faq'
+      responses:
+        '200':
+          description: FAQ atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Faq'
+    delete:
+      summary: Remover FAQ
+      tags: [Faq]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: FAQ removida
+
+# Portfolio
+  /portfolios:
+    get:
+      summary: Listar portfólios
+      tags: [Portfolio]
+      responses:
+        '200':
+          description: Lista de portfólios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Portfolio'
+    post:
+      summary: Criar portfólio
+      tags: [Portfolio]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Portfolio'
+      responses:
+        '201':
+          description: Portfólio criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Portfolio'
+  /portfolios/{id}:
+    delete:
+      summary: Remover portfólio
+      tags: [Portfolio]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Portfólio removido
+
+# Review
+  /reviews:
+    get:
+      summary: Listar avaliações públicas
+      tags: [Review]
+      responses:
+        '200':
+          description: Lista de avaliações
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Review'
+    post:
+      summary: Criar avaliação
+      tags: [Review]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Review'
+      responses:
+        '201':
+          description: Avaliação criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+
+# Contact
+  /contacts:
+    get:
+      summary: Listar mensagens de contato
+      tags: [Contact]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista de mensagens
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Contact'
+    post:
+      summary: Enviar mensagem de contato
+      tags: [Contact]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Contact'
+      responses:
+        '201':
+          description: Mensagem enviada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contact'
+  /contacts/{id}/read:
+    patch:
+      summary: Marcar mensagem como lida
+      tags: [Contact]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Mensagem marcada como lida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contact'
+    delete:
+      summary: Remover mensagem de contato
+      tags: [Contact]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Mensagem removida
+
+# Notification
+  /notifications:
+    get:
+      summary: Listar notificações do usuário
+      tags: [Notification]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista de notificações
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+
+# Collaborator
+  /collaborators:
+    get:
+      summary: Listar colaboradores
+      tags: [Collaborator]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista de colaboradores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+                    email:
+                      type: string
+                    role:
+                      type: string
+                    specialties:
+                      type: array
+                      items:
+                        type: string
+                    status:
+                      type: string
+                    hourlyRate:
+                      type: number
+                    createdAt:
+                      type: string
+                      format: date-time
+
+# Dashboard
+  /dashboard/stats:
+    get:
+      summary: Estatísticas do dashboard
+      tags: [Dashboard]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Estatísticas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalRevenue:
+                    type: number
+                  revenueGrowth:
+                    type: number
+                  newBookingsThisMonth:
+                    type: integer
+                  bookingsGrowth:
+                    type: number
+                  totalClients:
+                    type: integer
+                  pendingBookings:
+                    type: integer
+                  completedBookings:
+                    type: integer
+                  conversionRate:
+                    type: number
+
+# Payment
+  /payments/checkout:
+    post:
+      summary: Criar sessão de checkout
+      tags: [Payment]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bookingId:
+                  type: string
+      responses:
+        '200':
+          description: Sessão de checkout criada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessionId:
+                    type: string
+                  url:
+                    type: string
+
+# Upload
+  /upload/avatar:
+    post:
+      summary: Upload de avatar
+      tags: [Upload]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                avatar:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Avatar carregado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  avatarUrl:
+                    type: string
+
+# Gemini
+  /gemini/suggest-theme:
+    get:
+      summary: Sugestão de tema de evento via IA
+      tags: [Gemini]
+      responses:
+        '200':
+          description: Sugestão gerada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestion:
+                    type: string

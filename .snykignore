@@ -1,0 +1,20 @@
+# Ignore tudo exceto código-fonte da aplicação para análise do Snyk
+
+node_modules/
+dist/
+build/
+logs/
+uploads/
+.env*
+*.log
+*.patch
+*.md
+*.json
+*.sqlite
+prisma/
+tests/
+scripts/
+docs/
+patches/
+*.config.js
+*.config.ts
