@@ -9,7 +9,8 @@ import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
 const equipmentController = new EquipmentController();
 
 // --- Rotas Públicas (com cache otimizado) ---
-equipmentRoutes.get("/search", cacheMiddleware, equipmentController.search);
+// Rota de busca sem cache para garantir status de disponibilidade em tempo real na Home
+equipmentRoutes.get("/search", equipmentController.search);
 equipmentRoutes.get("/category/:categoryId", cacheMiddleware, equipmentController.getByCategory);
 equipmentRoutes.get("/", cacheMiddleware, equipmentController.findAll);
 equipmentRoutes.get("/:id/availability", cacheMiddleware, equipmentController.getAvailability); // 3 min

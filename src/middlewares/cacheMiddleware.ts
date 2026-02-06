@@ -50,6 +50,7 @@ export function createCacheMiddleware(ttl: number = CACHE_TTL.MEDIUM) {
 /**
  * Invalida cache por padrão de chave
  */
+// Função de invalidação limpa
 export function invalidateCache(pattern: string) {
   let count = 0;
   for (const [key] of cache.entries()) {

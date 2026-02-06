@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { EquipmentService } from "../services/equipmentService";
 import { equipmentCreateSchema } from "../validators/equipmentSchema";
 import { cacheService, CacheService } from "../services/cacheService";
+import { invalidateCache } from "../middlewares/cacheMiddleware";
 
 const equipmentService = new EquipmentService();
 
@@ -69,6 +70,12 @@ export class EquipmentController {
       // Invalidar cache após atualizar equipamento
       if (equipment) {
         await cacheService.invalidateEquipmentCaches(equipment.id);
+        // Também invalidar o cache do middleware (cache em memória das rotas públicas)
+        try {
+          invalidateCache('/equipments');
+        } catch (err) {
+          // não falhar a resposta em caso de erro ao invalidar middleware cache
+        }
       }
 
       return res.json(equipment);
@@ -143,6 +150,12 @@ export class EquipmentController {
       }
 
       const { id } = req.params as { id: string };
+            // Também invalidar o cache do middleware (cache em memória das rotas públicas)
+            try {
+              invalidateCache('/equipments');
+            } catch (err) {
+              // não falhar a resposta em caso de erro ao invalidar middleware cache
+            }
       if (!id) {
         return res
           .status(400)
