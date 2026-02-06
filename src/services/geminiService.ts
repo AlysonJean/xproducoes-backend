@@ -7,6 +7,7 @@ import logger from "../config/logger";
 
 // Validate API key presence
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
+const HF_KEY = process.env.HF_API_KEY;
 // Default to true in development if not explicitly disabled
 const IS_DEV = process.env.NODE_ENV !== 'production';
 const USE_MOCK_FALLBACK = process.env.GEMINI_MOCK_FALLBACK 
@@ -14,15 +15,18 @@ const USE_MOCK_FALLBACK = process.env.GEMINI_MOCK_FALLBACK
   : IS_DEV; // Auto-enable mock in dev if variable is unset
 
 let genAI: GoogleGenerativeAI | null = null;
-if (GEMINI_KEY) {
+if (GEMINI_KEY && !GEMINI_KEY.startsWith('REDACTED_GEMINI_KEY_ROTATE_IF_STILL_ACTIVE')) {
   try {
     genAI = new GoogleGenerativeAI(GEMINI_KEY);
+    logger.info('Gemini AI inicializado com sucesso.');
   } catch (e) {
     logger.error({obj:e}, 'Falha ao inicializar Gemini client:');
     genAI = null;
   }
+} else if (HF_KEY) {
+    logger.info('Usando Hugging Face como provedor de IA.');
 } else {
-  logger.warn('GEMINI_API_KEY não configurada. Gemini estará desativado. Para habilitar, configure GEMINI_API_KEY no ambiente.');
+  logger.warn('Nenhuma chave de API de IA (Gemini ou Hugging Face) configurada. Usando Mocks.');
 }
 
 const MOCK_SUGGESTIONS = [
@@ -38,91 +42,110 @@ function getMockSuggestion() {
 }
 
 export class GeminiService {
+  private async callHuggingFace(prompt: string): Promise<string> {
+    if (!HF_KEY) throw new Error("Chave HF ausente");
+
+    try {
+        const response = await fetch(
+            "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3",
+            {
+                headers: {
+                    Authorization: `Bearer ${HF_KEY}`,
+                    "Content-Type": "application/json",
+                },
+                method: "POST",
+                body: JSON.stringify({
+                    inputs: `<s>[INST] ${prompt} [/INST]`,
+                    parameters: {
+                        max_new_tokens: 200,
+                        return_full_text: false,
+                        temperature: 0.7
+                    }
+                }),
+            }
+        );
+
+        if (!response.ok) {
+           const errText = await response.text();
+           throw new Error(`HF API Error: ${response.status} - ${errText}`);
+        }
+
+        const result = await response.json();
+        // Hugging Face inference API returns array of object with 'generated_text'
+        if (Array.isArray(result) && result.length > 0 && result[0].generated_text) {
+             return result[0].generated_text.trim();
+        }
+        return "Sugestão gerada com sucesso!";
+
+    } catch (err: any) {
+        logger.error({err}, "Erro na chamada Hugging Face");
+        throw err;
+    }
+  }
+
   async suggestEventTheme(): Promise<string> {
-    // If no key and mock fallback enabled, return a safe mocked suggestion for local dev
-    if (!genAI) {
+    // Se não houver nenhum provedor configurado, tenta mock
+    if (!genAI && !HF_KEY) {
       if (USE_MOCK_FALLBACK) {
-        logger.info('GEMINI chave ausente: usando fallback mock auto-habilitado em DEV');
+        logger.info('IA indisponível: usando fallback mock auto-habilitado em DEV');
         return getMockSuggestion();
       }
-      // Otherwise throw a clear error for operators/developers
-      throw new Error('GEMINI_API_KEY não configurada e fallback desativado.');
+      throw new Error('Nenhuma chave de IA configurada e fallback desativado.');
     }
 
     try {
-      // 1. Buscar alguns equipamentos e kits do seu banco de dados para dar contexto à IA
+      // 1. Buscar contexto do banco de dados
       const equipments = await prisma.equipment.findMany({
-        take: 15, // Pega uma amostra de 15 equipamentos
+        take: 15,
         select: { name: true, description: true },
       });
 
       const kits = await prisma.kit.findMany({
-        take: 5, // Pega uma amostra de 5 kits
+        take: 5,
         select: { name: true, description: true },
       });
 
-      // 2. Montar um "prompt" inteligente e detalhado
-      const equipmentList = equipments
-        .map((e) => `- ${e.name}: ${e.description}`)
-        .join("\n");
-      const kitList = kits
-        .map((k) => `- ${k.name}: ${k.description}`)
-        .join("\n");
+      const equipmentList = equipments.map((e) => `- ${e.name}: ${e.description}`).join("\n");
+      const kitList = kits.map((k) => `- ${k.name}: ${k.description}`).join("\n");
 
-      const prompt = `
-        Você é um organizador de eventos criativo e especialista em marketing para uma empresa de aluguel de equipamentos de som e luz.
-        Sua tarefa é criar uma sugestão curta e empolgante para um tema de festa que um cliente poderia organizar usando nossos equipamentos.
-
-        Baseie-se na lista de equipamentos e kits disponíveis abaixo. A resposta deve ser em Português do Brasil.
-
-        A resposta deve ser um único parágrafo, direto ao ponto, e muito convidativo.
-        Exemplo de formato: "Que tal uma 'Festa Neon Retrô'? Ilumine a noite com nossas luzes negras, strobes e máquina de fumaça para uma viagem inesquecível aos anos 80! Combine com nosso Kit de DJ Básico para o som perfeito."
-
-        Equipamentos Disponíveis:
+      const promptContext = `
+        Você é um organizador de eventos criativo da empresa X-Produções.
+        Com base nestes equipamentos:
         ${equipmentList}
-
-        Kits Disponíveis:
+        
+        E nestes kits:
         ${kitList}
-
-        Agora, crie uma nova e diferente sugestão de tema de evento:
+        
+        Crie uma sugestão curta (máximo 3 frases) e empolgante de tema para uma festa.
+        Use Português do Brasil.
+        Exemplo: "Que tal uma Festa Neon? Use nossos canhões de luz..."
+        
+        Sugestão:
       `;
 
-      // 3. Chamar a API Gemini
-      const model = genAI!.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+      // 2. Decidir qual provedor chamar
+      if (HF_KEY) {
+          // Prioridade para HF se configurado (já que o usuário pediu a troca)
+          return await this.callHuggingFace(promptContext);
+      } else if (genAI) {
+          const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+          const result = await model.generateContent(promptContext);
+          const response = await result.response;
+          return response.text();
+      }
+      
+      return getMockSuggestion();
 
-      return text;
-    } catch (error: unknown) {
-      // Detect common API errors to provide actionable logs
+    } catch (error: any) {
       const errMsg = error instanceof Error ? error.message : String(error);
-      logger.error({obj: errMsg}, 'Erro ao comunicar com a API Gemini:');
+      logger.error({obj: errMsg}, 'Erro ao comunicar com a API de IA:');
 
-      // Fallback on API error if we are in DEV or configured to do so
       if (USE_MOCK_FALLBACK) {
-        logger.warn('Falha na API Gemini, retornando sugestão mockada como fallback.');
+        logger.warn('Falha na API de IA, retornando sugestão valida via mock.');
         return getMockSuggestion();
       }
 
-      // If the underlying error from Google contains structured details, try to surface a friendly message
-      try {
-        const errorObj = error as Record<string, unknown>;
-        const details = errorObj?.errorDetails || 
-          (errorObj?.response as Record<string, unknown>)?.data || null;
-        if (details) {
-          // If the error indicates invalid API key, log a clear instruction
-          const isApiKeyInvalid = JSON.stringify(details).includes('API_KEY_INVALID');
-          if (isApiKeyInvalid) {
-            logger.error('Gemini API retornou API_KEY_INVALID. Verifique se GEMINI_API_KEY está correta e ativa no console do Google Cloud.');
-          }
-        }
-      } catch {
-        // ignore parsing errors
-      }
-
-      // Lançar um erro para o middleware global sem vazar a chave
-      throw new Error('Não foi possível gerar a sugestão no momento. Verifique as configurações do provedor de IA.');
+      throw new Error('Não foi possível gerar a sugestão no momento.');
     }
   }
 }
