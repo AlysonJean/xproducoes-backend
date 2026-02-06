@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import sponsorController from '../controllers/sponsorController';
-import { authenticate } from '../middlewares/authMiddleware';
+import { authenticate } from '../middlewares/unifiedAuth';
 import multer from 'multer';
 
 // Multer in memory for Cloudinary upload
