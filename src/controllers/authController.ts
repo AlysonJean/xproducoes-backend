@@ -224,46 +224,34 @@ export class AuthController {
   updateProfile = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
-    try {
-      if (!req.userId) {
-        res
-          .status(401)
-          .json({ message: "ID do utilizador não encontrado no token." });
-        return;
-      }
-      const { name, avatarUrl } = req.body;
-      const user = await this.authService.updateProfile(req.userId, {
-        name,
-        avatarUrl,
-      });
-      res.json(user);
-    } catch (error) {
-      next(error);
+    if (!req.userId) {
+      throw new UnauthorizedError("ID do utilizador não encontrado no token.");
     }
+    const { name, avatarUrl } = req.body;
+    const user = await this.authService.updateProfile(req.userId, {
+      name,
+      avatarUrl,
+    });
+    res.json(user);
   };
 
-  // Método para administradores convidarem colaboradores
   inviteCollaborator = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
-    try {
-      const { name, email, collaboratorRole, hourlyRate, specialties } =
-        req.body;
-      const result = await this.authService.inviteCollaborator({
-        name,
-        email,
-        collaboratorRole,
-        hourlyRate,
-        specialties,
-      });
-      res.status(201).json(result);
-    } catch (error) {
-      next(error);
-    }
+    const { name, email, collaboratorRole, hourlyRate, specialties } =
+      req.body;
+    const result = await this.authService.inviteCollaborator({
+      name,
+      email,
+      collaboratorRole,
+      hourlyRate,
+      specialties,
+    });
+    res.status(201).json(result);
   };
 
   // Método para colaboradores completarem o registo
@@ -287,129 +275,100 @@ export class AuthController {
   socialLogin = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
-    try {
-      const { accessToken, userData } = req.body;
+    const { accessToken, userData } = req.body;
+    
+    // Detectar provider pela rota
+    const isFacebook = req.path.includes('facebook');
+    const provider = isFacebook ? 'Facebook' : 'Google';
+    
+    // Validar token com o provider apropriado
+    if (accessToken) {
+      logger.info(`Validando access token com ${provider}`);
       
-      // Detectar provider pela rota
-      const isFacebook = req.path.includes('facebook');
-      const provider = isFacebook ? 'Facebook' : 'Google';
+      const validation = isFacebook 
+        ? await validateFacebookToken(accessToken)
+        : await validateGoogleToken(accessToken);
       
-      // Validar token com o provider apropriado
-      if (accessToken) {
-        logger.info(`Validando access token com ${provider}`);
-        
-        const validation = isFacebook 
-          ? await validateFacebookToken(accessToken)
-          : await validateGoogleToken(accessToken);
-        
-        if (!validation.valid) {
-          logger.warn({ error: validation.error }, `Token ${provider} inválido`);
-          res.status(401).json({ message: validation.error || "Token inválido" });
-          return;
-        }
-        
-        const email = validation.email!;
-        const name = validation.name || email.split('@')[0];
-        
-        logger.info({ email, name }, "Token Google validado com sucesso");
-        
-        try {
-          // Buscar usuário pelo email
-          const user = await this.authService.findUserByEmail(email);
-
-          if (user) {
-            // Se existe, fazer login
-            logger.info({ userId: user.id }, "Usuário encontrado, fazendo login");
-            const result = await this.authService.loginById(user.id);
-            res.status(200).json(result);
-          } else {
-            // Se não existe, criar novo utilizador
-            const randomPassword = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12);
-            
-            const registerResult = await this.authService.register({
-              name,
-              email,
-              password: randomPassword,
-              role: "CLIENT",
-            });
-            
-            // Após registro, fazer login para obter token
-            const loginResult = await this.authService.loginById(registerResult.id);
-            res.status(201).json(loginResult);
-          }
-        } catch (error) {
-          logger.error({ error }, "Erro no login social");
-          if (error instanceof Error) {
-            res.status(400).json({ message: error.message });
-            return;
-          }
-          throw error;
-        }
-        return;
+      if (!validation.valid) {
+        logger.warn({ error: validation.error }, `Token ${provider} inválido`);
+        throw new UnauthorizedError(validation.error || "Token inválido");
       }
       
-      // Fallback: userData enviado diretamente (legado - menos seguro)
-      logger.warn("Login social sem validação de token - modo legado");
+      const email = validation.email!;
+      const name = validation.name || email.split('@')[0];
       
-      if (!userData || typeof userData !== 'object') {
-        res.status(400).json({ message: "Token ou dados de usuário são obrigatórios" });
-        return;
+      logger.info({ email, name }, `Token ${provider} validado com sucesso`);
+      
+      // Buscar usuário pelo email
+      const user = await this.authService.findUserByEmail(email);
+
+      if (user) {
+        // Se existe, fazer login
+        logger.info({ userId: user.id }, "Usuário encontrado, fazendo login");
+        const result = await this.authService.loginById(user.id);
+        res.status(200).json(result);
+      } else {
+        // Se não existe, criar novo utilizador
+        const randomPassword = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12);
+        
+        const registerResult = await this.authService.register({
+          name,
+          email,
+          password: randomPassword,
+          role: "CLIENT",
+        });
+        
+        // Após registro, fazer login para obter token
+        const loginResult = await this.authService.loginById(registerResult.id);
+        res.status(201).json(loginResult);
+      }
+      return;
+    }
+    
+    // Fallback: userData enviado diretamente (legado - menos seguro)
+    logger.warn("Login social sem validação de token - modo legado");
+    
+    if (!userData || typeof userData !== 'object') {
+      throw new BadRequestError("Token ou dados de usuário são obrigatórios");
+    }
+
+    const email = (userData.email && typeof userData.email === 'string') ? userData.email : null;
+    if (!email) throw new BadRequestError("E-mail é obrigatório");
+
+    const user = await this.authService.findUserByEmail(email);
+
+    if (user) {
+      // Se existe, fazer login
+      logger.info({ userId: user.id }, "Usuário encontrado, fazendo login por ID");
+      const result = await this.authService.loginById(user.id);
+      res.status(200).json(result);
+    } else {
+      // Se não existe, criar novo utilizador
+      logger.info("Usuário não encontrado, criando novo");
+      const randomPassword = Math.random().toString(36).slice(-8);
+      // Calcular nome seguro
+      let safeName: string;
+      if (userData.name && typeof userData.name === 'string' && userData.name.trim()) {
+        safeName = userData.name.trim();
+      } else if (email.includes('@')) {
+        safeName = email.split('@')[0];
+      } else {
+        safeName = email;
       }
 
-      const email = (userData.email && typeof userData.email === 'string') ? userData.email : null;
-      if (!email) {
-        res.status(400).json({ message: "E-mail é obrigatório" });
-        return;
-      }
+      const result = await this.authService.register({
+        name: safeName,
+        email: email,
+        password: randomPassword,
+        role: "CLIENT",
+      });
+      logger.info({ result }, "Registro realizado com sucesso");
 
-      try {
-        const user = await this.authService.findUserByEmail(email);
-
-        if (user) {
-          // Se existe, fazer login
-          logger.info({ userId: user.id }, "Usuário encontrado, fazendo login por ID");
-          const result = await this.authService.loginById(user.id);
-          res.status(200).json(result);
-        } else {
-          // Se não existe, criar novo utilizador
-          logger.info("Usuário não encontrado, criando novo");
-          const randomPassword = Math.random().toString(36).slice(-8);
-          // Calcular nome seguro: priorizar userData.name quando for string válida
-          let safeName: string;
-          if (userData.name && typeof userData.name === 'string' && userData.name.trim()) {
-            safeName = userData.name.trim();
-          } else if (email.includes('@')) {
-            // dividir apenas em string já validada
-            safeName = email.split('@')[0];
-          } else {
-            safeName = email;
-          }
-
-          const result = await this.authService.register({
-            name: safeName,
-            email: email,
-            password: randomPassword,
-            role: "CLIENT",
-          });
-          logger.info({ result }, "Registro realizado com sucesso");
-
-          // Após registro, fazer login para obter token
-          const loginResult = await this.authService.loginById(result.id);
-          res.status(201).json(loginResult);
-        }
-      } catch (error) {
-        logger.error({obj:error, errorMessage: error instanceof Error ? error.message : String(error)}, "Erro no login social:");
-        if (error instanceof Error) {
-          res.status(400).json({ message: error.message });
-          return;
-        }
-        throw error;
-      }
-    } catch (error) {
-      logger.error({obj:error}, "Erro no processamento de login social:");
-      next(error);
+      // Após registro, fazer login para obter token
+      const loginResult = await this.authService.loginById(result.id);
+      res.status(201).json(loginResult);
     }
   };
 
@@ -504,19 +463,14 @@ export class AuthController {
   getCurrentUser = async (
     req: Request,
     res: Response,
-    next: NextFunction
+    _next: NextFunction
   ): Promise<void> => {
-    try {
-      if (!req.userId) {
-        res.status(401).json({ message: "Não autorizado" });
-        return;
-      }
-      
-      const user = await this.authService.getProfile(req.userId);
-      res.json(user);
-    } catch (error) {
-      next(error);
+    if (!req.userId) {
+      throw new UnauthorizedError("Não autorizado");
     }
+    
+    const user = await this.authService.getProfile(req.userId);
+    res.json(user);
   };
 
   logout = async (

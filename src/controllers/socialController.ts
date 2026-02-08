@@ -333,9 +333,9 @@ export class SocialController {
     }
 
     async updateWall(req: Request, res: Response) {
+        const { id } = req.params;
+        const data = req.body;
         try {
-            const { id } = req.params;
-            const data = req.body;
             logger.info({ id, data }, '[updateWall] Recebido update de mural');
 
             // Check slug uniqueness if changed
@@ -385,8 +385,8 @@ export class SocialController {
             }
 
             res.json({ data: wall });
-        } catch (error) {
-            logger.error({ error, id, data }, '[updateWall] Erro ao atualizar mural');
+        } catch (err: any) {
+            logger.error({ error: err, id, data }, '[updateWall] Erro ao atualizar mural');
             res.status(500).json({ error: 'Failed to update wall' });
         }
     }

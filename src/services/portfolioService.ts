@@ -14,10 +14,11 @@ export async function updatePortfolio(id: string, data: Partial<{ title: string;
   
   // If uploadedFiles present, add them
   if (data.uploadedFiles && data.uploadedFiles.length > 0) {
+    const files = data.uploadedFiles; // for type safety
     await prisma.$transaction(async (tx) => {
       // Create media items
-      for (let i = 0; i < data.uploadedFiles.length; i++) {
-        const file = data.uploadedFiles[i];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
         const isCover = typeof data.coverIndex !== 'undefined' && Number(data.coverIndex) === i;
         
         await tx.portfolioMedia.create({
@@ -207,7 +208,7 @@ export async function setCoverVideo(portfolioId: string, mediaId: string) {
     const media = await prisma.portfolioMedia.findUnique({ where: { id: mediaId } });
     if (media) {
         await prisma.portfolio.update({
-            where: { portfolioId },
+            where: { id: portfolioId },
             data: { 
                 imageUrl: media.url,
                 coverImage: media.url

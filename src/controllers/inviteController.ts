@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import { prisma } from '../config/database';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
@@ -6,10 +6,9 @@ import emailService from '../services/emailService';
 import logger from "../config/logger";
 import { BadRequestError, ConflictError } from '../utils/errors';
 
-
 const INVITE_EXPIRATION_HOURS = parseInt(process.env.INVITE_EXPIRATION_HOURS || '72', 10);
 
-export async function sendInvite(req: Request, res: Response) {
+export async function sendInvite(req: Request, res: Response, _next: NextFunction) {
   const { email } = req.body;
   if (!email) {
     throw new BadRequestError('Email é obrigatório');
@@ -52,7 +51,7 @@ export async function sendInvite(req: Request, res: Response) {
 }
 
 // Rota pública para registrar-se a partir de um convite
-export async function registerFromInvite(req: Request, res: Response) {
+export async function registerFromInvite(req: Request, res: Response, _next: NextFunction) {
   const { token, email, name, password } = req.body;
   if (!token || !email || !name || !password) {
     throw new BadRequestError('Token, email, nome e senha são obrigatórios');

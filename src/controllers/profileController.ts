@@ -14,12 +14,6 @@ const clientProfileSchema = z.object({
   communicationPrefs: z.any().optional(),
 });
 import { Request, Response } from "express";
-// Declaração global para uso do console
-declare const console: Console;
-// Extensão do tipo Request para incluir userId
-interface AuthRequest extends Request {
-  userId?: string;
-}
 import * as clientService from "../services/clientService";
 import { prisma } from "../config/prisma";
 import logger from "../config/logger";
@@ -39,7 +33,7 @@ export class ProfileController {
         include: {
           clientProfile: {
             include: {
-              favoriteEquipments: {
+              favorites: {
                 include: { equipment: true },
               },
             },
@@ -193,7 +187,7 @@ export class ProfileController {
   }
 
   // Atualizar perfil de colaborador
-  async updateCollaboratorProfile(req: AuthRequest, res: Response) {
+  async updateCollaboratorProfile(req: Request, res: Response) {
     try {
       const userId = req.userId;
       if (!userId || typeof userId !== "string") {

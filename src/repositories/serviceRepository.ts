@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma";
+import { ItemStatus } from "@prisma/client";
 
 export class ServiceRepository {
   async create(data: any) {
@@ -9,7 +10,7 @@ export class ServiceRepository {
 
   async findAll(publicView = false) {
     const where = publicView 
-      ? { status: { in: ['ACTIVE', 'MAINTENANCE', 'COMING_SOON'] } } 
+      ? { status: { in: [ItemStatus.ACTIVE, ItemStatus.MAINTENANCE, ItemStatus.COMING_SOON] } } 
       : {};
       
     return prisma.service.findMany({
