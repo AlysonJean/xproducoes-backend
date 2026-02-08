@@ -136,103 +136,72 @@ export class CollaboratorController {
     });
   }
 
-  async deleteCollaborator(req: Request, res: Response) {
-    try {
-      const { id } = req.params as { id: string };
+  async deleteCollaborator(req: Request, res: Response, _next: NextFunction) {
+    const { id } = req.params as { id: string };
+    if (!id) throw new BadRequestError("ID do colaborador é obrigatório");
 
-      if (!id) {
-        return res.status(400).json({
-          success: false,
-          message: "ID do colaborador é obrigatório",
-        });
-      }
+    await collaboratorService.deleteCollaborator(id);
 
-      await collaboratorService.deleteCollaborator(id);
-
-      return res.json({
-        success: true,
-        message: "Colaborador removido com sucesso",
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Erro ao deletar colaborador");
-      return res.status(500).json({
-        success: false,
-        message: "Erro ao deletar colaborador",
-      });
-    }
+    return res.json({
+      success: true,
+      message: "Colaborador removido com sucesso",
+    });
   }
 
   // Gestão de Eventos
-  async assignCollaboratorToEvent(req: Request, res: Response) {
+  async assignCollaboratorToEvent(req: Request, res: Response, _next: NextFunction) {
+    const validatedData = assignCollaboratorSchema.parse(req.body);
+
+    const assignment = await collaboratorService.assignCollaboratorToEvent({
+      ...validatedData,
+      bookingId: validatedData.eventId,
+    });
+
+    // Buscar dados para envio de notificação (não falha a requisição se falhar)
     try {
-      const validatedData = assignCollaboratorSchema.parse(req.body);
-
-      const assignment = await collaboratorService.assignCollaboratorToEvent({
-        ...validatedData,
-        bookingId: validatedData.eventId,
+      const collaborator = await prisma.collaborator.findUnique({
+        where: { id: validatedData.collaboratorId },
+        include: { user: true }
       });
 
-      // Buscar dados para envio de notificação
-      try {
-        const collaborator = await prisma.collaborator.findUnique({
-          where: { id: validatedData.collaboratorId },
-          include: { user: true }
-        });
+      const booking = await prisma.booking.findUnique({
+        where: { id: validatedData.eventId },
+        include: { client: { include: { user: true } } }
+      });
 
-        const booking = await prisma.booking.findUnique({
-          where: { id: validatedData.eventId },
-          include: { client: { include: { user: true } } }
-        });
+      if (collaborator?.user?.email && booking) {
+        const eventDate = new Date(booking.eventDate).toLocaleDateString('pt-BR');
+        const eventTime = new Date(booking.eventDate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const street = booking.street || 'Endereço não informado';
+        const number = booking.addressNumber ? `, ${booking.addressNumber}` : '';
+        const city = booking.city ? ` - ${booking.city}` : '';
+        const location = `${street}${number}${city}`;
+        
+        const clientName = booking.clientName || booking.client?.companyName || booking.client?.user?.name || 'Cliente';
 
-        if (collaborator?.user?.email && booking) {
-          const eventDate = new Date(booking.eventDate).toLocaleDateString('pt-BR');
-          const eventTime = new Date(booking.eventDate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-          const street = booking.street || 'Endereço não informado';
-          const number = booking.addressNumber ? `, ${booking.addressNumber}` : '';
-          const city = booking.city ? ` - ${booking.city}` : '';
-          const location = `${street}${number}${city}`;
-          
-          const clientName = booking.clientName || booking.client?.companyName || booking.client?.user?.name || 'Cliente';
-
-          await emailServiceInstance.sendAssignmentNotification(
-            collaborator.user.email,
-            collaborator.user.name || 'Colaborador',
-            {
-              eventName: booking.eventTitle || `Evento de ${clientName}`,
-              eventDate,
-              eventTime,
-              role: validatedData.role,
-              location,
-              bookingUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/collaborator/events`
-            }
-          );
-          logger.info({ collaboratorId: collaborator.id }, 'Notificação de escalação enviada com sucesso');
-        }
-      } catch (emailError: any) {
-        logger.error({ err: emailError }, 'Falha ao enviar notificação de escalação (atribuição concluída)');
+        await emailServiceInstance.sendAssignmentNotification(
+          collaborator.user.email,
+          collaborator.user.name || 'Colaborador',
+          {
+            eventName: booking.eventTitle || `Evento de ${clientName}`,
+            eventDate,
+            eventTime,
+            role: validatedData.role,
+            location,
+            bookingUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/collaborator/events`
+          }
+        );
+        logger.info({ collaboratorId: collaborator.id }, 'Notificação de escalação enviada com sucesso');
       }
-
-      return res.status(201).json({
-        success: true,
-        data: assignment,
-        message: "Colaborador atribuído ao evento com sucesso",
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Erro ao atribuir colaborador");
-
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({
-          success: false,
-          message: "Dados inválidos",
-          errors: error.issues,
-        });
-      }
-
-      return res.status(500).json({
-        success: false,
-        message: "Erro ao atribuir colaborador ao evento",
-      });
+    } catch (emailError: any) {
+      logger.error({ err: emailError }, 'Falha ao enviar notificação de escalação (atribuição concluída)');
     }
+
+    return res.status(201).json({
+      success: true,
+      data: assignment,
+      message: "Colaborador atribuído ao evento com sucesso",
+    });
   }
 
   async getEventCollaborators(req: Request, res: Response) {
@@ -262,31 +231,17 @@ export class CollaboratorController {
     }
   }
 
-  async getCollaboratorEvents(req: Request, res: Response) {
-    try {
-      const { collaboratorId } = req.params as { collaboratorId: string };
+  async getCollaboratorEvents(req: Request, res: Response, _next: NextFunction) {
+    const { collaboratorId } = req.params as { collaboratorId: string };
+    if (!collaboratorId) throw new BadRequestError("ID do colaborador é obrigatório");
 
-      if (!collaboratorId) {
-        return res.status(400).json({
-          success: false,
-          message: "ID do colaborador é obrigatório",
-        });
-      }
+    const events =
+      await collaboratorService.getCollaboratorEvents(collaboratorId);
 
-      const events =
-        await collaboratorService.getCollaboratorEvents(collaboratorId);
-
-      return res.json({
-        success: true,
-        data: events,
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Erro ao buscar eventos do colaborador");
-      return res.status(500).json({
-        success: false,
-        message: "Erro ao buscar eventos do colaborador",
-      });
-    }
+    return res.json({
+      success: true,
+      data: events,
+    });
   }
 
   async updateEventCollaborator(req: Request, res: Response) {
@@ -369,30 +324,16 @@ export class CollaboratorController {
     }
   }
 
-  async getCollaboratorStats(req: Request, res: Response) {
-    try {
-      const { id } = req.params as { id: string };
+  async getCollaboratorStats(req: Request, res: Response, _next: NextFunction) {
+    const { id } = req.params as { id: string };
+    if (!id) throw new BadRequestError("ID do colaborador é obrigatório");
 
-      if (!id) {
-        return res.status(400).json({
-          success: false,
-          message: "ID do colaborador é obrigatório",
-        });
-      }
+    const stats = await collaboratorService.getCollaboratorStats(id);
 
-      const stats = await collaboratorService.getCollaboratorStats(id);
-
-      return res.json({
-        success: true,
-        data: stats,
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Erro ao buscar estatísticas");
-      return res.status(500).json({
-        success: false,
-        message: "Erro ao buscar estatísticas do colaborador",
-      });
-    }
+    return res.json({
+      success: true,
+      data: stats,
+    });
   }
 
   // Dashboard pessoal do colaborador (ou admin vendo um colaborador específico)
@@ -902,21 +843,13 @@ export class CollaboratorController {
     }
   }
 
-  async deletePayment(req: Request, res: Response) {
-    try {
-      const { id } = req.params as { id: string };
-      // Método não implementado no service
-      return res.status(501).json({
-        success: false,
-        message: "Remoção de pagamento não implementada ainda",
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Erro ao remover pagamento");
-      return res.status(500).json({
-        success: false,
-        message: "Erro ao remover pagamento",
-      });
-    }
+  async deletePayment(req: Request, res: Response, _next: NextFunction) {
+    // const { id } = req.params as { id: string };
+    // Método não implementado no service
+    return res.status(501).json({
+      success: false,
+      message: "Remoção de pagamento não implementada ainda",
+    });
   }
 
   async getCollaboratorPayments(req: Request, res: Response) {
@@ -938,23 +871,15 @@ export class CollaboratorController {
     }
   }
 
-  async getPaymentStats(req: Request, res: Response) {
-    try {
-      const { collaboratorId } = req.params as { collaboratorId: string };
-      // Método não implementado no service - retorna stats padrão
-      const stats = await collaboratorService.getPaymentStats();
+  async getPaymentStats(req: Request, res: Response, _next: NextFunction) {
+    // const { collaboratorId } = req.params as { collaboratorId: string };
+    // Método não implementado no service - retorna stats padrão
+    const stats = await collaboratorService.getPaymentStats();
 
-      return res.json({
-        success: true,
-        data: stats,
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Erro ao buscar estatísticas de pagamentos");
-      return res.status(500).json({
-        success: false,
-        message: "Erro ao buscar estatísticas de pagamentos",
-      });
-    }
+    return res.json({
+      success: true,
+      data: stats,
+    });
   }
 
   // Minhas notificações
