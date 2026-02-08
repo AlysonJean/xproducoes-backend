@@ -204,31 +204,18 @@ export class CollaboratorController {
     });
   }
 
-  async getEventCollaborators(req: Request, res: Response) {
-    try {
-      const { eventId } = req.params as { eventId: string };
+  async getEventCollaborators(req: Request, res: Response, _next: NextFunction) {
+    const { eventId } = req.params as { eventId: string };
 
-      if (!eventId) {
-        return res.status(400).json({
-          success: false,
-          message: "ID do evento é obrigatório",
-        });
-      }
+    if (!eventId) throw new BadRequestError("ID do evento é obrigatório");
 
-      const collaborators =
-        await collaboratorService.getEventCollaborators(eventId);
+    const collaborators =
+      await collaboratorService.getEventCollaborators(eventId);
 
-      return res.json({
-        success: true,
-        data: collaborators,
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Erro ao buscar colaboradores do evento");
-      return res.status(500).json({
-        success: false,
-        message: "Erro ao buscar colaboradores do evento",
-      });
-    }
+    return res.json({
+      success: true,
+      data: collaborators,
+    });
   }
 
   async getCollaboratorEvents(req: Request, res: Response, _next: NextFunction) {
@@ -295,33 +282,25 @@ export class CollaboratorController {
   }
 
   // Busca e estatísticas
-  async searchCollaborators(req: Request, res: Response) {
-    try {
-      const { role, status, name, page = "1", limit = "10" } = req.query;
+  async searchCollaborators(req: Request, res: Response, _next: NextFunction) {
+    const { role, status, name, page = "1", limit = "10" } = req.query;
 
-      const searchParams = {
-        role: role as any,
-        status: status as any,
-        name: name as string,
-        page: parseInt(page as string),
-        limit: parseInt(limit as string),
-      };
+    const searchParams = {
+      role: role as any,
+      status: status as any,
+      name: name as string,
+      page: parseInt(page as string),
+      limit: parseInt(limit as string),
+    };
 
-      const result =
-        await collaboratorService.searchCollaborators(searchParams);
+    const result =
+      await collaboratorService.searchCollaborators(searchParams);
 
-      return res.json({
-        success: true,
-        data: result.collaborators,
-        pagination: result.pagination,
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Erro ao buscar colaboradores");
-      return res.status(500).json({
-        success: false,
-        message: "Erro ao buscar colaboradores",
-      });
-    }
+    return res.json({
+      success: true,
+      data: result.collaborators,
+      pagination: result.pagination,
+    });
   }
 
   async getCollaboratorStats(req: Request, res: Response, _next: NextFunction) {
@@ -337,99 +316,82 @@ export class CollaboratorController {
   }
 
   // Dashboard pessoal do colaborador (ou admin vendo um colaborador específico)
-  async getMyDashboard(req: Request, res: Response) {
-    try {
-      // Obter ID do usuário autenticado
-      const userId = req.userId as string;
+  async getMyDashboard(req: Request, res: Response, _next: NextFunction) {
+    // Obter ID do usuário autenticado
+    const userId = req.userId as string;
 
-      if (!userId) {
-        return res.status(400).json({ success: false, message: 'Usuário não autenticado' });
+    if (!userId) throw new BadRequestError('Usuário não autenticado');
+
+    // Buscar o colaborador pelo userId
+    let collaborator = await collaboratorService.findByUserId(userId);
+    
+    if (!collaborator) {
+      // Tentar criar perfil automaticamente se não existir
+      try {
+        logger.info({ userId }, '[Dashboard] Perfil não encontrado. Criando perfil padrão...');
+        collaborator = await prisma.collaborator.create({
+          data: {
+            userId,
+            collaboratorRole: 'OTHER',
+            status: 'PENDING_APPROVAL',
+            specialties: [],
+          },
+          include: { user: true }
+        }) as any;
+      } catch (createError) {
+        logger.error({ err: createError }, '[Dashboard] Erro ao criar perfil automático');
+        throw new NotFoundError('Colaborador não encontrado');
       }
-
-      // Buscar o colaborador pelo userId
-      let collaborator = await collaboratorService.findByUserId(userId);
-      
-      if (!collaborator) {
-        // Tentar criar perfil automaticamente se não existir (mesma lógica do getMyProfile)
-        try {
-          logger.info({ userId }, '[Dashboard] Perfil não encontrado. Criando perfil padrão...');
-          collaborator = await prisma.collaborator.create({
-            data: {
-              userId,
-              collaboratorRole: 'OTHER',
-              status: 'PENDING_APPROVAL',
-              specialties: [],
-            },
-            include: { user: true }
-          }) as any;
-        } catch (createError) {
-          logger.error({ err: createError }, '[Dashboard] Erro ao criar perfil automático');
-          return res.status(404).json({ success: false, message: 'Colaborador não encontrado' });
-        }
-      }
-
-      // Reutiliza o service para agregar os dados do dashboard
-      const stats = await collaboratorService.getCollaboratorDashboard(collaborator!.id);
-
-      return res.json({ success: true, data: stats });
-    } catch (error) {
-      logger.error({ err: error }, 'Erro ao buscar dashboard do colaborador');
-      return res.status(500).json({ success: false, message: 'Erro ao buscar dashboard do colaborador' });
     }
+
+    // Reutiliza o service para agregar os dados do dashboard
+    const stats = await collaboratorService.getCollaboratorDashboard(collaborator!.id);
+
+    return res.json({ success: true, data: stats });
   }
 
   // Perfil pessoal do colaborador
-  async getMyProfile(req: Request, res: Response) {
-    try {
-      // Obter ID do usuário autenticado
-      const userId = req.userId as string;
+  async getMyProfile(req: Request, res: Response, _next: NextFunction) {
+    // Obter ID do usuário autenticado
+    const userId = req.userId as string;
 
-      if (!userId) {
-        return res.status(400).json({ success: false, message: 'Usuário não autenticado' });
-      }
+    if (!userId) throw new BadRequestError('Usuário não autenticado');
 
-      // Buscar o colaborador pelo userId
-      let collaborator = await collaboratorService.findByUserId(userId);
-      
-      if (!collaborator) {
-        // Auto-criação de perfil para usuários com role COLLABORATOR que ainda não possuem registro
-        // Isso corrige o problema de "Perfil não encontrado" para usuários recém-promovidos
-        try {
-          logger.info({ userId }, 'Perfil não encontrado. Criando perfil padrão...');
-          
-          // Verificar se já existe (concorrência) ou criar
-          collaborator = await prisma.collaborator.create({
-            data: {
-              userId,
-              collaboratorRole: 'OTHER',
-              status: 'PENDING_APPROVAL',
-              specialties: [],
-            },
-            include: {
-              user: {
-                select: {
-                  name: true,
-                  email: true,
-                  avatarUrl: true,
-                  bio: true,
-                  location: true,
-                  website: true,
-                }
+    // Buscar o colaborador pelo userId
+    let collaborator = await collaboratorService.findByUserId(userId);
+    
+    if (!collaborator) {
+      try {
+        logger.info({ userId }, 'Perfil não encontrado. Criando perfil padrão...');
+        
+        collaborator = await prisma.collaborator.create({
+          data: {
+            userId,
+            collaboratorRole: 'OTHER',
+            status: 'PENDING_APPROVAL',
+            specialties: [],
+          },
+          include: {
+            user: {
+              select: {
+                name: true,
+                email: true,
+                avatarUrl: true,
+                bio: true,
+                location: true,
+                website: true,
               }
             }
-          }) as any;
-          
-        } catch (createError) {
-          logger.error({ err: createError }, 'Erro ao criar perfil automático');
-          return res.status(404).json({ success: false, message: 'Colaborador não encontrado' });
-        }
+          }
+        }) as any;
+        
+      } catch (createError) {
+        logger.error({ err: createError }, 'Erro ao criar perfil automático');
+        throw new NotFoundError('Colaborador não encontrado');
       }
-      
-      return res.json({ success: true, data: collaborator });
-    } catch (error) {
-      logger.error({ err: error }, 'Erro ao buscar perfil do colaborador');
-      return res.status(500).json({ success: false, message: 'Erro ao buscar perfil do colaborador' });
     }
+    
+    return res.json({ success: true, data: collaborator });
   }
 
   // Meus eventos
@@ -500,33 +462,20 @@ export class CollaboratorController {
     }
   }
 
-  async getAvailableCollaborators(req: Request, res: Response) {
-    try {
-      const { date, role } = req.query;
+  async getAvailableCollaborators(req: Request, res: Response, _next: NextFunction) {
+    const { date, role } = req.query;
 
-      if (!date) {
-        return res.status(400).json({
-          success: false,
-          message: "Data é obrigatória",
-        });
-      }
+    if (!date) throw new BadRequestError("Data é obrigatória");
 
-      const collaborators = await collaboratorService.getAvailableCollaborators({
-        date: date as string,
-        role: role as string,
-      });
+    const collaborators = await collaboratorService.getAvailableCollaborators({
+      date: date as string,
+      role: role as string,
+    });
 
-      return res.json({
-        success: true,
-        data: collaborators,
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Erro ao buscar colaboradores disponíveis");
-      return res.status(500).json({
-        success: false,
-        message: "Erro ao buscar colaboradores disponíveis",
-      });
-    }
+    return res.json({
+      success: true,
+      data: collaborators,
+    });
   }
 
   // Gerenciamento de Disponibilidades
@@ -651,21 +600,13 @@ export class CollaboratorController {
     }
   }
 
-  async deleteAvailability(req: Request, res: Response) {
-    try {
-      const { id } = req.params as { id: string };
-      await collaboratorService.deleteAvailability(id);
-      return res.json({
-        success: true,
-        message: "Disponibilidade removida com sucesso",
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Erro ao remover disponibilidade");
-      return res.status(500).json({
-        success: false,
-        message: "Erro ao remover disponibilidade",
-      });
-    }
+  async deleteAvailability(req: Request, res: Response, _next: NextFunction) {
+    const { id } = req.params as { id: string };
+    await collaboratorService.deleteAvailability(id);
+    return res.json({
+      success: true,
+      message: "Disponibilidade removida com sucesso",
+    });
   }
 
   async getCollaboratorAvailabilities(req: Request, res: Response) {
