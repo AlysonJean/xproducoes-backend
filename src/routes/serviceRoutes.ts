@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { ServiceController } from '../controllers/serviceController';
 import { uploadSingle, processUpload } from '../middlewares/upload';
-import { authenticate } from '../middlewares/unifiedAuth';
+import { authenticate, optionalAuth } from '../middlewares/unifiedAuth';
 
 const router = Router();
 const controller = new ServiceController();
 
 // Public routes
-router.get('/', controller.list);
+router.get('/', optionalAuth, controller.list);
 router.get('/:id', controller.get);
 
 // Protected admin routes

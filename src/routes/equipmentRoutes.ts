@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { EquipmentController } from "../controllers/equipmentController";
-import { authenticate } from "../middlewares/unifiedAuth";
+import { authenticate, optionalAuth } from "../middlewares/unifiedAuth";
 import { cacheMiddleware } from "../middlewares/cacheMiddleware";
 import { uploadSingle } from "../middlewares/upload";
 
@@ -10,9 +10,9 @@ const equipmentController = new EquipmentController();
 
 // --- Rotas Públicas (com cache otimizado) ---
 // Rota de busca sem cache para garantir status de disponibilidade em tempo real na Home
-equipmentRoutes.get("/search", equipmentController.search);
-equipmentRoutes.get("/category/:categoryId", cacheMiddleware, equipmentController.getByCategory);
-equipmentRoutes.get("/", cacheMiddleware, equipmentController.findAll);
+equipmentRoutes.get("/search", optionalAuth, equipmentController.search);
+equipmentRoutes.get("/category/:categoryId", optionalAuth, cacheMiddleware, equipmentController.getByCategory);
+equipmentRoutes.get("/", optionalAuth, cacheMiddleware, equipmentController.findAll);
 equipmentRoutes.get("/:id/availability", cacheMiddleware, equipmentController.getAvailability); // 3 min
 equipmentRoutes.get("/:id", cacheMiddleware, equipmentController.findOne); // 10 min
 

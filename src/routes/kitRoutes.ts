@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { KitController } from "../controllers/kitController";
-import { authenticate, adminOnly } from "../middlewares/unifiedAuth";
+import { authenticate, adminOnly, optionalAuth } from "../middlewares/unifiedAuth";
 import { uploadSingle } from "../middlewares/upload";
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
 
@@ -10,7 +10,7 @@ const kitController = new KitController();
 // Rotas Públicas
 kitRoutes.get("/recommended", kitController.getRecommended);
 kitRoutes.get("/popular", kitController.getPopular);
-kitRoutes.get("/", kitController.findAll);
+kitRoutes.get("/", optionalAuth, kitController.findAll);
 kitRoutes.get("/:id", kitController.findOne);
 
 // Rotas de Admin com upload de imagem
