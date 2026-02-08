@@ -36,8 +36,10 @@ router.get('/admin/social/leaderboard', authenticate, socialController.getLeader
 
 
 // --- Announcement Routes ---
-// GET /api/events/:id/social/announcements
+// GET /api/events/:id/social/announcements (admin/auth required)
 router.get('/events/:id/social/announcements', authenticate, socialController.getAnnouncements);
+// Public announcements endpoint for TVs and public displays (no auth)
+router.get('/public/events/:id/social/announcements', socialController.getAnnouncements);
 // POST /api/events/:id/social/announcements
 router.post('/events/:id/social/announcements', authenticate, socialController.createAnnouncement);
 // PUT /api/announcements/:id
