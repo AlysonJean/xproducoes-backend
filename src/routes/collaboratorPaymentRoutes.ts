@@ -7,8 +7,7 @@ import {
   getCollaboratorPayments,
   getPaymentStats,
 } from "../controllers/collaboratorController";
-import { authenticate } from "../middlewares/unifiedAuth";
-import { ensureAdmin } from "../config/ensureAdmin";
+import { authenticate, adminOnly } from "../middlewares/unifiedAuth";
 
 const router: RouterType = Router();
 
@@ -17,9 +16,9 @@ router.use(authenticate);
 
 // Rotas de pagamentos de colaboradores
 router.get("/", getAllPayments);
-router.post("/", ensureAdmin, createPayment);
-router.put("/:id", ensureAdmin, updatePayment);
-router.delete("/:id", ensureAdmin, deletePayment);
+router.post("/", adminOnly, createPayment);
+router.put("/:id", adminOnly, updatePayment);
+router.delete("/:id", adminOnly, deletePayment);
 
 // Rotas para buscar pagamentos e estatísticas de um colaborador específico
 router.get("/collaborator/:collaboratorId", getCollaboratorPayments);

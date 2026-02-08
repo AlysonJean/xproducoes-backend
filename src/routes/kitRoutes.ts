@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { KitController } from "../controllers/kitController";
-import { authenticate } from "../middlewares/unifiedAuth";
-import { ensureAdmin } from "../config/ensureAdmin";
+import { authenticate, adminOnly } from "../middlewares/unifiedAuth";
 import { uploadSingle } from "../middlewares/upload";
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
 
@@ -18,7 +17,7 @@ kitRoutes.get("/:id", kitController.findOne);
 kitRoutes.post(
   "/",
   authenticate,
-  ensureAdmin,
+  adminOnly,
   uploadRateLimit, uploadSingle("image"),
   require("../middlewares/upload").processUpload,
   kitController.create,
@@ -26,11 +25,11 @@ kitRoutes.post(
 kitRoutes.put(
   "/:id",
   authenticate,
-  ensureAdmin,
+  adminOnly,
   uploadRateLimit, uploadSingle("image"),
   require("../middlewares/upload").processUpload,
   kitController.update,
 );
-kitRoutes.delete("/:id", authenticate, ensureAdmin, kitController.delete);
+kitRoutes.delete("/:id", authenticate, adminOnly, kitController.delete);
 
 export default kitRoutes;

@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../config/database';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
-import { sendMail } from '../services/mailerService';
+import emailService from '../services/emailService';
 import logger from "../config/logger";
 
 
@@ -33,7 +33,7 @@ export async function sendInvite(req: Request, res: Response) {
 
     let emailSent = false;
     try {
-      await sendMail({ to: email, subject, html });
+      await emailService.sendMail(email, subject, html);
       emailSent = true;
     } catch (emailError) {
       logger.error({ obj: emailError }, 'Falha ao enviar email do convite, mas token foi gerado.');

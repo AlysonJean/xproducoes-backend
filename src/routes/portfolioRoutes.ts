@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { PortfolioController } from "../controllers/portfolioController";
-import { authenticate } from "../middlewares/unifiedAuth";
-import { roleMiddleware } from "../middlewares/roleMiddleware";
+import { authenticate, adminOnly } from "../middlewares/unifiedAuth";
 import { uploadMultiple } from "../middlewares/upload";
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
 
@@ -17,13 +16,13 @@ portfolioRoutes.get("/portfolio", portfolioController.findAll);
 portfolioRoutes.put(
   "/reorder",
   authenticate,
-  roleMiddleware(["ADMIN"]),
+  adminOnly,
   portfolioController.reorder
 );
 portfolioRoutes.post(
   "/",
   authenticate,
-  roleMiddleware(["ADMIN"]),
+  adminOnly,
   uploadRateLimit, uploadMultiple("media"),
   require("../middlewares/upload").processUpload,
   portfolioController.create,
@@ -31,7 +30,7 @@ portfolioRoutes.post(
 portfolioRoutes.put(
   "/:id",
   authenticate,
-  roleMiddleware(["ADMIN"]),
+  adminOnly,
   uploadRateLimit, uploadMultiple("media"),
   require("../middlewares/upload").processUpload,
   portfolioController.update,
@@ -39,7 +38,7 @@ portfolioRoutes.put(
 portfolioRoutes.delete(
   "/:id",
   authenticate,
-  roleMiddleware(["ADMIN"]),
+  adminOnly,
   portfolioController.delete,
 );
 

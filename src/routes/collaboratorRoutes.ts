@@ -29,8 +29,7 @@ import {
   getCollaboratorAvailabilities,
 } from "../controllers/collaboratorController";
 import { sendInvite } from '../controllers/inviteController';
-import { authenticate, requireAdminOrCollaborator } from "../middlewares/unifiedAuth";
-import { ensureAdmin } from "../config/ensureAdmin";
+import { authenticate, requireAdminOrCollaborator, adminOnly } from "../middlewares/unifiedAuth";
 
 const router: RouterType = Router();
 
@@ -38,9 +37,9 @@ const router: RouterType = Router();
 router.use(authenticate);
 
 // Rotas de CRUD de Colaboradores (apenas admin)
-router.post("/", ensureAdmin, createCollaborator);
+router.post("/", adminOnly, createCollaborator);
 // Rota para enviar convite por email
-router.post('/invite', ensureAdmin, sendInvite);
+router.post('/invite', adminOnly, sendInvite);
 router.get("/", getAllCollaborators);
 router.get("/search", searchCollaborators);
 router.get("/available", getAvailableCollaborators);
@@ -62,29 +61,29 @@ router.get('/me/notifications', requireAdminOrCollaborator, getMyNotifications);
 // ---------------------------------------------
 
 router.get("/:id", getCollaboratorById);
-router.put("/:id", ensureAdmin, updateCollaborator);
-router.delete("/:id", ensureAdmin, deleteCollaborator);
+router.put("/:id", adminOnly, updateCollaborator);
+router.delete("/:id", adminOnly, deleteCollaborator);
 
 // Rotas de estatísticas
 router.get("/:id/stats", getCollaboratorStats);
 router.get("/:collaboratorId/events", getCollaboratorEvents);
 
 // Rotas de disponibilidades (CRUD genérico)
-router.post("/availabilities", ensureAdmin, createAvailability);
+router.post("/availabilities", adminOnly, createAvailability);
 router.get("/events/:eventId/collaborators", getEventCollaborators);
-router.post("/event-assignments", ensureAdmin, assignCollaboratorToEvent); // Rota adicionada
-router.put("/event-assignments/:id", ensureAdmin, updateEventCollaborator);
+router.post("/event-assignments", adminOnly, assignCollaboratorToEvent); // Rota adicionada
+router.put("/event-assignments/:id", adminOnly, updateEventCollaborator);
 router.delete(
   "/event-assignments/:id",
-  ensureAdmin,
+  adminOnly,
   removeCollaboratorFromEvent,
 );
 
 // Rotas de disponibilidades
 router.get("/availabilities", getAllAvailabilities);
-router.post("/availabilities", ensureAdmin, createAvailability);
-router.put("/availabilities/:id", ensureAdmin, updateAvailability);
-router.delete("/availabilities/:id", ensureAdmin, deleteAvailability);
+router.post("/availabilities", adminOnly, createAvailability);
+router.put("/availabilities/:id", adminOnly, updateAvailability);
+router.delete("/availabilities/:id", adminOnly, deleteAvailability);
 router.get("/:collaboratorId/availabilities", getCollaboratorAvailabilities);
 
 export default router;

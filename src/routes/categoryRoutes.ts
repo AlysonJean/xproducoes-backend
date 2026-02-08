@@ -1,7 +1,6 @@
 import { Router, type Router as RouterType } from "express";
 import { CategoryController } from "../controllers/categoryController";
-import { authenticate } from "../middlewares/unifiedAuth";
-import { ensureAdmin } from "../config/ensureAdmin";
+import { authenticate, adminOnly } from "../middlewares/unifiedAuth";
 import { uploadSingle, processUpload } from "../middlewares/upload";
 
 const categoryRoutes: RouterType = Router();
@@ -26,7 +25,7 @@ categoryRoutes.post(
     next();
   },
   authenticate,
-  ensureAdmin,
+  adminOnly,
   categoryController.create,
 );
 categoryRoutes.put(
@@ -34,13 +33,13 @@ categoryRoutes.put(
   uploadSingle('image'),
   processUpload,
   authenticate,
-  ensureAdmin,
+  adminOnly,
   categoryController.update,
 );
 categoryRoutes.delete(
   "/:id",
   authenticate,
-  ensureAdmin,
+  adminOnly,
   categoryController.delete,
 );
 
