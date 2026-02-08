@@ -3,6 +3,7 @@ import { EquipmentService } from "../services/equipmentService";
 import { equipmentCreateSchema } from "../validators/equipmentSchema";
 import { cacheService, CacheService } from "../services/cacheService";
 import { invalidateCache } from "../middlewares/cacheMiddleware";
+import { BadRequestError, ForbiddenError, NotFoundError } from "../utils/errors";
 
 const equipmentService = new EquipmentService();
 
@@ -10,78 +11,64 @@ export class EquipmentController {
   create = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<any> => {
-    try {
-      if (req.userRole !== "ADMIN") {
-        return res.status(403).json({ message: "Acesso negado" });
-      }
-
-      if (!req.file) {
-        return res
-          .status(400)
-          .json({ message: "Ficheiro de imagem é obrigatório" });
-      }
-
-      const data = {
-        ...req.body,
-        pricePerHour: Number(req.body.pricePerHour),
-        quantity: Number(req.body.quantity),
-      };
-
-      equipmentCreateSchema.parse(data);
-
-      const equipment = await equipmentService.create(data, req.file);
-
-      // Invalidar cache após criar equipamento
-      await cacheService.invalidateEquipmentCaches();
-
-      return res
-        .status(201)
-        .json({ equipment, message: "Equipamento criado com sucesso" });
-    } catch (error) {
-      return next(error);
+    if (req.userRole !== "ADMIN") {
+      throw new ForbiddenError("Acesso negado");
     }
+
+    if (!req.file) {
+      throw new BadRequestError("Ficheiro de imagem é obrigatório");
+    }
+
+    const data = {
+      ...req.body,
+      pricePerHour: Number(req.body.pricePerHour),
+      quantity: Number(req.body.quantity),
+    };
+
+    equipmentCreateSchema.parse(data);
+
+    const equipment = await equipmentService.create(data, req.file);
+
+    // Invalidar cache após criar equipamento
+    await cacheService.invalidateEquipmentCaches();
+
+    return res
+      .status(201)
+      .json({ equipment, message: "Equipamento criado com sucesso" });
   };
 
   update = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<any> => {
-    try {
-      if (req.userRole !== "ADMIN") {
-        throw new Error("Acesso negado");
-      }
-      const data = { ...req.body };
-      if (data.pricePerHour) data.pricePerHour = Number(data.pricePerHour);
-      if (data.quantity) data.quantity = Number(data.quantity);
-      equipmentCreateSchema.partial().parse(data);
-
-      const { id } = req.params as { id: string };
-      if (!id) {
-        return res
-          .status(400)
-          .json({ message: "ID do equipamento é obrigatório." });
-      }
-
-      const equipment = await equipmentService.update(id, data, req.file);
-
-      // Invalidar cache após atualizar equipamento
-      if (equipment) {
-        await cacheService.invalidateEquipmentCaches(equipment.id);
-        // Também invalidar o cache do middleware (cache em memória das rotas públicas)
-        try {
-          invalidateCache('/equipments');
-        } catch (err) {
-          // não falhar a resposta em caso de erro ao invalidar middleware cache
-        }
-      }
-
-      return res.json(equipment);
-    } catch (error) {
-      return next(error);
+    if (req.userRole !== "ADMIN") {
+      throw new ForbiddenError("Acesso negado");
     }
+    const data = { ...req.body };
+    if (data.pricePerHour) data.pricePerHour = Number(data.pricePerHour);
+    if (data.quantity) data.quantity = Number(data.quantity);
+    equipmentCreateSchema.partial().parse(data);
+
+    const { id } = req.params as { id: string };
+    if (!id) throw new BadRequestError("ID do equipamento é obrigatório.");
+
+    const equipment = await equipmentService.update(id, data, req.file);
+
+    // Invalidar cache após atualizar equipamento
+    if (equipment) {
+      await cacheService.invalidateEquipmentCaches(equipment.id);
+      // Também invalidar o cache do middleware (cache em memória das rotas públicas)
+      try {
+        invalidateCache('/equipments');
+      } catch {
+        // não falhar a resposta em caso de erro ao invalidar middleware cache
+      }
+    }
+
+    return res.json(equipment);
   };
 
   findAll = async (
@@ -113,94 +100,68 @@ export class EquipmentController {
   findOne = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<any> => {
-    try {
-      const { id } = req.params as { id: string };
-      if (!id) {
-        return res
-          .status(400)
-          .json({ message: "ID do equipamento é obrigatório." });
-      }
+    const { id } = req.params as { id: string };
+    if (!id) throw new BadRequestError("ID do equipamento é obrigatório.");
 
-      const cacheKey = CacheService.KEYS.EQUIPMENT(id);
-      const equipment = await cacheService.getOrSet(
-        cacheKey,
-        () => equipmentService.findOne(id),
-        CacheService.TTL.MEDIUM
-      );
+    const cacheKey = CacheService.KEYS.EQUIPMENT(id);
+    const equipment = await cacheService.getOrSet(
+      cacheKey,
+      () => equipmentService.findOne(id),
+      CacheService.TTL.MEDIUM
+    );
 
-      if (!equipment) {
-        return res.status(404).json({ message: "Equipamento não encontrado." });
-      }
-      return res.json(equipment);
-    } catch (error) {
-      return next(error);
+    if (!equipment) {
+      throw new NotFoundError("Equipamento não encontrado.");
     }
+    return res.json(equipment);
   };
 
   delete = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<any> => {
-    try {
-      if (req.userRole !== "ADMIN") {
-        throw new Error("Acesso negado");
-      }
-
-      const { id } = req.params as { id: string };
-            // Também invalidar o cache do middleware (cache em memória das rotas públicas)
-            try {
-              invalidateCache('/equipments');
-            } catch (err) {
-              // não falhar a resposta em caso de erro ao invalidar middleware cache
-            }
-      if (!id) {
-        return res
-          .status(400)
-          .json({ message: "ID do equipamento é obrigatório." });
-      }
-
-      await equipmentService.delete(id);
-
-      // Invalidar cache após deletar equipamento
-      await cacheService.invalidateEquipmentCaches(id);
-
-      return res.status(204).send();
-    } catch (error) {
-      return next(error);
+    if (req.userRole !== "ADMIN") {
+      throw new ForbiddenError("Acesso negado");
     }
+
+    const { id } = req.params as { id: string };
+    if (!id) throw new BadRequestError("ID do equipamento é obrigatório.");
+
+    // Também invalidar o cache do middleware (cache em memória das rotas públicas)
+    try {
+      invalidateCache('/equipments');
+    } catch {
+      // não falhar a resposta em caso de erro ao invalidar middleware cache
+    }
+
+    await equipmentService.delete(id);
+
+    // Invalidar cache após deletar equipamento
+    await cacheService.invalidateEquipmentCaches(id);
+
+    return res.status(204).send();
   };
 
   getAvailability = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<any> => {
-    try {
-      const { id } = req.params as { id: string };
-      const { month, year } = req.query;
+    const { id } = req.params as { id: string };
+    const { month, year } = req.query;
 
-      if (!id) {
-        return res
-          .status(400)
-          .json({ message: "ID do equipamento é obrigatório." });
-      }
+    if (!id) throw new BadRequestError("ID do equipamento é obrigatório.");
+    if (!month || !year) throw new BadRequestError("Mês e ano são obrigatórios.");
 
-      if (!month || !year) {
-        return res.status(400).json({ message: "Mês e ano são obrigatórios." });
-      }
-
-      const availability = await equipmentService.getAvailability(
-        id,
-        Number(month),
-        Number(year),
-      );
-      return res.json(availability);
-    } catch (error) {
-      return next(error);
-    }
+    const availability = await equipmentService.getAvailability(
+      id,
+      Number(month),
+      Number(year),
+    );
+    return res.json(availability);
   };
 
   search = async (
@@ -219,42 +180,32 @@ export class EquipmentController {
   getByCategory = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<any> => {
-    try {
-      const { categoryId } = req.params as { categoryId: string };
-      
-      if (!categoryId) {
-        return res
-          .status(400)
-          .json({ message: "ID da categoria é obrigatório." });
-      }
+    const { categoryId } = req.params as { categoryId: string };
+    
+    if (!categoryId) throw new BadRequestError("ID da categoria é obrigatório.");
 
-      const equipments = await equipmentService.findByCategory(categoryId);
-      return res.json(equipments);
-    } catch (error) {
-      return next(error);
-    }
+    const equipments = await equipmentService.findByCategory(categoryId);
+    return res.json(equipments);
   };
 
   duplicate = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<any> => {
-    try {
-      if (req.userRole !== "ADMIN") {
-        return res.status(403).json({ message: "Acesso negado" });
-      }
-
-      const { id } = req.params;
-      const duplicate = await equipmentService.duplicate(id as string);
-
-      await cacheService.invalidateEquipmentCaches();
-
-      return res.status(201).json({ equipment: duplicate, message: "Equipamento duplicado com sucesso" });
-    } catch (error) {
-      return next(error);
+    if (req.userRole !== "ADMIN") {
+      throw new ForbiddenError("Acesso negado");
     }
+
+    const { id } = req.params;
+    if (!id) throw new BadRequestError("ID é obrigatório.");
+
+    const duplicate = await equipmentService.duplicate(id as string);
+
+    await cacheService.invalidateEquipmentCaches();
+
+    return res.status(201).json({ equipment: duplicate, message: "Equipamento duplicado com sucesso" });
   };
 }

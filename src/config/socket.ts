@@ -1,17 +1,21 @@
 // Configuração do Socket.IO para Chat em Tempo Real
 import { Server as SocketIOServer, Socket } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
 import jwt from 'jsonwebtoken';
 import { MessageType } from '@prisma/client';
 import { prisma } from './prisma';
 import { config } from './environment';
 import logger from './logger';
+import IORedis from 'ioredis';
 
 let io: SocketIOServer | null = null;
+let pubClient: IORedis | null = null;
+let subClient: IORedis | null = null;
 
-// Mapa para rastrear usuários conectados
-const connectedUsers = new Map<string, string>(); // userId -> socketId
+// Chave do Redis para status global (userId -> socketId)
+const REDIS_ONLINE_KEY = 'xproducoes:online_users';
 
-export function initializeSocket(server: any) {
+export async function initializeSocket(server: any) {
   io = new SocketIOServer(server, {
     cors: {
       origin: process.env.FRONTEND_URL || "http://localhost:5173",
@@ -20,70 +24,78 @@ export function initializeSocket(server: any) {
     }
   });
 
+  // Configurar Redis Adapter para Escalabilidade (Multinode)
+  if (process.env.REDIS_URL) {
+    try {
+      pubClient = new IORedis(process.env.REDIS_URL);
+      subClient = pubClient.duplicate();
+      io.adapter(createAdapter(pubClient, subClient));
+      logger.info('Socket.IO Redis Adapter configurado');
+    } catch (error) {
+      logger.error({ err: error }, 'Erro ao conectar Redis para Socket.IO Adapter');
+    }
+  }
+
   // Middleware de autenticação
   io.use(async (socket: Socket, next) => {
     try {
       const token = socket.handshake.auth.token || socket.handshake.query.token;
 
       if (!token) {
-        // Permitir conexões públicas (ex: TV/Telão) sem token
         return next();
       }
 
-      // Verificar token JWT
       const decoded = jwt.verify(token as string, config.jwtSecret) as any;
 
-      // Buscar usuário no banco
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
         select: { id: true, name: true, email: true, role: true }
       });
 
       if (user) {
-        // Anexar dados do usuário ao socket
         socket.data.user = user;
       }
       
       next();
     } catch (error) {
-      // Em caso de erro no token, apenas ignora o usuário mas permite a conexão como público
       logger.warn({ err: error }, 'Falha na autenticação do socket, conectando como público');
       next();
     }
   });
 
-  io.on('connection', (socket: Socket) => {
+  io.on('connection', async (socket: Socket) => {
     const user = socket.data.user;
     
     if (user) {
       logger.info({ socketId: socket.id, userId: user.id, userName: user.name }, 'Cliente autenticado conectado');
-      // Registrar usuário conectado
-      connectedUsers.set(user.id, socket.id);
-      // Entrar na sala do usuário
+      
+      // Registrar no Redis se disponível (para múltiplos servidores entenderem quem está online)
+      if (pubClient) {
+        await pubClient.hset(REDIS_ONLINE_KEY, user.id, socket.id);
+      }
+      
       socket.join(`user_${user.id}`);
     } else {
       logger.info({ socketId: socket.id }, 'Dispositivo público conectado');
     }
 
-    // Evento genérico de Join (usado pela TV para murais)
     socket.on('join', (room: string) => {
-      // Segurança: Permitir apenas salas de murais ou eventos publicamente
       if (room.startsWith('wall:') || room.startsWith('event:')) {
         socket.join(room);
         logger.info({ socketId: socket.id, room }, 'Dispositivo entrou na sala do mural');
       } else if (user) {
-        // Usuários autenticados podem entrar em outras salas
         socket.join(room);
       }
     });
 
-    // Eventos de chat
     socket.on('join_chat', (chatId: string) => {
+      if (!user) return;
       socket.join(`chat_${chatId}`);
       logger.info({ userName: user.name, chatId }, 'Usuário entrou no chat');
     });
 
     socket.on('leave_chat', (chatId: string) => {
+      if (!user) return;
       socket.leave(`chat_${chatId}`);
       logger.info({ userName: user.name, chatId }, 'Usuário saiu do chat');
     });
@@ -95,14 +107,17 @@ export function initializeSocket(server: any) {
       fileUrl?: string;
       fileName?: string;
     }) => {
+      if (!user) {
+        return socket.emit('message_error', { error: 'Não autenticado' });
+      }
+
       try {
-        // Salvar mensagem no banco
         const message = await prisma.chatMessage.create({
           data: {
             chatId: data.chatId,
             senderId: user.id,
             content: data.content,
-            messageType: data.messageType as MessageType,
+            messageType: data.messageType as any,
             fileUrl: data.fileUrl,
             fileName: data.fileName,
           },
@@ -113,10 +128,8 @@ export function initializeSocket(server: any) {
           }
         });
 
-        // Emitir para todos no chat
         io?.to(`chat_${data.chatId}`).emit('new_message', message);
 
-        // Notificar participantes do chat (exceto o remetente)
         const chat = await prisma.chat.findUnique({
           where: { id: data.chatId },
           include: { participants: true }
@@ -132,7 +145,6 @@ export function initializeSocket(server: any) {
             });
           });
         }
-
       } catch (error) {
         logger.error({ err: error }, 'Erro ao enviar mensagem');
         socket.emit('message_error', { error: 'Erro ao enviar mensagem' });
@@ -140,6 +152,7 @@ export function initializeSocket(server: any) {
     });
 
     socket.on('typing_start', (chatId: string) => {
+      if (!user) return;
       socket.to(`chat_${chatId}`).emit('user_typing', {
         userId: user.id,
         userName: user.name,
@@ -148,6 +161,7 @@ export function initializeSocket(server: any) {
     });
 
     socket.on('typing_stop', (chatId: string) => {
+      if (!user) return;
       socket.to(`chat_${chatId}`).emit('user_stopped_typing', {
         userId: user.id,
         userName: user.name,
@@ -156,6 +170,7 @@ export function initializeSocket(server: any) {
     });
 
     socket.on('mark_as_read', async (data: { chatId: string; messageId: string }) => {
+      if (!user) return;
       try {
         await prisma.chatMessageRead.create({
           data: {
@@ -165,7 +180,6 @@ export function initializeSocket(server: any) {
           }
         });
 
-        // Notificar outros participantes
         socket.to(`chat_${data.chatId}`).emit('message_read', {
           messageId: data.messageId,
           userId: user.id,
@@ -176,10 +190,12 @@ export function initializeSocket(server: any) {
       }
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       if (user) {
         logger.info({ socketId: socket.id, userName: user.name }, 'Cliente autenticado desconectado');
-        connectedUsers.delete(user.id);
+        if (pubClient) {
+          await pubClient.hdel(REDIS_ONLINE_KEY, user.id);
+        }
       } else {
         logger.info({ socketId: socket.id }, 'Dispositivo público desconectado');
       }
@@ -196,10 +212,11 @@ export function getSocketIO(): SocketIOServer {
   return io;
 }
 
-export function getConnectedUsers() {
-  return connectedUsers;
-}
-
-export function isUserOnline(userId: string): boolean {
-  return connectedUsers.has(userId);
+export async function isUserOnline(userId: string): Promise<boolean> {
+  if (pubClient) {
+    const res = await pubClient.hexists(REDIS_ONLINE_KEY, userId);
+    return res === 1;
+  }
+  // Fallback se Redis não estiver ativo, não temos como saber em multinode sem Redis
+  return false;
 }

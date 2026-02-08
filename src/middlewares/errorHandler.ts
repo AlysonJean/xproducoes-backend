@@ -1,77 +1,71 @@
-// Caminho do arquivo: backend/src/middlewares/errorHandler.ts
-
 import { Request, Response, NextFunction } from "express";
 import logger from "../config/logger";
 import { ZodError } from "zod";
+import { AppError } from "../utils/errors";
 
-// Tipamos o erro como `unknown` para maior segurança
 export function errorHandler(
   err: unknown,
   req: Request,
   res: Response,
   _next: NextFunction,
 ) {
-  // Log detalhado do erro
-  // Verificamos se 'err' é um objeto do tipo Error para acessar 'message' e 'stack'
+  // 1. Log detalhado
   if (err instanceof Error) {
     logger.error({
       message: err.message,
-      stack: err.stack,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
       path: req.path,
       method: req.method,
+      requestId: (req as any).requestId,
     });
   } else {
-    // Se não for um Error, logamos o que recebemos
     logger.error({
-      message: "Um erro não padrão ocorreu",
+      message: "Um erro não identificado ocorreu",
       error: err,
       path: req.path,
-      method: req.method,
     });
   }
 
-  // Erro de validação Zod
+  // 2. Erros de Validação (Zod)
   if (err instanceof ZodError) {
-    return res
-      .status(422)
-      .json({ message: "Dados inválidos", details: err.issues });
+    return res.status(422).json({
+      success: false,
+      message: "Erro de validação de dados",
+      errors: err.issues,
+    });
   }
 
-  // Para outros erros, retornamos uma mensagem mais específica se possível
-  if (err instanceof Error) {
-    if (err.message.includes("não encontrado")) {
-      return res.status(404).json({ message: err.message });
-    }
-    if (err.message.includes("Acesso negado")) {
-      return res.status(403).json({ message: err.message });
-    }
-    if (err.message.includes("Credenciais inválidas")) {
-      return res.status(401).json({ message: err.message });
-    }
-    if (
-      err.message.includes("já está em uso") ||
-      err.message.includes("já existe")
-    ) {
-      return res.status(409).json({ message: err.message });
-    }
-    if (
-      err.message.includes("inválido") ||
-      err.message.includes("obrigatório") ||
-      err.message.includes("deve ter")
-    ) {
-      return res.status(400).json({ message: err.message });
+  // 3. Erros Operacionais da Aplicação (Customizados)
+  if (err instanceof AppError) {
+    // Reporting security events
+    const ip = req.ip || (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+
+    if (err.statusCode === 401) {
+      const { securityMonitor } = require('../config/securityMonitor');
+      securityMonitor.recordInvalidToken(ip, userAgent, req.path, { message: err.message });
+    } else if (err.statusCode === 403) {
+      const { securityMonitor } = require('../config/securityMonitor');
+      securityMonitor.recordSuspiciousActivity(ip, userAgent, req.path, { message: err.message, type: 'forbidden_access' });
     }
 
-    // Para ambiente de desenvolvimento, retornar a mensagem real do erro
-    if (process.env.NODE_ENV !== "production") {
-      return res.status(500).json({
-        message: "Erro interno do servidor",
-        details: err.message,
-        stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
-      });
-    }
+    return res.status(err.statusCode).json({
+      success: false,
+      message: err.message,
+      code: err.code,
+      ...(err.constructor.name === 'ValidationError' && { details: (err as any).details })
+    });
   }
 
-  // Erro genérico
-  return res.status(500).json({ message: "Erro interno do servidor" });
+  // 4. Erros do Prisma (Opcional: tratar erros comuns de banco)
+  // if (err instanceof Prisma.PrismaClientKnownRequestError) { ... }
+
+  // 5. Erro Genérico (Fallback de Segurança)
+  const isProd = process.env.NODE_ENV === "production";
+  
+  return res.status(500).json({
+    success: false,
+    message: isProd ? "Ocorreu um erro interno no servidor" : (err instanceof Error ? err.message : "Erro desconhecido"),
+    ...( !isProd && err instanceof Error ? { stack: err.stack } : {} )
+  });
 }

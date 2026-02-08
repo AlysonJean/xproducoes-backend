@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { AuthService } from "../services/authService";
 import logger from "../config/logger";
-import { isAppError, getErrorMessage, getErrorCode } from "../types/common";
 import { setAuthCookies, clearAuthCookies } from "../config/cookies";
+import { BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError } from "../utils/errors";
 
 // Função para validar access token do Google
 async function validateGoogleToken(accessToken: string): Promise<{
@@ -90,92 +90,74 @@ export class AuthController {
   register = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
-    try {
-      const { name, email, password, role, phone, companyName } = req.body;
-      if (!name || !email || !password) {
-        res.status(400).json({ message: 'Nome, e-mail e senha são obrigatórios' });
-        return;
-      }
-      const result = await this.authService.register({
-        name,
-        email,
-        password,
-        role,
-        phone,
-        companyName,
-      });
-      res.status(201).json(result);
-    } catch (error) {
-      next(error);
+    const { name, email, password, role, phone, companyName } = req.body;
+    if (!name || !email || !password) {
+      throw new BadRequestError('Nome, e-mail e senha são obrigatórios');
     }
+    const result = await this.authService.register({
+      name,
+      email,
+      password,
+      role,
+      phone,
+      companyName,
+    });
+    res.status(201).json(result);
   };
 
   login = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
-    try {
-      const { email, password } = req.body;
-      if (!email || !password) {
-        res.status(400).json({ message: "Email e senha são obrigatórios" });
-        return;
-      }
+    const { email, password } = req.body;
+    if (!email || !password) {
+      throw new BadRequestError("Email e senha são obrigatórios");
+    }
 
-      try {
-        const result = await this.authService.login({ email, password });
-        
-        // Definir tokens como httpOnly cookies
-        setAuthCookies(res, result.token, result.refreshToken);
-        
-        // Retornar dados do usuário (sem tokens no body para maior segurança)
-        res.status(200).json({
-          user: result.user,
-          redirectTo: result.redirectTo,
-          // Manter tokens no response para compatibilidade com apps mobile
-          token: result.token,
-          refreshToken: result.refreshToken,
-        });
-      } catch (error: unknown) {
-        if (getErrorCode(error) === 'EMAIL_NOT_VERIFIED') {
-          res.status(403).json({
-            message: 'E-mail não verificado. Verifique sua caixa de entrada.',
-            code: 'EMAIL_NOT_VERIFIED',
-          });
-          return;
-        }
-        const errMsg = getErrorMessage(error);
-        if (errMsg === "Credenciais inválidas." || errMsg === 'Usuário não encontrado' || errMsg === 'Senha inválida') {
-          res.status(401).json({ message: 'Credenciais inválidas.' });
-          return;
-        }
-        throw error;
+    try {
+      const result = await this.authService.login({ email, password });
+      
+      setAuthCookies(res, result.token, result.refreshToken);
+      
+      res.status(200).json({
+        user: result.user,
+        redirectTo: result.redirectTo,
+        token: result.token,
+        refreshToken: result.refreshToken,
+      });
+    } catch (error: any) {
+      if (error.code === 'EMAIL_NOT_VERIFIED' || error.message?.includes('verificado')) {
+        throw new ForbiddenError('E-mail não verificado. Verifique sua caixa de entrada.', 'EMAIL_NOT_VERIFIED');
       }
-    } catch (error) {
-      logger.error({obj:error}, "Erro no login:");
-      next(error);
+      
+      if (error.message === "Credenciais inválidas." || error.message?.includes('not found') || error.message?.includes('invalid')) {
+        throw new UnauthorizedError('Credenciais inválidas.');
+      }
+      
+      throw error;
     }
   };
 
   requestPasswordReset = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
+    const { email } = req.body;
+    const ipAddress = req.ip || req.socket.remoteAddress || undefined;
+    const userAgent = req.get('user-agent') || undefined;
+    
     try {
-      const { email } = req.body;
-      const ipAddress = req.ip || req.socket.remoteAddress || undefined;
-      const userAgent = req.get('user-agent') || undefined;
       const result = await this.authService.requestPasswordReset(email, ipAddress, userAgent);
       res.status(200).json(result);
-    } catch (error: unknown) {
-      if (getErrorMessage(error) === 'Usuário não encontrado') {
-        res.status(404).json({ message: 'Não encontramos nenhuma conta com este e-mail.' });
-        return;
+    } catch (error: any) {
+      if (error.message === 'Usuário não encontrado') {
+        throw new NotFoundError('Não encontramos nenhuma conta com este e-mail.');
       }
-      next(error);
+      throw error;
     }
   };
 
@@ -198,19 +180,16 @@ export class AuthController {
   verifyEmail = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
+    const token = (req.query.token as string) || req.body.token;
+    if (!token) throw new BadRequestError('Token é obrigatório');
+    
     try {
-      const token = (req.query.token as string) || req.body.token;
-  if (!token) { res.status(400).json({ message: 'Token é obrigatório' }); return; }
-      try {
-        await (await import('../services/userService')).verifyEmailByToken(token);
-        res.status(200).json({ success: true });
-      } catch (e: unknown) {
-        res.status(400).json({ message: getErrorMessage(e) || 'Token inválido' });
-      }
-    } catch (error) {
-      next(error);
+      await (await import('../services/userService')).verifyEmailByToken(token);
+      res.status(200).json({ success: true });
+    } catch (e: any) {
+      throw new BadRequestError(e.message || 'Token inválido');
     }
   };
 
@@ -218,37 +197,28 @@ export class AuthController {
   resendVerificationPublic = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
-    try {
-      const { email } = req.body;
-  if (!email) { res.status(400).json({ message: 'Email é obrigatório' }); return; }
-  const user = await this.authService.findUserByEmail(email);
-  if (!user) { res.status(404).json({ message: 'Usuário não encontrado' }); return; }
-  await (await import('../services/userService')).resendEmailVerification(user.id);
-  res.json({ success: true });
-    } catch (error) {
-      next(error);
-    }
+    const { email } = req.body;
+    if (!email) throw new BadRequestError('Email é obrigatório');
+    
+    const user = await this.authService.findUserByEmail(email);
+    if (!user) throw new NotFoundError('Usuário não encontrado');
+    
+    await (await import('../services/userService')).resendEmailVerification(user.id);
+    res.json({ success: true });
   };
 
   getProfile = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
-    try {
-      if (!req.userId) {
-        res
-          .status(401)
-          .json({ message: "ID do utilizador não encontrado no token." });
-        return;
-      }
-      const user = await this.authService.getProfile(req.userId);
-      res.json(user);
-    } catch (error) {
-      next(error);
+    if (!req.userId) {
+      throw new UnauthorizedError("ID do utilizador não encontrado no token.");
     }
+    const user = await this.authService.getProfile(req.userId);
+    res.json(user);
   };
 
   updateProfile = async (
@@ -300,22 +270,17 @@ export class AuthController {
   completeRegistration = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
+    const { token, password } = req.body;
+    if (!token || !password) {
+      throw new BadRequestError('Token e password são obrigatórios');
+    }
     try {
-      const { token, password } = req.body;
-      if (!token || !password) {
-        res.status(400).json({ message: 'Token e password são obrigatórios' });
-        return;
-      }
-      try {
-        await this.authService.resetPassword(token, password);
-        res.status(200).json({ success: true });
-      } catch (e: unknown) {
-        res.status(400).json({ message: getErrorMessage(e) || 'Falha ao completar registro' });
-      }
-    } catch (error) {
-      next(error);
+      await this.authService.resetPassword(token, password);
+      res.status(200).json({ success: true });
+    } catch (e: any) {
+      throw new BadRequestError(e.message || 'Falha ao completar registro');
     }
   };
 
@@ -573,66 +538,52 @@ export class AuthController {
   refresh = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
+    const refreshToken = req.cookies?.x_refresh_token || req.body.refreshToken;
+    
+    if (!refreshToken) {
+      throw new BadRequestError('Refresh token é obrigatório');
+    }
+
+    const jwt = require('jsonwebtoken');
+    const config = require('../config/environment').config;
+
     try {
-      // Tentar pegar refresh token do cookie primeiro, depois do body
-      const refreshToken = req.cookies?.x_refresh_token || req.body.refreshToken;
-      
-      if (!refreshToken) {
-        res.status(400).json({ message: 'Refresh token é obrigatório' });
-        return;
+      const decoded = jwt.verify(refreshToken, config.jwtSecret) as any;
+
+      const user = await this.authService.getProfile(decoded.userId);
+      if (!user) {
+        throw new UnauthorizedError('Usuário não encontrado');
       }
 
-      // Verificar se o refresh token é válido
-      const jwt = require('jsonwebtoken');
-      const config = require('../config/environment').config;
+      const newToken = jwt.sign(
+        { userId: user.id, role: user.role },
+        config.jwtSecret,
+        { expiresIn: '15m' }
+      );
 
-      try {
-        const decoded = jwt.verify(refreshToken, config.jwtSecret) as any;
+      const newRefreshToken = jwt.sign(
+        { userId: user.id, role: user.role },
+        config.jwtSecret,
+        { expiresIn: '7d' }
+      );
 
-        // Buscar usuário para confirmar que ainda existe
-        const user = await this.authService.getProfile(decoded.userId);
-        if (!user) {
-          res.status(401).json({ message: 'Usuário não encontrado' });
-          return;
+      setAuthCookies(res, newToken, newRefreshToken);
+
+      res.status(200).json({
+        accessToken: newToken,
+        refreshToken: newRefreshToken,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role
         }
-
-        // Gerar novo access token
-        const newToken = jwt.sign(
-          { userId: user.id, role: user.role },
-          config.jwtSecret,
-          { expiresIn: '15m' }
-        );
-
-        // Gerar novo refresh token
-        const newRefreshToken = jwt.sign(
-          { userId: user.id, role: user.role },
-          config.jwtSecret,
-          { expiresIn: '7d' }
-        );
-
-        // Definir novos tokens como cookies
-        setAuthCookies(res, newToken, newRefreshToken);
-
-        res.status(200).json({
-          accessToken: newToken,
-          refreshToken: newRefreshToken,
-          user: {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            role: user.role
-          }
-        });
-      } catch (tokenError) {
-        // Limpar cookies inválidos
-        clearAuthCookies(res);
-        res.status(401).json({ message: 'Refresh token inválido' });
-        return;
-      }
-    } catch (error) {
-      next(error);
+      });
+    } catch {
+      clearAuthCookies(res);
+      throw new UnauthorizedError('Refresh token inválido');
     }
   };
 
@@ -644,59 +595,42 @@ export class AuthController {
   facebookDataDeletion = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ): Promise<void> => {
-    try {
-      const signedRequest = req.body.signed_request;
-      
-      if (!signedRequest) {
-        res.status(400).json({ error: 'signed_request é obrigatório' });
-        return;
-      }
-
-      // Decodificar o signed_request do Facebook
-      const [encodedSig, payload] = signedRequest.split('.');
-      
-      // Decodificar o payload (base64url)
-      const data = JSON.parse(
-        Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8')
-      );
-      
-      const userId = data.user_id;
-      
-      if (!userId) {
-        res.status(400).json({ error: 'user_id não encontrado no signed_request' });
-        return;
-      }
-      
-      logger.info({ facebookUserId: userId }, 'Solicitação de exclusão de dados do Facebook recebida');
-      
-      // Gerar código de confirmação único
-      const confirmationCode = `FB-DEL-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      
-      // Nota: Como não armazenamos o Facebook ID separadamente no banco de dados,
-      // não conseguimos mapear diretamente o user_id do Facebook para nosso usuário.
-      // O login via Facebook usa o email retornado pela API, não o user_id.
-      // 
-      // Para uma implementação completa, você precisaria:
-      // 1. Adicionar um campo 'facebookId' ao schema do Prisma
-      // 2. Salvar o Facebook user_id durante o primeiro login
-      // 3. Usar esse campo para buscar e excluir o usuário aqui
-      //
-      // Por enquanto, logamos a solicitação e retornamos sucesso ao Facebook
-      logger.info({ facebookId: userId }, 'Solicitação de exclusão registrada (Facebook ID não mapeado para usuário local)');
-      
-      // Resposta no formato exigido pelo Facebook
-      const statusUrl = `${process.env.FRONTEND_URL || 'https://xproducoeseeventos.com.br'}/data-deletion-status?code=${confirmationCode}`;
-      
-      res.status(200).json({
-        url: statusUrl,
-        confirmation_code: confirmationCode
-      });
-      
-    } catch (error) {
-      logger.error({ error }, 'Erro no callback de exclusão de dados do Facebook');
-      next(error);
+    const signedRequest = req.body.signed_request;
+    
+    if (!signedRequest) {
+      throw new BadRequestError('signed_request é obrigatório');
     }
+
+    // Decodificar o signed_request do Facebook
+    const parts = signedRequest.split('.');
+    if (parts.length !== 2) throw new BadRequestError('signed_request inválido');
+    
+    const payload = parts[1];
+    
+    // Decodificar o payload (base64url)
+    const data = JSON.parse(
+      Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8')
+    );
+    
+    const userId = data.user_id;
+    
+    if (!userId) {
+      throw new BadRequestError('user_id não encontrado no signed_request');
+    }
+    
+    logger.info({ facebookUserId: userId }, 'Solicitação de exclusão de dados do Facebook recebida');
+    
+    const confirmationCode = `FB-DEL-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    
+    logger.info({ facebookId: userId }, 'Solicitação de exclusão registrada (Facebook ID não mapeado para usuário local)');
+    
+    const statusUrl = `${process.env.FRONTEND_URL || 'https://xproducoeseeventos.com.br'}/data-deletion-status?code=${confirmationCode}`;
+    
+    res.status(200).json({
+      url: statusUrl,
+      confirmation_code: confirmationCode
+    });
   };
 }

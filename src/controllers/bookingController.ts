@@ -4,45 +4,30 @@ import { prisma } from "../config/prisma";
 import { BookingStatus, DeliveryStatus } from "@prisma/client";
 import { bookingCreateSchema } from "../validators/bookingSchema";
 import logger from "../config/logger";
+import { BadRequestError, ForbiddenError, NotFoundError } from "../utils/errors";
 
 const bookingService = new BookingService();
 
 export class BookingController {
-  create = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      // Validação do schema
-      const validatedData = bookingCreateSchema.parse(req.body);
-      
-      // Validação de negócio
-      const { kitId, equipmentIds } = validatedData;
-      if (!kitId && (!equipmentIds || !Array.isArray(equipmentIds) || equipmentIds.length === 0)) {
-        res.status(400).json({
-          success: false,
-          message: "É necessário fornecer um kit ou uma lista de equipamentos.",
-        });
-        return;
-      }
-
-  // Suporte a idempotency: ler header 'Idempotency-Key' ou 'x-idempotency-key'
-  const idempotencyKey = (req.header('Idempotency-Key') || req.header('x-idempotency-key')) as string | undefined;
-  const booking = await bookingService.createBooking(validatedData, req.userId!, idempotencyKey);
-      
-      res.status(201).json({
-        success: true,
-        message: "Reserva criada com sucesso",
-        data: booking
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Erro no controller create");
-      if (error instanceof Error) {
-        res.status(400).json({
-          success: false,
-          message: error.message
-        });
-      } else {
-        next(error);
-      }
+  create = async (req: Request, res: Response, _next: NextFunction) => {
+    // Validação do schema
+    const validatedData = bookingCreateSchema.parse(req.body);
+    
+    // Validação de negócio
+    const { kitId, equipmentIds } = validatedData;
+    if (!kitId && (!equipmentIds || !Array.isArray(equipmentIds) || equipmentIds.length === 0)) {
+      throw new BadRequestError("É necessário fornecer um kit ou uma lista de equipamentos.");
     }
+
+    // Suporte a idempotency
+    const idempotencyKey = (req.header('Idempotency-Key') || req.header('x-idempotency-key')) as string | undefined;
+    const booking = await bookingService.createBooking(validatedData, req.userId!, idempotencyKey);
+    
+    res.status(201).json({
+      success: true,
+      message: "Reserva criada com sucesso",
+      data: booking
+    });
   };
 
   findByUser = async (req: Request, res: Response, next: NextFunction) => {
@@ -135,53 +120,24 @@ export class BookingController {
     }
   };
 
-  updateStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  updateStatus = async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     if (req.userRole !== "ADMIN") {
-      res.status(403).json({ 
-        success: false,
-        message: "Acesso negado." 
-      });
-      return;
+      throw new ForbiddenError("Acesso negado.");
     }
 
-    try {
-      const { id } = req.params as { id: string };
-      const { status } = req.body as { status: BookingStatus };
+    const { id } = req.params as { id: string };
+    const { status } = req.body as { status: BookingStatus };
 
-      if (!id) {
-        res.status(400).json({ 
-          success: false,
-          message: "ID da reserva é obrigatório." 
-        });
-        return;
-      }
+    if (!id) throw new BadRequestError("ID da reserva é obrigatório.");
+    if (!Object.values(BookingStatus).includes(status)) throw new BadRequestError("Estado inválido.");
 
-      if (!Object.values(BookingStatus).includes(status)) {
-        res.status(400).json({ 
-          success: false,
-          message: "Estado inválido." 
-        });
-        return;
-      }
-
-      const updatedBooking = await bookingService.updateBookingStatus(id, status);
-      
-      res.json({
-        success: true,
-        message: "Status atualizado com sucesso",
-        data: updatedBooking
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Erro no controller updateStatus");
-      if (error instanceof Error) {
-        res.status(400).json({
-          success: false,
-          message: error.message
-        });
-      } else {
-        next(error);
-      }
-    }
+    const updatedBooking = await bookingService.updateBookingStatus(id, status);
+    
+    res.json({
+      success: true,
+      message: "Status atualizado com sucesso",
+      data: updatedBooking
+    });
   };
 
   updateDeliveryStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {

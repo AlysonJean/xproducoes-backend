@@ -1,9 +1,10 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import { CollaboratorService } from "../services/collaboratorService";
 import { z } from "zod";
 import { prisma } from "../config/prisma";
 import logger from "../config/logger";
 import emailServiceInstance from "../services/emailService";
+import { BadRequestError, NotFoundError } from "../utils/errors";
 
 const collaboratorService = new CollaboratorService();
 
@@ -68,129 +69,71 @@ const assignCollaboratorSchema = z.object({
 
 export class CollaboratorController {
   // CRUD de Colaboradores
-  async createCollaborator(req: Request, res: Response) {
-    try {
-      const validatedData = createCollaboratorSchema.parse(req.body);
+  async createCollaborator(req: Request, res: Response, _next: NextFunction) {
+    const validatedData = createCollaboratorSchema.parse(req.body);
 
-      // Mapear 'role' para 'collaboratorRole' e incluir dados do usuário
-      const collaboratorData = {
-        name: validatedData.name,
-        email: validatedData.email,
-        phone: validatedData.phone,
-        collaboratorRole: validatedData.role,
-        specialties: validatedData.specialties,
-        hourlyRate: validatedData.hourlyRate,
-        fixedRate: validatedData.fixedRate,
-        commissionRate: validatedData.commissionRate,
-        status: validatedData.status,
-        availabilityStatus: validatedData.availabilityStatus,
-      };
+    // Mapear 'role' para 'collaboratorRole' e incluir dados do usuário
+    const collaboratorData = {
+      name: validatedData.name,
+      email: validatedData.email,
+      phone: validatedData.phone,
+      collaboratorRole: validatedData.role,
+      specialties: validatedData.specialties,
+      hourlyRate: validatedData.hourlyRate,
+      fixedRate: validatedData.fixedRate,
+      commissionRate: validatedData.commissionRate,
+      status: validatedData.status,
+      availabilityStatus: validatedData.availabilityStatus,
+    };
 
-      const collaborator =
-        await collaboratorService.createCollaborator(collaboratorData);
+    const collaborator =
+      await collaboratorService.createCollaborator(collaboratorData);
 
-      return res.status(201).json({
-        success: true,
-        data: collaborator,
-        message: "Colaborador criado com sucesso",
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Erro ao criar colaborador");
-
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({
-          success: false,
-          message: "Dados inválidos",
-          errors: error.issues,
-        });
-      }
-
-      return res.status(500).json({
-        success: false,
-        message: "Erro interno do servidor",
-      });
-    }
+    return res.status(201).json({
+      success: true,
+      data: collaborator,
+      message: "Colaborador criado com sucesso",
+    });
   }
 
-  async getAllCollaborators(req: Request, res: Response) {
-    try {
-      const collaborators = await collaboratorService.getAllCollaborators();
+  async getAllCollaborators(req: Request, res: Response, _next: NextFunction) {
+    const collaborators = await collaboratorService.getAllCollaborators();
 
-      return res.json({
-        success: true,
-        data: collaborators,
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Erro ao buscar colaboradores");
-      return res.status(500).json({
-        success: false,
-        message: "Erro ao buscar colaboradores",
-      });
-    }
+    return res.json({
+      success: true,
+      data: collaborators,
+    });
   }
 
-  async getCollaboratorById(req: Request, res: Response) {
-    try {
-      const { id } = req.params as { id: string };
+  async getCollaboratorById(req: Request, res: Response, _next: NextFunction) {
+    const { id } = req.params as { id: string };
+    if (!id) throw new BadRequestError("ID do colaborador é obrigatório");
 
-      if (!id) {
-        return res.status(400).json({
-          success: false,
-          message: "ID do colaborador é obrigatório",
-        });
-      }
+    const collaborator = await collaboratorService.getCollaboratorById(id);
+    if (!collaborator) throw new NotFoundError("Colaborador não encontrado");
 
-      const collaborator = await collaboratorService.getCollaboratorById(id);
-
-      if (!collaborator) {
-        return res.status(404).json({
-          success: false,
-          message: "Colaborador não encontrado",
-        });
-      }
-
-      return res.json({
-        success: true,
-        data: collaborator,
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Erro ao buscar colaborador");
-      return res.status(500).json({
-        success: false,
-        message: "Erro ao buscar colaborador",
-      });
-    }
+    return res.json({
+      success: true,
+      data: collaborator,
+    });
   }
 
-  async updateCollaborator(req: Request, res: Response) {
-    try {
-      const { id } = req.params as { id: string };
-      const updateData = req.body;
+  async updateCollaborator(req: Request, res: Response, _next: NextFunction) {
+    const { id } = req.params as { id: string };
+    const updateData = req.body;
 
-      if (!id) {
-        return res.status(400).json({
-          success: false,
-          message: "ID do colaborador é obrigatório",
-        });
-      }
+    if (!id) throw new BadRequestError("ID do colaborador é obrigatório");
 
-      const collaborator = await collaboratorService.updateCollaborator(
-        id,
-        updateData,
-      );
+    const collaborator = await collaboratorService.updateCollaborator(
+      id,
+      updateData,
+    );
 
-      return res.json({
-        success: true,
-        data: collaborator,
-        message: "Colaborador atualizado com sucesso",
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Erro ao atualizar colaborador");
-      return res.status(500).json({
-        success: false,
-        message: "Erro ao atualizar colaborador",
-      });
-    }
+    return res.json({
+      success: true,
+      data: collaborator,
+      message: "Colaborador atualizado com sucesso",
+    });
   }
 
   async deleteCollaborator(req: Request, res: Response) {

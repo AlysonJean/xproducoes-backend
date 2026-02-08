@@ -5,7 +5,7 @@ import logger from '../config/logger';
 export class SitemapController {
   async getSitemap(req: Request, res: Response) {
     try {
-      const baseUrl = process.env.FRONTEND_URL || 'https://xproducoes.com.br';
+      const baseUrl = (process.env.FRONTEND_URL || 'https://xproducoes.com.br').replace(/\/$/, '');
       
       // Static pages that should be indexed
       const staticRoutes = [
@@ -28,14 +28,14 @@ export class SitemapController {
         }),
         prisma.equipment.findMany({ 
           where: { status: 'ACTIVE' }, 
-          select: { id: true, updatedAt: true } 
+          select: { id: true, slug: true, updatedAt: true } 
         }),
         prisma.kit.findMany({ 
           where: { status: 'ACTIVE' }, 
-          select: { id: true, updatedAt: true } 
+          select: { id: true, slug: true, updatedAt: true } 
         }),
         prisma.portfolio.findMany({ 
-          select: { id: true, updatedAt: true } 
+          select: { id: true, slug: true, updatedAt: true } 
         })
       ]);
 
@@ -60,7 +60,7 @@ export class SitemapController {
         if (cat.slug) {
           xml += `
   <url>
-    <loc>${baseUrl}/equipamentos?categoria=${cat.slug}</loc>
+    <loc>${baseUrl}/equipamentos/categoria/${cat.slug}</loc>
     <lastmod>${formatDate(cat.updatedAt)}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
@@ -70,9 +70,10 @@ export class SitemapController {
 
       // Equipments
       equipments.forEach(eq => {
+        const identifier = eq.slug || eq.id;
         xml += `
   <url>
-    <loc>${baseUrl}/equipamentos/${eq.id}</loc>
+    <loc>${baseUrl}/equipamento/${identifier}</loc>
     <lastmod>${formatDate(eq.updatedAt)}</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
@@ -81,9 +82,10 @@ export class SitemapController {
 
       // Kits
       kits.forEach(k => {
+        const identifier = k.slug || k.id;
         xml += `
   <url>
-    <loc>${baseUrl}/kits/${k.id}</loc>
+    <loc>${baseUrl}/kits/${identifier}</loc>
     <lastmod>${formatDate(k.updatedAt)}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
@@ -92,9 +94,10 @@ export class SitemapController {
 
       // Portfolio
       portfolios.forEach(p => {
+        const identifier = p.slug || p.id;
         xml += `
   <url>
-    <loc>${baseUrl}/portfolio/${p.id}</loc>
+    <loc>${baseUrl}/portfolio/${identifier}</loc>
     <lastmod>${formatDate(p.updatedAt)}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
