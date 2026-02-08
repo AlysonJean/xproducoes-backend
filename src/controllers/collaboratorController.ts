@@ -153,9 +153,20 @@ export class CollaboratorController {
     const validatedData = assignCollaboratorSchema.parse(req.body);
 
     const assignment = await collaboratorService.assignCollaboratorToEvent({
-      ...validatedData,
       bookingId: validatedData.eventId,
-    });
+      collaboratorId: validatedData.collaboratorId,
+      role: validatedData.role as any,
+      status: (validatedData.status as any) || "ASSIGNED",
+      notes: validatedData.notes || null,
+      hourlyRate: validatedData.hourlyRate || null,
+      fixedRate: validatedData.fixedRate || null,
+      totalHours: null,
+      totalPayment: null,
+      rating: null,
+      feedback: null,
+      arrivalConfirmed: false,
+      departureConfirmed: false
+    } as any);
 
     // Buscar dados para envio de notificação (não falha a requisição se falhar)
     try {
@@ -229,56 +240,6 @@ export class CollaboratorController {
       success: true,
       data: events,
     });
-  }
-
-  async updateEventCollaborator(req: Request, res: Response) {
-    try {
-      const { id } = req.params as { id: string };
-
-      if (!id) {
-        return res.status(400).json({
-          success: false,
-          message: "ID da atribuição é obrigatório",
-        });
-      }
-
-      // Método não implementado no service
-      return res.status(501).json({
-        success: false,
-        message: "Atualização de colaborador em evento não implementada ainda",
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Erro ao atualizar atribuição");
-      return res.status(500).json({
-        success: false,
-        message: "Erro ao atualizar atribuição",
-      });
-    }
-  }
-
-  async removeCollaboratorFromEvent(req: Request, res: Response) {
-    try {
-      const { id } = req.params as { id: string };
-
-      if (!id) {
-        return res.status(400).json({
-          success: false,
-          message: "ID da atribuição é obrigatório",
-        });
-      }
-
-      // Método não implementado no service
-      return res.status(501).json({
-        success: false,
-        message: "Remoção de colaborador de evento não implementada ainda",
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Erro ao remover colaborador do evento");
-      return res.status(500).json({
-        success: false,
-        message: "Erro ao remover colaborador do evento",
-      });
-    }
   }
 
   // Busca e estatísticas
@@ -509,9 +470,10 @@ export class CollaboratorController {
       date: new Date(validatedData.startDate), 
       startTime: validatedData.startTime,
       endTime: validatedData.endTime,
-      status: validatedData.status,
-      notes: validatedData.notes
-    });
+      status: validatedData.status as any,
+      notes: validatedData.notes || null,
+      eventId: null
+    } as any);
 
     return res.status(201).json({ success: true, data: avail });
   }
@@ -578,9 +540,9 @@ export class CollaboratorController {
       collaboratorId: validatedData.collaboratorId,
       eventId: validatedData.eventId,
       amount: validatedData.amount,
-      type: validatedData.type,
+      type: validatedData.type as any,
       description: validatedData.description || "Pagamento manual",
-      dueDate: validatedData.paymentDate,
+      dueDate: new Date(validatedData.paymentDate),
       notes: validatedData.notes,
     });
     return res.status(201).json({ success: true, data: payment });
@@ -596,7 +558,12 @@ export class CollaboratorController {
   }
 
   async deletePayment(req: Request, res: Response, _next: NextFunction) {
-    return res.status(501).json({ success: false, message: "Remoção não implementada" });
+    const { id } = req.params as { id: string };
+    if (!id) throw new BadRequestError('ID do pagamento é obrigatório');
+    if (req.userRole !== 'ADMIN') throw new ForbiddenError('Acesso negado');
+
+    await collaboratorService.deletePayment(id);
+    return res.json({ success: true, message: "Pagamento removido" });
   }
 
   async getCollaboratorPayments(req: Request, res: Response, _next: NextFunction) {
@@ -611,7 +578,20 @@ export class CollaboratorController {
   }
 
   async getAllEventCollaborators(req: Request, res: Response, _next: NextFunction) {
-    return res.json({ success: true, data: [] });
+    const assignments = await collaboratorService.getAllEventCollaborators();
+    return res.json({ success: true, data: assignments });
+  }
+
+  async updateEventCollaborator(req: Request, res: Response, _next: NextFunction) {
+    const { id } = req.params as { id: string };
+    const updated = await collaboratorService.updateEventCollaborator(id, req.body);
+    return res.json({ success: true, data: updated });
+  }
+
+  async removeCollaboratorFromEvent(req: Request, res: Response, _next: NextFunction) {
+    const { id } = req.params as { id: string };
+    await collaboratorService.removeCollaboratorFromEvent(id);
+    return res.json({ success: true, message: "Colaborador removido do evento" });
   }
 }
 
@@ -627,6 +607,8 @@ export const {
   deleteCollaborator,
   assignCollaboratorToEvent,
   getAllEventCollaborators,
+  updateEventCollaborator,
+  removeCollaboratorFromEvent,
   getEventCollaborators,
   getCollaboratorEvents,
   searchCollaborators,
@@ -655,5 +637,3 @@ export const {
 
 // Alias para createEventCollaborator
 export const createEventCollaborator = assignCollaboratorToEvent;
-export const updateEventCollaborator = (req: any, res: any) => res.status(501).json({ message: 'Not implemented' });
-export const removeCollaboratorFromEvent = (req: any, res: any) => res.status(501).json({ message: 'Not implemented' });

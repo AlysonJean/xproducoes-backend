@@ -4,9 +4,7 @@ import type {
   EventCollaborator,
   CollaboratorRole,
   CollaboratorStatus,
-  EventCollaboratorStatus,
   CollaboratorAvailability,
-  CollaboratorPayment,
 } from "@prisma/client";
 import { PaymentStatus, PaymentType } from "../repositories/collaboratorRepository";
 
@@ -226,33 +224,40 @@ export class CollaboratorService {
     return this.delete(id);
   }
 
-  async assignCollaboratorToEvent(data: any) {
+  async assignCollaboratorToEvent(data: EventAssignmentData) {
     return repo.assignToEvent(data);
   }
 
   async getEventCollaborators(eventId: string) {
-    return getEventCollaborators(eventId);
+    return repo.findEventCollaborators(eventId);
+  }
+
+  async getAllEventCollaborators() {
+    return repo.findAllEventAssignments();
   }
 
   async getCollaboratorEvents(collaboratorId: string) {
-    return getCollaboratorEvents(collaboratorId);
+    return repo.findCollaboratorEvents(collaboratorId);
   }
 
-  async searchCollaborators(params: any) {
-    return this.searchByName(params.name || '');
+  async updateEventCollaborator(id: string, data: Partial<EventCollaborator>) {
+    return repo.updateEventCollaborator(id, data);
+  }
+
+  async removeCollaboratorFromEvent(id: string) {
+    return repo.removeFromEvent(id);
+  }
+
+  async searchCollaborators(params: CollaboratorSearchParams) {
+    return repo.search(params);
   }
 
   async getCollaboratorStats(id: string) {
-    return {
-      totalEvents: 0,
-      completedEvents: 0,
-      rating: 0,
-      earnings: 0
-    };
+    return repo.getCollaboratorStats(id);
   }
 
   async getCollaboratorDashboard(id?: string) {
-    return getCollaboratorDashboard(id);
+    return repo.getCollaboratorDashboard(id);
   }
 
   async getAvailableCollaborators(data: { date: string; role?: string }) {
@@ -260,56 +265,61 @@ export class CollaboratorService {
   }
 
   async getAllAvailabilities() {
-    return [];
+    return repo.findAllAvailabilities();
   }
 
   async getCollaboratorAvailabilities(collaboratorId: string) {
-    return getCollaboratorAvailabilities(collaboratorId);
+    return repo.findCollaboratorAvailabilities(collaboratorId);
   }
 
-  async createAvailability(data: any) {
-    return createAvailability(data);
+  async createAvailability(data: AvailabilityCreateData) {
+    return repo.setAvailability(data);
   }
 
-  async updateAvailability(id: string, data: any) {
-    return updateAvailability(id, data);
+  async updateAvailability(id: string, data: AvailabilityUpdateData) {
+    return repo.updateAvailability(id, data);
   }
 
   async deleteAvailability(id: string) {
-    return deleteAvailability(id);
+    return repo.deleteAvailability(id);
   }
 
   async getAllPayments() {
-    return getAllPayments();
+    return repo.findAllPayments();
   }
 
-  async createPaymentRecord(data: any) {
-    return {
-      id: `payment_${Date.now()}`,
-      ...data,
-      createdAt: new Date()
-    };
+  async createPaymentRecord(data: PaymentRecordData) {
+    return repo.createPaymentRecord(data);
   }
 
-  async updatePayment(id: string, data: any) {
+  async updatePayment(id: string, data: PaymentUpdateData) {
     return repo.updatePayment(id, data);
   }
 
+  async deletePayment(id: string) {
+    return repo.deletePayment(id);
+  }
+
   async getCollaboratorPayments(collaboratorId: string) {
-    return getCollaboratorPayments(collaboratorId);
+    return repo.findCollaboratorPayments(collaboratorId);
   }
 
   async getPaymentStats(collaboratorId?: string) {
      if (collaboratorId) {
-        return getPaymentStats(collaboratorId);
+        return repo.getPaymentStats(collaboratorId);
      }
+     // Retornar estatísticas agregadas de todos os pagamentos se nenhum ID for fornecido
+     const payments = await repo.findAllPayments();
+     const totalPaid = payments.filter(p => p.status === 'PAID').reduce((sum, p) => sum + Number(p.amount), 0);
+     const totalPending = payments.filter(p => p.status === 'PENDING').reduce((sum, p) => sum + Number(p.amount), 0);
+     
      return {
-       totalPayments: 0,
-       totalPaid: 0,
-       totalPending: 0,
-       averagePayment: 0,
-       paymentsCompleted: 0,
-       paymentsPending: 0,
+       totalPayments: payments.length,
+       totalPaid,
+       totalPending,
+       averagePayment: payments.length > 0 ? (totalPaid + totalPending) / payments.length : 0,
+       paymentsCompleted: payments.filter(p => p.status === 'PAID').length,
+       paymentsPending: payments.filter(p => p.status === 'PENDING').length,
      };
   }
 }

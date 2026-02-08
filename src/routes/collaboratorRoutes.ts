@@ -1,7 +1,6 @@
 import { Router, type Router as RouterType } from "express";
 import {
   createCollaborator,
-  // ...existing exports
   getAllCollaborators,
   getCollaboratorById,
   updateCollaborator,
@@ -21,12 +20,19 @@ import {
   getMyStats, // Novo
   getMyEvents, // Novo
   getMyNotifications, // Novo
+  getCollaboratorAvailabilities,
   getAvailableCollaborators,
   getAllAvailabilities,
   createAvailability,
   updateAvailability,
   deleteAvailability,
-  getCollaboratorAvailabilities,
+  getAllPayments,
+  createPayment,
+  updatePayment,
+  deletePayment,
+  getCollaboratorPayments,
+  getPaymentStats,
+  getAllEventCollaborators,
 } from "../controllers/collaboratorController";
 import { sendInvite } from '../controllers/inviteController';
 import { authenticate, requireAdminOrCollaborator, adminOnly } from "../middlewares/unifiedAuth";
@@ -85,5 +91,16 @@ router.post("/availabilities", adminOnly, createAvailability);
 router.put("/availabilities/:id", adminOnly, updateAvailability);
 router.delete("/availabilities/:id", adminOnly, deleteAvailability);
 router.get("/:collaboratorId/availabilities", getCollaboratorAvailabilities);
+
+// Rotas de Pagamentos
+router.get("/payments/all", adminOnly, getAllPayments);
+router.get("/payments/stats", adminOnly, getPaymentStats);
+router.post("/payments", adminOnly, createPayment);
+router.put("/payments/:id", adminOnly, updatePayment);
+router.delete("/payments/:id", adminOnly, deletePayment);
+router.get("/:collaboratorId/payments", getCollaboratorPayments);
+
+// Rota global de atribuições
+router.get("/event-assignments/all", adminOnly, getAllEventCollaborators);
 
 export default router;

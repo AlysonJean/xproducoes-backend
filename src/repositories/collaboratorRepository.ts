@@ -206,8 +206,32 @@ export class CollaboratorRepository {
     return prisma.eventCollaborator.findMany({
       where: { bookingId: eventId },
       include: {
-        collaborator: true,
+        collaborator: {
+          include: {
+             user: {
+               select: { name: true, email: true, avatarUrl: true }
+             }
+          }
+        },
       },
+    });
+  }
+
+  async findAllEventAssignments(): Promise<EventCollaborator[]> {
+    return prisma.eventCollaborator.findMany({
+      include: {
+        collaborator: {
+          include: {
+            user: {
+              select: { name: true, email: true, avatarUrl: true }
+            }
+          }
+        },
+        booking: {
+          select: { id: true, eventTitle: true, eventDate: true, status: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
     });
   }
 
@@ -788,13 +812,13 @@ export class CollaboratorRepository {
   }
 
   // Método auxiliar para buscar receita mensal
-  private async getMonthlyRevenue(collaboratorId: string) {
+  private async getMonthlyRevenue(_collaboratorId: string) {
     // Implementação simplificada - retorna dados vazios por enquanto
     return {};
   }
 
   // Método auxiliar para buscar eventos mensais
-  private async getMonthlyEvents(collaboratorId: string) {
+  private async getMonthlyEvents(_collaboratorId: string) {
     // Implementação simplificada - retorna dados vazios por enquanto
     return {};
   }
@@ -887,12 +911,13 @@ export class CollaboratorRepository {
     const where: import("@prisma/client").Prisma.CollaboratorWhereInput = {
       ...(role ? { collaboratorRole: role as CollaboratorRole } : {}),
       ...(status ? { status: status as CollaboratorStatus } : {}),
-      ...(name ? { name: { contains: name, mode: "insensitive" } } : {}),
+      ...(name ? { user: { name: { contains: name, mode: "insensitive" } } } : {}),
     };
 
     const [collaborators, total] = await Promise.all([
       prisma.collaborator.findMany({
         where,
+        include: { user: { select: { name: true, email: true, avatarUrl: true } } },
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { createdAt: "desc" },
