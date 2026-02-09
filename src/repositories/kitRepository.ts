@@ -49,7 +49,7 @@ export class KitRepository {
       prisma.kit.findFirst({
         where: {
           name: { lt: kit.name },
-          status: 'ACTIVE'
+          status: { in: ['ACTIVE', 'MAINTENANCE', 'COMING_SOON'] }
         },
         orderBy: { name: 'desc' },
         select: { slug: true }
@@ -57,7 +57,7 @@ export class KitRepository {
       prisma.kit.findFirst({
         where: {
           name: { gt: kit.name },
-          status: 'ACTIVE'
+          status: { in: ['ACTIVE', 'MAINTENANCE', 'COMING_SOON'] }
         },
         orderBy: { name: 'asc' },
         select: { slug: true }

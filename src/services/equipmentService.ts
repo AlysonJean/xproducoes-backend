@@ -105,7 +105,7 @@ export class EquipmentService {
         where: {
           categoryId: equipment.categoryId,
           name: { gt: equipment.name },
-          status: { in: ['ACTIVE', 'COMING_SOON'] }
+          status: { in: ['ACTIVE', 'MAINTENANCE', 'COMING_SOON'] }
         },
         orderBy: { name: 'asc' },
         select: { slug: true }
