@@ -1,3 +1,4 @@
+// backend/src/services/cartService.ts
 import { CartRepository } from "../repositories/cartRepository";
 
 export class CartService {
@@ -17,9 +18,21 @@ export class CartService {
     return updated;
   }
 
+  async addServiceToCart(userId: string, serviceId: string) {
+    const cart = await this.getOrCreateCart(userId);
+    const updated = await this.repo.addService(cart.id, serviceId);
+    return updated;
+  }
+
   async removeItemFromCart(userId: string, equipmentId: string) {
     const cart = await this.getOrCreateCart(userId);
     const updated = await this.repo.removeItem(cart.id, equipmentId);
+    return updated;
+  }
+
+  async removeServiceFromCart(userId: string, serviceId: string) {
+    const cart = await this.getOrCreateCart(userId);
+    const updated = await this.repo.removeService(cart.id, serviceId);
     return updated;
   }
 
@@ -30,10 +43,11 @@ export class CartService {
   }
 
   async clearCart(userId: string) {
-  const cart = await this.getOrCreateCart(userId);
-  await this.repo.clearEquipments(cart.id);
-  await this.repo.clearKit(cart.id);
-  return this.getOrCreateCart(userId);
+    const cart = await this.getOrCreateCart(userId);
+    await this.repo.clearEquipments(cart.id);
+    await this.repo.clearServices(cart.id);
+    await this.repo.clearKit(cart.id);
+    return this.getOrCreateCart(userId);
   }
 
   async checkout(data: any) {

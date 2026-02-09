@@ -16,8 +16,16 @@ export class CartController {
       return res
         .status(400)
         .json({ message: "O ID do equipamento é obrigatório." });
-  const cart = await cartService.addItemToCart(req.userId!, equipmentId);
-  return res.status(200).json(cart);
+    const cart = await cartService.addItemToCart(req.userId!, equipmentId);
+    return res.status(200).json(cart);
+  };
+
+  addService = async (req: Request, res: Response) => {
+    const { serviceId } = req.body;
+    if (!serviceId)
+      return res.status(400).json({ message: "O ID do serviço é obrigatório." });
+    const cart = await cartService.addServiceToCart(req.userId!, serviceId);
+    return res.status(200).json(cart);
   };
 
   removeItem = async (req: Request, res: Response) => {
@@ -26,11 +34,18 @@ export class CartController {
       return res
         .status(400)
         .json({ message: "O ID do equipamento é obrigatório." });
-  const cart = await cartService.removeItemFromCart(req.userId!, equipmentId);
-  return res.status(200).json(cart);
+    const cart = await cartService.removeItemFromCart(req.userId!, equipmentId);
+    return res.status(200).json(cart);
   };
 
-  // Controller para o checkout
+  removeService = async (req: Request, res: Response) => {
+    const { serviceId } = req.params as { serviceId: string };
+    if (!serviceId)
+      return res.status(400).json({ message: "O ID do serviço é obrigatório." });
+    const cart = await cartService.removeServiceFromCart(req.userId!, serviceId);
+    return res.status(200).json(cart);
+  };
+
   checkout = async (req: Request, res: Response) => {
     try {
       const data = { ...req.body, userId: req.userId! };
@@ -58,63 +73,48 @@ export class CartController {
     if (!kitId) {
       return res.status(400).json({ message: "O ID do kit é obrigatório." });
     }
-  const cart = await cartService.addKitToCart(req.userId!, kitId);
-  return res.status(200).json(cart);
+    const cart = await cartService.addKitToCart(req.userId!, kitId);
+    return res.status(200).json(cart);
   };
 
-  // Novo método para calcular o preço do carrinho
   calculatePrice = async (req: Request, res: Response) => {
     try {
       const { eventDate, eventEndDate, requiresStairs, isCovered } = req.body;
       const cart = await cartService.getCart(req.userId!);
 
-      // Cálculo simples do preço
       let finalPrice = 0;
       const hours = Math.ceil(
         (new Date(eventEndDate).getTime() - new Date(eventDate).getTime()) /
           (1000 * 60 * 60),
       );
 
-      // Calcular preço dos equipamentos
       if (cart && cart.equipments) {
         for (const equipment of cart.equipments) {
           finalPrice += Number((equipment as any).pricePerHour || 0) * hours;
         }
       }
 
-      // Calcular preço do kit
+      if (cart && (cart as any).services) {
+        for (const service of (cart as any).services) {
+          finalPrice += Number(service.price || 0);
+        }
+      }
+
       if (cart && cart.kit) {
         finalPrice += Number(cart.kit.price || 0);
       }
 
-      // Adicionar taxas extras
       if (requiresStairs) {
-        finalPrice *= 1.1; // 10% extra
+        finalPrice *= 1.1;
       }
 
       if (!isCovered) {
-        finalPrice *= 1.05; // 5% extra
+        finalPrice *= 1.05;
       }
       return res.json({ totalPrice: finalPrice });
     } catch (error: unknown) {
       return res.status(400).json({ message: getErrorMessage(error) });
     }
-  };
-
-  clearEquipments = async (req: Request, res: Response) => {
-  const cart = await cartService.getCart(req.userId!);
-  if (!cart) return res.status(404).json({ message: "Carrinho não encontrado" });
-  const updated = await (cartService as any).repo.clearEquipments(cart.id);
-  return res.status(200).json(updated);
-  };
-
-  clearKit = async (req: Request, res: Response) => {
-    const cart = await cartService.getCart(req.userId!);
-    if (!cart) return res.status(404).json({ message: "Carrinho não encontrado" });
-    // Reutiliza o service de clear apenas do kit
-    // Implementação direta via repo para evitar limpar equipamentos
-    const updated = await (cartService as any).repo.clearKit(cart.id);
-    return res.status(200).json(updated);
   };
 
   clearCart = async (req: Request, res: Response) => {

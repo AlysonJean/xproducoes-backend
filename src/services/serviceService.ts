@@ -5,20 +5,16 @@ import { randomBytes } from "crypto";
 
 export class ServiceService {
   async create(data: Prisma.ServiceCreateInput): Promise<Service> {
-    // imageUrl deve vir do middleware do Cloudinary
     const imageUrl = data.imageUrl || "";
     const serviceData = { ...data } as any;
     
-    // Limpeza de campos internos/metadata de upload que não existem no banco
     delete serviceData.fileName;
     delete serviceData.folder;
     delete serviceData.uploadedFile;
     delete serviceData.imageUrl;
     
-    // Gerar slug a partir do nome
     let slug = generateSlug(serviceData.name);
     
-    // Verificar se slug existe e adicionar sufixo se necessário
     const slugExists = await prisma.service.findUnique({ where: { slug } });
     if (slugExists) {
         slug = `${slug}-${randomBytes(2).toString('hex')}`;
@@ -39,11 +35,9 @@ export class ServiceService {
     id: string,
     data: Prisma.ServiceUpdateInput,
   ): Promise<Service | null> {
-    // imageUrl deve vir do middleware do Cloudinary (se fornecido)
     const imageUrl = data.imageUrl;
     const serviceData = { ...data } as any;
     
-    // Limpeza de campos internos/metadata de upload
     delete serviceData.fileName;
     delete serviceData.folder;
     delete serviceData.uploadedFile;
@@ -68,8 +62,8 @@ export class ServiceService {
     });
   }
 
-  async findOne(idOrSlug: string): Promise<Service | null> {
-    return prisma.service.findFirst({
+  async findOne(idOrSlug: string): Promise<Service & { prevSlug?: string | null; nextSlug?: string | null } | null> {
+    const service = await prisma.service.findFirst({
       where: {
         OR: [
           { id: idOrSlug },
@@ -77,16 +71,42 @@ export class ServiceService {
         ]
       },
     });
+
+    if (!service) return null;
+
+    // Fetch neighbors (Previous and Next by name)
+    const [prev, next] = await Promise.all([
+      prisma.service.findFirst({
+        where: {
+          name: { lt: service.name },
+          status: { in: ['ACTIVE', 'MAINTENANCE', 'COMING_SOON'] }
+        },
+        orderBy: { name: 'desc' },
+        select: { slug: true }
+      }),
+      prisma.service.findFirst({
+        where: {
+          name: { gt: service.name },
+          status: { in: ['ACTIVE', 'MAINTENANCE', 'COMING_SOON'] }
+        },
+        orderBy: { name: 'asc' },
+        select: { slug: true }
+      })
+    ]);
+
+    return {
+      ...(service as any),
+      prevSlug: prev?.slug || null,
+      nextSlug: next?.slug || null
+    };
   }
 
   async delete(id: string): Promise<void> {
-    // Get service to retrieve image URL before deletion
     const service = await prisma.service.findUnique({
       where: { id },
       select: { imageUrl: true }
     });
 
-    // Delete image from Cloudinary if exists
     if (service?.imageUrl) {
       const { UploadService } = await import('./uploadService');
       const uploadService = new UploadService();
@@ -99,7 +119,6 @@ export class ServiceService {
   }
 
   async duplicate(id: string): Promise<Service> {
-    // Get original service
     const original = await prisma.service.findUnique({
       where: { id }
     });
@@ -108,17 +127,14 @@ export class ServiceService {
       throw new Error('Service not found');
     }
 
-    // Create copy with modified name
     const copyName = `${original.name} (Cópia)`;
     let slug = generateSlug(copyName);
 
-    // Ensure unique slug
     const slugExists = await prisma.service.findUnique({ where: { slug } });
     if (slugExists) {
       slug = `${slug}-${randomBytes(2).toString('hex')}`;
     }
 
-    // Create duplicate
     return prisma.service.create({
       data: {
         name: copyName,

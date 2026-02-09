@@ -7,15 +7,15 @@ const cartRoutes: RouterType = Router();
 const cartController = new CartController();
 
 cartRoutes.use(authenticate);
-cartRoutes.use(cartRateLimit); // Proteção contra operações abusivas no carrinho
+cartRoutes.use(cartRateLimit);
 
 cartRoutes.get("/", cartController.getCart);
 cartRoutes.post("/add", cartController.addItem);
+cartRoutes.post("/add-service", cartController.addService);
 cartRoutes.post("/add-kit", cartController.addKit);
 cartRoutes.post("/checkout", cartController.checkout);
 cartRoutes.delete("/remove/:equipmentId", cartController.removeItem);
-cartRoutes.post("/clear-equipments", cartController.clearEquipments);
-cartRoutes.post("/clear-kit", cartController.clearKit);
+cartRoutes.delete("/remove-service/:serviceId", cartController.removeService);
 cartRoutes.post("/clear", cartController.clearCart);
 
 export default cartRoutes;

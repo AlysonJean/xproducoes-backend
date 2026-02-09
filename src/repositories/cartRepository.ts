@@ -1,20 +1,24 @@
-// OBSOLETO: Centralizado no Prisma Client
 // Caminho do arquivo: backend/src/repositories/cartRepository.ts
 
 import { prisma } from "../config/prisma";
+
+const CART_INCLUDE = {
+  equipments: {
+    select: { id: true, name: true, pricePerHour: true, imageUrl: true },
+  },
+  services: {
+    select: { id: true, name: true, price: true, imageUrl: true, duration: true },
+  },
+  kit: {
+    select: { id: true, name: true, price: true, description: true },
+  },
+};
 
 export class CartRepository {
   async findOrCreateCart(userId: string) {
     let cart = await prisma.booking.findFirst({
       where: { creatorId: userId, status: "DRAFT" },
-      include: {
-        equipments: {
-          select: { id: true, name: true, pricePerHour: true, imageUrl: true },
-        },
-        kit: {
-          select: { id: true, name: true, price: true, description: true },
-        },
-      },
+      include: CART_INCLUDE,
     });
 
     if (!cart) {
@@ -26,19 +30,7 @@ export class CartRepository {
           eventDate: new Date(),
           eventEndDate: new Date(),
         },
-        include: {
-          equipments: {
-            select: {
-              id: true,
-              name: true,
-              pricePerHour: true,
-              imageUrl: true,
-            },
-          },
-          kit: {
-            select: { id: true, name: true, price: true, description: true },
-          },
-        },
+        include: CART_INCLUDE,
       });
     }
     return cart;
@@ -47,26 +39,16 @@ export class CartRepository {
   async findCartById(cartId: string) {
     return prisma.booking.findUnique({
       where: { id: cartId },
-      include: {
-        equipments: {
-          select: { id: true, name: true, pricePerHour: true, imageUrl: true },
-        },
-        kit: {
-          select: { id: true, name: true, price: true, description: true },
-        },
-      },
+      include: CART_INCLUDE,
     });
   }
 
   async addItems(cartId: string, equipmentIds: string[]) {
-    // Verificação de segurança sugerida por você
     const cartExists = await prisma.booking.findUnique({
       where: { id: cartId },
     });
     if (!cartExists) {
-      throw new Error(
-        "Carrinho não encontrado. Não é possível adicionar itens.",
-      );
+      throw new Error("Carrinho não encontrado. Não é possível adicionar itens.");
     }
 
     return prisma.booking.update({
@@ -76,14 +58,26 @@ export class CartRepository {
           connect: equipmentIds.map((id) => ({ id })),
         },
       },
-      include: {
-        equipments: {
-          select: { id: true, name: true, pricePerHour: true, imageUrl: true },
-        },
-        kit: {
-          select: { id: true, name: true, price: true, description: true },
+      include: CART_INCLUDE,
+    });
+  }
+
+  async addService(cartId: string, serviceId: string) {
+    const cartExists = await prisma.booking.findUnique({
+      where: { id: cartId },
+    });
+    if (!cartExists) {
+      throw new Error("Carrinho não encontrado. Não é possível adicionar serviços.");
+    }
+
+    return prisma.booking.update({
+      where: { id: cartId },
+      data: {
+        services: {
+          connect: { id: serviceId },
         },
       },
+      include: CART_INCLUDE,
     });
   }
 
@@ -95,14 +89,19 @@ export class CartRepository {
           disconnect: { id: equipmentId },
         },
       },
-      include: {
-        equipments: {
-          select: { id: true, name: true, pricePerHour: true, imageUrl: true },
-        },
-        kit: {
-          select: { id: true, name: true, price: true, description: true },
+      include: CART_INCLUDE,
+    });
+  }
+
+  async removeService(cartId: string, serviceId: string) {
+    return prisma.booking.update({
+      where: { id: cartId },
+      data: {
+        services: {
+          disconnect: { id: serviceId },
         },
       },
+      include: CART_INCLUDE,
     });
   }
 
@@ -110,14 +109,7 @@ export class CartRepository {
     return prisma.booking.update({
       where: { id: cartId },
       data: { kitId },
-      include: {
-        equipments: {
-          select: { id: true, name: true, pricePerHour: true, imageUrl: true },
-        },
-        kit: {
-          select: { id: true, name: true, price: true, description: true },
-        },
-      },
+      include: CART_INCLUDE,
     });
   }
 
@@ -129,14 +121,19 @@ export class CartRepository {
           set: [],
         },
       },
-      include: {
-        equipments: {
-          select: { id: true, name: true, pricePerHour: true, imageUrl: true },
-        },
-        kit: {
-          select: { id: true, name: true, price: true, description: true },
+      include: CART_INCLUDE,
+    });
+  }
+
+  async clearServices(cartId: string) {
+    return prisma.booking.update({
+      where: { id: cartId },
+      data: {
+        services: {
+          set: [],
         },
       },
+      include: CART_INCLUDE,
     });
   }
 
@@ -144,14 +141,7 @@ export class CartRepository {
     return prisma.booking.update({
       where: { id: cartId },
       data: { kitId: null },
-      include: {
-        equipments: {
-          select: { id: true, name: true, pricePerHour: true, imageUrl: true },
-        },
-        kit: {
-          select: { id: true, name: true, price: true, description: true },
-        },
-      },
+      include: CART_INCLUDE,
     });
   }
 }

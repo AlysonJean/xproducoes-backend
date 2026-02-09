@@ -345,6 +345,7 @@ model Service {
   clientFavorites ClientFavorite[]
   
   imageUrl    String?
+  bookings    Booking[] @relation("BookingServices")
 
   @@map("services")
 }
@@ -396,6 +397,7 @@ model Booking {
   messages           Message[]
   review             Review?
   equipments         Equipment[]         @relation("BookingEquipments")
+  services           Service[]           @relation("BookingServices")
 
   // Social Wall
   socialSetting      EventSocialSetting?
