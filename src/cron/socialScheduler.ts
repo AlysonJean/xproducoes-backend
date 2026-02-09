@@ -10,18 +10,11 @@ export const startSocialScheduler = () => {
     logger.info('[SocialScheduler] Starting scheduler...');
     
     cron.schedule(POLL_INTERVAL, async () => {
-        logger.info('[SocialScheduler] Running polling job');
         try {
-            // Fetch active walls (created in last 24h or explictly active?)
-            // For now, fetch all that have 'hashtag' and connected credentials
-            // Limit to simpler scope: 
-            // 1. Walls updated recently OR 
-            // 2. Just all active ones (assuming small number for now)
-            
-            // Let's iterate all standalone walls and active bookings
+            // optimized: Only fetch settings that have a hashtag defined
             const settings = await prisma.eventSocialSetting.findMany({
                 where: {
-                    // Optimized: Only fetch if we have either a user or a booking attached
+                    hashtag: { not: '' },
                     OR: [
                         { userId: { not: null } },
                         { bookingId: { not: null } }
@@ -29,6 +22,12 @@ export const startSocialScheduler = () => {
                 }
             });
 
+            if (settings.length === 0) {
+                return; // Nothing to sync, avoid logging and API overhead
+            }
+
+            logger.info({ count: settings.length }, '[SocialScheduler] Running polling job');
+            
             for (const setting of settings) {
                 try {
                     logger.info({ settingId: setting.id }, '[SocialScheduler] Syncing wall');
