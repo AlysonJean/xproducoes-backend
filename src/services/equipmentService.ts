@@ -14,7 +14,12 @@ export class EquipmentService {
     // imageUrl deve vir do middleware do Cloudinary
     const imageUrl = data.imageUrl || "";
     const equipmentData = { ...data } as any;
+    
+    // Limpeza de campos internos/metadata de upload
     delete equipmentData.fileName;
+    delete equipmentData.folder;
+    delete equipmentData.uploadedFile;
+    delete equipmentData.imageUrl;
     
     // Gerar slug a partir do nome
     let slug = generateSlug(equipmentData.name);
@@ -44,7 +49,12 @@ export class EquipmentService {
     // imageUrl deve vir do middleware do Cloudinary (se fornecido)
     const imageUrl = data.imageUrl;
     const equipmentData = { ...data } as any;
+    
+    // Limpeza de campos internos/metadata de upload
     delete equipmentData.fileName;
+    delete equipmentData.folder;
+    delete equipmentData.uploadedFile;
+    delete equipmentData.imageUrl;
     
     return prisma.equipment.update({
       where: { id },

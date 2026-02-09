@@ -29,9 +29,9 @@ export class ServiceController {
   async create(req: Request, res: Response) {
     try {
       const data = { ...req.body };
-      // Ensure numeric types
-      if (data.price) data.price = Number(data.price);
-      if (data.duration) data.duration = Number(data.duration);
+      // Ensure numeric types correctly even if 0
+      if (data.price !== undefined) data.price = Number(data.price);
+      if (data.duration !== undefined) data.duration = Number(data.duration);
       
       const serviceData = await service.create(data);
       return res.status(201).json(serviceData);
@@ -45,8 +45,8 @@ export class ServiceController {
     try {
       const { id } = req.params;
       const data = { ...req.body };
-      if (data.price) data.price = Number(data.price);
-      if (data.duration) data.duration = Number(data.duration);
+      if (data.price !== undefined) data.price = Number(data.price);
+      if (data.duration !== undefined) data.duration = Number(data.duration);
 
       const serviceData = await service.update(String(id), data);
       return res.json(serviceData);

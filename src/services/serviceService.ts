@@ -8,7 +8,12 @@ export class ServiceService {
     // imageUrl deve vir do middleware do Cloudinary
     const imageUrl = data.imageUrl || "";
     const serviceData = { ...data } as any;
+    
+    // Limpeza de campos internos/metadata de upload que não existem no banco
     delete serviceData.fileName;
+    delete serviceData.folder;
+    delete serviceData.uploadedFile;
+    delete serviceData.imageUrl;
     
     // Gerar slug a partir do nome
     let slug = generateSlug(serviceData.name);
@@ -37,7 +42,12 @@ export class ServiceService {
     // imageUrl deve vir do middleware do Cloudinary (se fornecido)
     const imageUrl = data.imageUrl;
     const serviceData = { ...data } as any;
+    
+    // Limpeza de campos internos/metadata de upload
     delete serviceData.fileName;
+    delete serviceData.folder;
+    delete serviceData.uploadedFile;
+    delete serviceData.imageUrl;
     
     return prisma.service.update({
       where: { id },

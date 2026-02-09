@@ -40,6 +40,8 @@ export async function create(data: any, _file?: Express.Multer.File) {
 
   // Remove campos que não existem no schema do Prisma
   delete kitData.fileName;
+  delete kitData.folder;
+  delete kitData.uploadedFile;
   
   // Experience Levels - processar se enviado
   if (Array.isArray(data.experienceLevels) && data.experienceLevels.length > 0) {
@@ -106,6 +108,8 @@ export async function update(
 
   // Remove campos que não existem no schema do Prisma
   delete kitData.fileName;
+  delete kitData.folder;
+  delete kitData.uploadedFile;
   
   // Experience Levels - processar se enviado
   if (Array.isArray(data.experienceLevels)) {

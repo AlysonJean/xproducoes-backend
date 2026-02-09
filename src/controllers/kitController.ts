@@ -27,7 +27,7 @@ export class KitController {
   update = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = { ...req.body };
-      if (data.price) {
+      if (data.price !== undefined) {
         data.price = Number(data.price);
       }
 
