@@ -27,42 +27,35 @@ model NewsletterSubscriber {
 }
 
 model Portfolio {
-  id          String   @id @default(uuid())
+  id          String           @id @default(uuid())
   title       String
   description String
   eventDate   DateTime
   imageUrl    String
-  coverImage  String?  // Cache for the cover image
-  slug        String?  @unique
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  sortOrder   Int              @default(0)
+  slug        String?          @unique
+  coverImage  String?
   media       PortfolioMedia[]
 
   @@map("portfolios")
 }
 
 model PortfolioMedia {
-  id          String     @id @default(cuid())
+  id          String    @id @default(cuid())
   portfolioId String
   url         String
-  type        MediaType  @default(IMAGE)
+  type        MediaType @default(IMAGE)
   filename    String?
   mimeType    String?
-  isCover     Boolean    @default(false)
-  sortOrder   Int        @default(0)
-  createdAt   DateTime   @default(now())
-  
-  portfolio   Portfolio  @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  isCover     Boolean   @default(false)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
 
   @@index([portfolioId])
   @@map("portfolio_media")
-}
-
-enum MediaType {
-  IMAGE
-  VIDEO
 }
 
 model Faq {
@@ -76,56 +69,49 @@ model Faq {
 }
 
 model User {
-id                       String            @id @default(cuid())
-name                     String
-email                    String            @unique
-passwordHash             String
-avatarUrl                String?
-role                     UserRole          @default(CLIENT)
-bio                      String?
-location                 String?
-// Modelo PortfolioItem fora do User
-  website                  String?
-  socialLinks              Json?
-  verified                 Boolean           @default(false)
-  passwordResetToken       String?           @unique
-  passwordResetTokenExpiry DateTime?
-  emailVerificationToken   String?
+  id                           String                @id @default(cuid())
+  name                         String
+  email                        String                @unique
+  passwordHash                 String
+  avatarUrl                    String?
+  role                         UserRole              @default(CLIENT)
+  bio                          String?
+  location                     String?
+  website                      String?
+  socialLinks                  Json?
+  verified                     Boolean               @default(false)
+  passwordResetToken           String?               @unique
+  passwordResetTokenExpiry     DateTime?
+  emailVerificationToken       String?
   emailVerificationTokenExpiry DateTime?
-  profileSettings          Json?
-  isVip                   Boolean           @default(false)
-  isActive                 Boolean           @default(true)
-  
-  // Google Calendar Integration
-  googleResourceId         String?
-  googleRefreshToken       String?
-  googleCalendarEmail      String?
-
-  createdAt                DateTime          @default(now())
-  updatedAt                DateTime          @updatedAt
-  auditLogs                BookingAuditLog[]
-  assignedBookings         Booking[]         @relation("BookingAssignee")
-  createdBookings          Booking[]         @relation("BookingCreator")
-  clientProfile            Client?
-  collaboratorProfile      Collaborator?
-  receivedMessages         Message[]         @relation("MessageRecipient")
-  sentMessages             Message[]         @relation("MessageSender")
-  notifications            Notification[]
-  reviews                  Review[]
-  chatParticipants         ChatParticipant[]
-  sentChatMessages         ChatMessage[]
-  chatMessageReads         ChatMessageRead[]
-  createdChecklists        Checklist[]           @relation("ChecklistCreator")
-  completedChecklistItems  ChecklistItem[]       @relation("ChecklistItemCompleter")
-  assignedChecklists       ChecklistAssignment[] @relation("ChecklistAssignee")
-  assignedByChecklists     ChecklistAssignment[] @relation("ChecklistAssigner")
-  
-  // Social Media Integration
-  socialCredentials        SocialCredential[]
-  // Relations for Social Wall (Standalone & Moderation)
-  socialSettings           EventSocialSetting[]
-  moderatedPosts           SocialPost[]
-  sponsorLogos             SponsorLogo[]
+  profileSettings              Json?
+  isVip                        Boolean               @default(false)
+  isActive                     Boolean               @default(true)
+  createdAt                    DateTime              @default(now())
+  updatedAt                    DateTime              @updatedAt
+  googleCalendarEmail          String?
+  googleRefreshToken           String?
+  googleResourceId             String?
+  auditLogs                    BookingAuditLog[]
+  assignedBookings             Booking[]             @relation("BookingAssignee")
+  createdBookings              Booking[]             @relation("BookingCreator")
+  chatMessageReads             ChatMessageRead[]
+  sentChatMessages             ChatMessage[]
+  chatParticipants             ChatParticipant[]
+  assignedByChecklists         ChecklistAssignment[] @relation("ChecklistAssigner")
+  assignedChecklists           ChecklistAssignment[] @relation("ChecklistAssignee")
+  completedChecklistItems      ChecklistItem[]       @relation("ChecklistItemCompleter")
+  createdChecklists            Checklist[]           @relation("ChecklistCreator")
+  clientProfile                Client?
+  collaboratorProfile          Collaborator?
+  socialSettings               EventSocialSetting[]
+  receivedMessages             Message[]             @relation("MessageRecipient")
+  sentMessages                 Message[]             @relation("MessageSender")
+  notifications                Notification[]
+  reviews                      Review[]
+  socialCredentials            SocialCredential[]
+  moderatedPosts               SocialPost[]
+  sponsorLogos                 SponsorLogo[]
 
   @@index([email])
   @@index([role])
@@ -167,8 +153,6 @@ model Collaborator {
   id               String                     @id @default(cuid())
   phone            String?
   collaboratorRole CollaboratorRole           @default(OTHER)
-  functionId       String?
-  function         CollaboratorFunction?      @relation(fields: [functionId], references: [id])
   specialties      String[]
   status           CollaboratorStatus         @default(PENDING_APPROVAL)
   experience       String?
@@ -185,8 +169,10 @@ model Collaborator {
   createdAt        DateTime                   @default(now())
   updatedAt        DateTime                   @updatedAt
   userId           String                     @unique
+  functionId       String?
   availabilities   CollaboratorAvailability[]
   payments         CollaboratorPayment[]
+  function         CollaboratorFunction?      @relation(fields: [functionId], references: [id])
   user             User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   eventAssignments EventCollaborator[]
   reviews          Review[]                   @relation("CollaboratorReviews")
@@ -201,28 +187,16 @@ model Collaborator {
 }
 
 model CollaboratorFunction {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  description String?
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  collaborators     Collaborator[]
-  eventAssignments  EventCollaborator[]
+  id               String              @id @default(cuid())
+  name             String              @unique
+  description      String?
+  active           Boolean             @default(true)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  collaborators    Collaborator[]
+  eventAssignments EventCollaborator[]
 
   @@map("collaborator_functions")
-}
-
-// ================================
-// ENUMS GERAIS
-// ================================
-
-enum ItemStatus {
-  ACTIVE        // Ativo e visível
-  INACTIVE      // Inativo (escondido)
-  MAINTENANCE   // Em manutenção (escondido ou aviso)
-  COMING_SOON   // Em breve (visível)
 }
 
 model Equipment {
@@ -230,10 +204,8 @@ model Equipment {
   name                  String
   description           String
   imageUrl              String
-  slug                  String?           @unique
   pricePerHour          Decimal          @db.Decimal(10, 2)
   quantity              Int
-  status                ItemStatus       @default(ACTIVE)
   tags                  String[]
   specifications        Json?
   weight                Decimal?         @db.Decimal(8, 2)
@@ -251,10 +223,12 @@ model Equipment {
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
   categoryId            String
+  slug                  String?          @unique
+  status                ItemStatus       @default(ACTIVE)
   clientFavorites       ClientFavorite[]
   category              Category         @relation(fields: [categoryId], references: [id])
-  bookings              Booking[]        @relation("BookingEquipments")
   kitItems              KitItem[]
+  bookings              Booking[]        @relation("BookingEquipments")
 
   @@index([categoryId])
   @@index([name])
@@ -293,12 +267,11 @@ model Category {
 }
 
 model Kit {
-  id                    String      @id @default(cuid())
+  id                    String               @id @default(cuid())
   name                  String
   description           String
-  price                 Decimal     @db.Decimal(10, 2)
+  price                 Decimal              @db.Decimal(10, 2)
   imageUrl              String
-  slug                  String?      @unique
   category              String?
   tags                  String[]
   minimumRentalDuration Int?
@@ -306,23 +279,22 @@ model Kit {
   targetAudience        String[]
   skillLevel            String?
   estimatedSetupTime    Int?
-  weight                Decimal?    @db.Decimal(8, 2)
+  weight                Decimal?             @db.Decimal(8, 2)
   transportRequirements String?
-  status                ItemStatus  @default(ACTIVE)
   coverImage            String?
   images                String[]
   setupGuides           String[]
-  recommended           Boolean     @default(false)
-  popular               Boolean     @default(false)
-  discount              Decimal?    @db.Decimal(5, 2)
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
+  recommended           Boolean              @default(false)
+  popular               Boolean              @default(false)
+  discount              Decimal?             @db.Decimal(5, 2)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  slug                  String?              @unique
+  status                ItemStatus           @default(ACTIVE)
   bookings              Booking[]
-  items                 KitItem[]
-  experienceLevels      KitExperienceLevel[]
   clientFavorites       ClientFavorite[]
-
-
+  experienceLevels      KitExperienceLevel[]
+  items                 KitItem[]
 
   @@index([recommended])
   @@index([popular])
@@ -331,21 +303,19 @@ model Kit {
 }
 
 model Service {
-  id          String    @id @default(cuid())
-  name        String
-  slug        String?   @unique
-  description String
-  price       Decimal   @db.Decimal(10, 2)
-  duration    Int       @default(60) // Duration in minutes
-  status      ItemStatus @default(ACTIVE)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
-  items       KitItem[]
+  id              String           @id @default(cuid())
+  name            String
+  description     String
+  price           Decimal          @db.Decimal(10, 2)
+  duration        Int              @default(60)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  status          ItemStatus       @default(ACTIVE)
+  imageUrl        String?
+  slug            String?          @unique
   clientFavorites ClientFavorite[]
-  
-  imageUrl    String?
-  bookings    Booking[] @relation("BookingServices")
+  items           KitItem[]
+  bookings        Booking[]        @relation("BookingServices")
 
   @@map("services")
 }
@@ -387,21 +357,19 @@ model Booking {
   creatorId          String
   assigneeId         String?
   kitId              String?
+  attachments        BookingAttachment[]
   auditLogs          BookingAuditLog[]
   assignee           User?               @relation("BookingAssignee", fields: [assigneeId], references: [id])
   client             Client?             @relation("ClientBookings", fields: [clientId], references: [id])
   creator            User                @relation("BookingCreator", fields: [creatorId], references: [id])
   kit                Kit?                @relation(fields: [kitId], references: [id])
   eventCollaborators EventCollaborator[]
-  attachments        BookingAttachment[]
+  socialSetting      EventSocialSetting?
   messages           Message[]
   review             Review?
+  tvDevices          TVDevice[]
   equipments         Equipment[]         @relation("BookingEquipments")
   services           Service[]           @relation("BookingServices")
-
-  // Social Wall
-  socialSetting      EventSocialSetting?
-  tvDevices          TVDevice[]
 
   @@index([clientId])
   @@index([creatorId])
@@ -418,14 +386,13 @@ model Booking {
 }
 
 model BookingAttachment {
-  id         String   @id @default(cuid())
-  bookingId  String
-  url        String
-  filename   String?
-  mimeType   String?
-  createdAt  DateTime @default(now())
-
-  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  bookingId String
+  url       String
+  filename  String?
+  mimeType  String?
+  createdAt DateTime @default(now())
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@index([bookingId])
   @@map("booking_attachments")
@@ -434,8 +401,6 @@ model BookingAttachment {
 model EventCollaborator {
   id             String                  @id @default(cuid())
   role           CollaboratorRole        @default(OTHER)
-  functionId     String?
-  function       CollaboratorFunction?   @relation(fields: [functionId], references: [id])
   startTime      String
   endTime        String
   hourlyRate     Decimal?                @db.Decimal(8, 2)
@@ -450,8 +415,10 @@ model EventCollaborator {
   updatedAt      DateTime                @updatedAt
   bookingId      String
   collaboratorId String
+  functionId     String?
   booking        Booking                 @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   collaborator   Collaborator            @relation(fields: [collaboratorId], references: [id], onDelete: Cascade)
+  function       CollaboratorFunction?   @relation(fields: [functionId], references: [id])
 
   @@unique([bookingId, collaboratorId, role])
   @@index([bookingId])
@@ -464,8 +431,8 @@ model EventCollaborator {
 }
 
 model ClientFavorite {
-  id          String    @id @default(cuid())
-  createdAt   DateTime  @default(now())
+  id          String     @id @default(cuid())
+  createdAt   DateTime   @default(now())
   clientId    String
   equipmentId String?
   kitId       String?
@@ -486,7 +453,6 @@ model Review {
   id              String        @id @default(cuid())
   rating          Int
   comment         String?
-  slug            String?       @unique
   photos          String[]
   tags            String[]
   punctuality     Int?
@@ -501,6 +467,7 @@ model Review {
   bookingId       String        @unique
   reviewerId      String
   collaboratorId  String?
+  slug            String?       @unique
   booking         Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   collaborator    Collaborator? @relation("CollaboratorReviews", fields: [collaboratorId], references: [id])
   reviewer        User          @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
@@ -580,13 +547,13 @@ model CollaboratorAvailability {
 }
 
 model InviteToken {
-  id         String   @id @default(cuid())
-  token      String   @unique
-  email      String
-  invitedBy  String?
-  used       Boolean  @default(false)
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  token     String   @unique
+  email     String
+  invitedBy String?
+  used      Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 
   @@index([email])
   @@map("invite_tokens")
@@ -652,6 +619,306 @@ model WebhookLog {
   @@index([event, createdAt])
   @@index([status, createdAt])
   @@map("webhook_logs")
+}
+
+model Chat {
+  id            String            @id @default(cuid())
+  name          String?
+  type          ChatType          @default(PRIVATE)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  lastMessageAt DateTime?
+  messages      ChatMessage[]
+  participants  ChatParticipant[]
+
+  @@map("chats")
+}
+
+model ChatParticipant {
+  id         String    @id @default(cuid())
+  chatId     String
+  userId     String
+  role       ChatRole  @default(MEMBER)
+  joinedAt   DateTime  @default(now())
+  lastReadAt DateTime?
+  chat       Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@map("chat_participants")
+}
+
+model ChatMessage {
+  id          String            @id @default(cuid())
+  chatId      String
+  senderId    String
+  content     String
+  messageType MessageType       @default(TEXT)
+  fileUrl     String?
+  fileName    String?
+  fileSize    Int?
+  createdAt   DateTime          @default(now())
+  reads       ChatMessageRead[]
+  chat        Chat              @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender      User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@index([senderId])
+  @@index([chatId, createdAt])
+  @@map("chat_messages")
+}
+
+model ChatMessageRead {
+  id        String      @id @default(cuid())
+  messageId String
+  userId    String
+  chatId    String
+  readAt    DateTime    @default(now())
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@map("chat_message_reads")
+}
+
+model Checklist {
+  id          String                @id @default(cuid())
+  title       String
+  description String?
+  type        ChecklistType         @default(GENERAL)
+  status      ChecklistStatus       @default(ACTIVE)
+  isTemplate  Boolean               @default(false)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  createdById String
+  assignments ChecklistAssignment[]
+  items       ChecklistItem[]
+  createdBy   User                  @relation("ChecklistCreator", fields: [createdById], references: [id])
+
+  @@map("checklists")
+}
+
+model KitItem {
+  id          String     @id @default(cuid())
+  kitId       String
+  equipmentId String?
+  serviceId   String?
+  quantity    Int        @default(1)
+  equipment   Equipment? @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  kit         Kit        @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  service     Service?   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([kitId])
+  @@index([equipmentId])
+  @@index([serviceId])
+  @@map("kit_items")
+}
+
+model ChecklistItem {
+  id            String              @id @default(cuid())
+  checklistId   String
+  title         String
+  description   String?
+  order         Int                 @default(0)
+  isRequired    Boolean             @default(false)
+  status        ChecklistItemStatus @default(PENDING)
+  completedAt   DateTime?
+  completedById String?
+  notes         String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  checklist     Checklist           @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  completedBy   User?               @relation("ChecklistItemCompleter", fields: [completedById], references: [id])
+
+  @@map("checklist_items")
+}
+
+model ChecklistAssignment {
+  id           String                    @id @default(cuid())
+  checklistId  String
+  assignedToId String
+  assignedById String
+  dueDate      DateTime?
+  priority     ChecklistPriority         @default(MEDIUM)
+  status       ChecklistAssignmentStatus @default(PENDING)
+  notes        String?
+  completedAt  DateTime?
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+  assignedBy   User                      @relation("ChecklistAssigner", fields: [assignedById], references: [id])
+  assignedTo   User                      @relation("ChecklistAssignee", fields: [assignedToId], references: [id])
+  checklist    Checklist                 @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+  @@unique([checklistId, assignedToId])
+  @@map("checklist_assignments")
+}
+
+model AppSettings {
+  id          String   @id @default(cuid())
+  logoUrl     String?
+  companyName String   @default("X Produçoes e Eventos")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
+model Banner {
+  id             String    @id @default(cuid())
+  title          String
+  description    String?
+  imageUrl       String
+  mobileImageUrl String?
+  linkUrl        String?
+  active         Boolean   @default(true)
+  sortOrder      Int       @default(0)
+  startDate      DateTime?
+  endDate        DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("banners")
+}
+
+model KitExperienceLevel {
+  id          String          @id @default(cuid())
+  level       ExperienceLevel
+  price       Decimal         @db.Decimal(10, 2)
+  description String?
+  includes    String[]
+  isPopular   Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  kitId       String
+  kit         Kit             @relation(fields: [kitId], references: [id], onDelete: Cascade)
+
+  @@unique([kitId, level])
+  @@index([kitId])
+  @@index([level])
+  @@map("kit_experience_levels")
+}
+
+model SocialCredential {
+  id          String   @id @default(cuid())
+  userId      String
+  platform    String   @default("INSTAGRAM")
+  accessToken String
+  pageId      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("social_credentials")
+}
+
+model EventSocialSetting {
+  id                 String               @id @default(cuid())
+  bookingId          String?              @unique
+  userId             String?
+  name               String?
+  slug               String?              @unique
+  hashtag            String
+  autoApprove        Boolean              @default(false)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  enableGamification Boolean              @default(false)
+  enableMosaic       Boolean              @default(true)
+  enableQrCode       Boolean              @default(true)
+  layoutMode         LayoutMode           @default(LANDSCAPE)
+  mosaicFrequency    Int                  @default(15)
+  qrCodeText         String?
+  booking            Booking?             @relation(fields: [bookingId], references: [id])
+  user               User?                @relation(fields: [userId], references: [id])
+  announcements      SocialAnnouncement[]
+  posts              SocialPost[]
+  devices            TVDevice[]
+  sponsors           SponsorLogo[]        @relation("EventSocialSettingToSponsorLogo")
+
+  @@index([userId])
+  @@map("event_social_settings")
+}
+
+model SocialPost {
+  id          String             @id @default(cuid())
+  settingId   String
+  platformId  String             @unique
+  mediaUrl    String
+  permalink   String
+  caption     String?
+  author      String
+  status      SocialPostStatus   @default(PENDING)
+  postedAt    DateTime
+  fetchedAt   DateTime           @default(now())
+  moderatedAt DateTime?
+  moderatedBy String?
+  moderator   User?              @relation(fields: [moderatedBy], references: [id])
+  setting     EventSocialSetting @relation(fields: [settingId], references: [id], onDelete: Cascade)
+
+  @@index([settingId])
+  @@index([status])
+  @@map("social_posts")
+}
+
+model TVDevice {
+  id          String              @id @default(cuid())
+  pairingCode String              @unique
+  deviceToken String              @unique @default(uuid())
+  name        String?
+  settingId   String?
+  bookingId   String?
+  lastSeen    DateTime            @default(now())
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  booking     Booking?            @relation(fields: [bookingId], references: [id])
+  setting     EventSocialSetting? @relation(fields: [settingId], references: [id])
+
+  @@index([pairingCode])
+  @@index([settingId])
+  @@map("tv_devices")
+}
+
+model SponsorLogo {
+  id        String               @id @default(cuid())
+  name      String
+  imageUrl  String
+  createdAt DateTime             @default(now())
+  userId    String
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  settings  EventSocialSetting[] @relation("EventSocialSettingToSponsorLogo")
+
+  @@index([userId])
+  @@map("sponsor_logos")
+}
+
+model SocialAnnouncement {
+  id        String             @id @default(cuid())
+  settingId String
+  title     String
+  message   String
+  type      AnnouncementType   @default(TEXT)
+  imageUrl  String?
+  duration  Int                @default(10)
+  frequency Int                @default(10)
+  isActive  Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  setting   EventSocialSetting @relation(fields: [settingId], references: [id], onDelete: Cascade)
+
+  @@index([settingId])
+  @@map("social_announcements")
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum ItemStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  COMING_SOON
 }
 
 enum UserRole {
@@ -755,372 +1022,64 @@ enum NotificationType {
   MAINTENANCE_SCHEDULED
 }
 
-// ================================
-// MODELOS DE CHAT E COMUNICAÇÃO
-// ================================
-
-model Chat {
-  id            String            @id @default(cuid())
-  name          String?           // Nome do chat (opcional para chats individuais)
-  type          ChatType          @default(PRIVATE)
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  lastMessageAt DateTime?
-
-  // Relacionamentos
-  participants  ChatParticipant[]
-  messages      ChatMessage[]
-
-  @@map("chats")
-}
-
-model ChatParticipant {
-  id        String            @id @default(cuid())
-  chatId    String
-  userId    String
-  role      ChatRole          @default(MEMBER)
-  joinedAt  DateTime          @default(now())
-  lastReadAt DateTime?
-
-  // Relacionamentos
-  chat      Chat              @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([chatId, userId])
-  @@map("chat_participants")
-}
-
-model ChatMessage {
-  id          String            @id @default(cuid())
-  chatId      String
-  senderId    String
-  content     String
-  messageType MessageType       @default(TEXT)
-  fileUrl     String?
-  fileName    String?
-  fileSize    Int?
-  createdAt   DateTime          @default(now())
-
-  // Relacionamentos
-  chat        Chat              @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  sender      User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  reads       ChatMessageRead[]
-
-  @@index([chatId])
-  @@index([senderId])
-  @@index([chatId, createdAt])
-  @@map("chat_messages")
-}
-
-model ChatMessageRead {
-  id        String   @id @default(cuid())
-  messageId String
-  userId    String
-  chatId    String
-  readAt    DateTime @default(now())
-
-  // Relacionamentos
-  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([messageId, userId])
-  @@map("chat_message_reads")
-}
-
-// ================================
-// MODELOS DE NOTIFICAÇÕES
-// ================================
-
-// Modelo Notification já existe no arquivo, então removemos a duplicata
-
-// ================================
-// ENUMS ADICIONAIS
-// ================================
-
 enum ChatType {
-  PRIVATE     // Chat individual
-  GROUP       // Chat em grupo
-  EVENT       // Chat relacionado a um evento
-  SUPPORT     // Chat de suporte
+  PRIVATE
+  GROUP
+  EVENT
+  SUPPORT
 }
-
-
 
 enum ChatRole {
-  ADMIN       // Administrador do chat
-  MODERATOR   // Moderador
-  MEMBER      // Membro comum
+  ADMIN
+  MODERATOR
+  MEMBER
 }
-
-// ================================
-// MODELOS DE CHECKLIST
-// ================================
-
-model Checklist {
-  id          String               @id @default(cuid())
-  title       String
-  description String?
-  type        ChecklistType        @default(GENERAL)
-  status      ChecklistStatus      @default(ACTIVE)
-  isTemplate  Boolean              @default(false)
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
-  createdById String
-  createdBy   User                 @relation("ChecklistCreator", fields: [createdById], references: [id])
-
-  // Relacionamentos
-  items       ChecklistItem[]
-  assignments ChecklistAssignment[]
-
-  @@map("checklists")
-}
-
-model KitItem {
-  id          String    @id @default(cuid())
-  kitId       String
-  equipmentId String?
-  serviceId   String?
-  quantity    Int       @default(1)
-
-  kit         Kit       @relation(fields: [kitId], references: [id], onDelete: Cascade)
-  equipment   Equipment? @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
-  service     Service?   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-
-  @@index([kitId])
-  @@index([equipmentId])
-  @@index([serviceId])
-  @@map("kit_items")
-}
-
-model ChecklistItem {
-  id          String            @id @default(cuid())
-  checklistId String
-  title       String
-  description String?
-  order       Int               @default(0)
-  isRequired  Boolean           @default(false)
-  status      ChecklistItemStatus @default(PENDING)
-  completedAt DateTime?
-  completedById String?
-  notes       String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-
-  // Relacionamentos
-  checklist   Checklist          @relation(fields: [checklistId], references: [id], onDelete: Cascade)
-  completedBy User?              @relation("ChecklistItemCompleter", fields: [completedById], references: [id])
-
-  @@map("checklist_items")
-}
-
-model ChecklistAssignment {
-  id            String                @id @default(cuid())
-  checklistId   String
-  assignedToId  String
-  assignedById  String
-  dueDate       DateTime?
-  priority      ChecklistPriority     @default(MEDIUM)
-  status        ChecklistAssignmentStatus @default(PENDING)
-  notes         String?
-  completedAt   DateTime?
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
-
-  // Relacionamentos
-  checklist     Checklist             @relation(fields: [checklistId], references: [id], onDelete: Cascade)
-  assignedTo    User                  @relation("ChecklistAssignee", fields: [assignedToId], references: [id])
-  assignedBy    User                  @relation("ChecklistAssigner", fields: [assignedById], references: [id])
-
-  @@unique([checklistId, assignedToId])
-  @@map("checklist_assignments")
-}
-
-// ================================
-// ENUMS DE CHECKLIST
-// ================================
 
 enum ChecklistType {
-  GENERAL       // Checklist geral
-  EVENT_SETUP   // Configuração de evento
-  EVENT_BREAKDOWN // Desmontagem de evento
-  MAINTENANCE   // Manutenção de equipamento
-  CLIENT_MEETING // Reunião com cliente
-  DELIVERY      // Entrega de equipamento
-  PICKUP        // Retirada de equipamento
-  OTHER         // Outro tipo
+  GENERAL
+  EVENT_SETUP
+  EVENT_BREAKDOWN
+  MAINTENANCE
+  CLIENT_MEETING
+  DELIVERY
+  PICKUP
+  OTHER
 }
 
 enum ChecklistStatus {
-  ACTIVE        // Ativo
-  COMPLETED     // Concluído
-  ARCHIVED      // Arquivado
-  CANCELLED     // Cancelado
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+  CANCELLED
 }
 
 enum ChecklistItemStatus {
-  PENDING       // Pendente
-  IN_PROGRESS   // Em andamento
-  COMPLETED     // Concluído
-  SKIPPED       // Pulado
-  CANCELLED     // Cancelado
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  CANCELLED
 }
 
 enum ChecklistPriority {
-  LOW           // Baixa
-  MEDIUM        // Média
-  HIGH          // Alta
-  URGENT        // Urgente
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
 }
 
 enum ChecklistAssignmentStatus {
-  PENDING       // Pendente
-  IN_PROGRESS   // Em andamento
-  COMPLETED     // Concluído
-  OVERDUE       // Atrasado
-  CANCELLED     // Cancelado
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+  CANCELLED
 }
-
-// ================================
-// MODELO DE CONFIGURAÇÕES DA APLICAÇÃO
-// ================================
-
-model AppSettings {
-  id          String   @id @default(cuid())
-  logoUrl     String?
-  companyName String   @default("X Produçoes e Eventos")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@map("app_settings")
-}
-
-model Banner {
-  id             String    @id @default(cuid())
-  title          String
-  description    String?
-  imageUrl       String    
-  mobileImageUrl String?
-  linkUrl        String?
-  active         Boolean   @default(true)
-  sortOrder      Int       @default(0)
-  startDate      DateTime?
-  endDate        DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  @@map("banners")
-}
-
-// ================================
-// NÍVEIS DE EXPERIÊNCIA DOS KITS
-// ================================
 
 enum ExperienceLevel {
-  SILVER    // Self-service (apenas equipamentos)
-  GOLD      // Com montagem e desmontagem profissional
-  PLATINUM  // Solução completa (técnico + DJ)
-}
-
-model KitExperienceLevel {
-  id          String          @id @default(cuid())
-  level       ExperienceLevel
-  price       Decimal         @db.Decimal(10, 2)
-  description String?
-  includes    String[]        // Lista do que está incluído
-  isPopular   Boolean         @default(false)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  kitId       String
-  kit         Kit             @relation(fields: [kitId], references: [id], onDelete: Cascade)
-
-  @@unique([kitId, level])
-  @@index([kitId])
-  @@index([level])
-  @@map("kit_experience_levels")
-}
-
-// ================================
-// SOCIAL WALL MODULE
-// ================================
-
-model SocialCredential {
-  id           String   @id @default(cuid())
-  userId       String
-  platform     String   @default("INSTAGRAM")
-  accessToken  String   // Long-lived token
-  pageId       String?  // Facebook Page ID for business discovery
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("social_credentials")
-}
-
-model EventSocialSetting {
-  id           String   @id @default(cuid())
-  
-  // Decoupling: Booking is now optional
-  bookingId    String?   @unique
-  userId       String?   // New: Owner of the standalone wall (for credentials)
-  
-  // Standalone fields
-  name         String?   // Friendly name (e.g. "Casamento Joao")
-  slug         String?   @unique // Public URL slug
-  
-  hashtag      String
-  autoApprove  Boolean  @default(false)
-  layoutMode   LayoutMode @default(LANDSCAPE)
-
-  // UX / Interactivity Features
-  enableQrCode Boolean  @default(true)
-  qrCodeText   String?  // Custom text for QR (e.g. "Scan to Post") or URL override
-  
-  // Mosaic / Grid View
-  enableMosaic    Boolean @default(true)
-  mosaicFrequency Int     @default(15) // Show mosaic every N slides
-  
-  // Gamification
-  enableGamification Boolean @default(false)
-  
-  sponsors     SponsorLogo[]
-  announcements SocialAnnouncement[]
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  booking      Booking?  @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-  user         User?     @relation(fields: [userId], references: [id])
-  posts        SocialPost[]
-  devices      TVDevice[]
-
-  @@index([userId])
-  @@map("event_social_settings")
-}
-
-model SocialPost {
-  id           String           @id @default(cuid())
-  settingId    String
-  platformId   String           @unique // Instagram Media ID
-  mediaUrl     String           // Optimized URL
-  permalink    String
-  caption      String?
-  author       String
-  status       SocialPostStatus @default(PENDING)
-  postedAt     DateTime
-  fetchedAt    DateTime         @default(now())
-  
-  // Moderation Audit
-  moderatedAt  DateTime?
-  moderatedBy  String?
-  moderator    User?            @relation(fields: [moderatedBy], references: [id])
-  
-  setting      EventSocialSetting @relation(fields: [settingId], references: [id], onDelete: Cascade)
-
-  @@index([settingId])
-  @@index([status])
-  @@map("social_posts")
+  SILVER
+  GOLD
+  PLATINUM
 }
 
 enum SocialPostStatus {
@@ -1129,70 +1088,9 @@ enum SocialPostStatus {
   REJECTED
 }
 
-model TVDevice {
-  id           String   @id @default(cuid())
-  pairingCode  String   @unique // Short 4-char code for input
-  deviceToken  String   @unique @default(uuid()) // Long auth token
-  name         String?  // e.g. "Main Stage TV"
-  
-  // Relink to EventSocialSetting directly
-  settingId    String?
-  bookingId    String?  // Deprecated/Optional legacy or redundant? Keeping for now but settingId is primary source of truth for "what to show"
-  
-  lastSeen     DateTime @default(now())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  setting      EventSocialSetting? @relation(fields: [settingId], references: [id])
-  booking      Booking? @relation(fields: [bookingId], references: [id])
-
-  @@index([pairingCode])
-  @@index([settingId])
-  @@map("tv_devices")
-}
-
-model SponsorLogo {
-  id           String   @id @default(cuid())
-  name         String
-  imageUrl     String   // Cloudinary URL
-  createdAt    DateTime @default(now())
-  
-  // Ownership
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // Relations: Many-to-Many with EventSocialSetting
-  settings     EventSocialSetting[]
-
-  @@index([userId])
-  @@map("sponsor_logos")
-}
-
 enum LayoutMode {
-  LANDSCAPE // Default: Sidebars if vertical content
-  PORTRAIT  // Fullscreen vertical
-}
-
-model SocialAnnouncement {
-  id           String   @id @default(cuid())
-  settingId    String
-  
-  title        String
-  message      String   @db.Text
-  type         AnnouncementType @default(TEXT)
-  imageUrl     String?  // For IMAGE type
-  
-  duration     Int      @default(10) // Seconds to show
-  frequency    Int      @default(10) // Show every N slides
-  isActive     Boolean  @default(true)
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  setting      EventSocialSetting @relation(fields: [settingId], references: [id], onDelete: Cascade)
-
-  @@index([settingId])
-  @@map("social_announcements")
+  LANDSCAPE
+  PORTRAIT
 }
 
 enum AnnouncementType {
