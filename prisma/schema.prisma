@@ -166,7 +166,9 @@ model Client {
 model Collaborator {
   id               String                     @id @default(cuid())
   phone            String?
-  collaboratorRole CollaboratorRole
+  collaboratorRole CollaboratorRole           @default(OTHER)
+  functionId       String?
+  function         CollaboratorFunction?      @relation(fields: [functionId], references: [id])
   specialties      String[]
   status           CollaboratorStatus         @default(PENDING_APPROVAL)
   experience       String?
@@ -192,9 +194,24 @@ model Collaborator {
   @@index([userId])
   @@index([status])
   @@index([collaboratorRole])
+  @@index([functionId])
   @@index([status, collaboratorRole])
   @@index([userId, status])
   @@map("collaborators")
+}
+
+model CollaboratorFunction {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  collaborators     Collaborator[]
+  eventAssignments  EventCollaborator[]
+
+  @@map("collaborator_functions")
 }
 
 // ================================
@@ -414,7 +431,9 @@ model BookingAttachment {
 
 model EventCollaborator {
   id             String                  @id @default(cuid())
-  role           CollaboratorRole
+  role           CollaboratorRole        @default(OTHER)
+  functionId     String?
+  function       CollaboratorFunction?   @relation(fields: [functionId], references: [id])
   startTime      String
   endTime        String
   hourlyRate     Decimal?                @db.Decimal(8, 2)
@@ -435,6 +454,7 @@ model EventCollaborator {
   @@unique([bookingId, collaboratorId, role])
   @@index([bookingId])
   @@index([collaboratorId])
+  @@index([functionId])
   @@index([status])
   @@index([bookingId, status])
   @@index([collaboratorId, status])
