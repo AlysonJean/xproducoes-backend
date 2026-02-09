@@ -68,7 +68,7 @@ class EnterpriseMonitoringService {
   }
 
   private async performHealthChecks(): Promise<void> {
-    const integrations = ['database', 'cache', 'cloudinary', 'smtp', 'gemini'];
+    const integrations = ['database', 'cache', 'cloudinary', 'smtp', 'ai'];
     
     for (const integration of integrations) {
       try {
@@ -134,8 +134,8 @@ class EnterpriseMonitoringService {
         case 'smtp':
           await this.checkSMTP();
           break;
-        case 'gemini':
-          await this.checkGemini();
+        case 'ai':
+          await this.checkAI();
           break;
         default:
           throw new Error(`Unknown integration: ${integration}`);
@@ -193,10 +193,10 @@ class EnterpriseMonitoringService {
     }
   }
 
-  private async checkGemini(): Promise<void> {
-    // Simulate Gemini AI check
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error('Gemini AI not configured');
+  private async checkAI(): Promise<void> {
+    // Check for either Gemini or Hugging Face (HUGGIE) configuration
+    if (!process.env.GEMINI_API_KEY && !process.env.HF_API_KEY) {
+      throw new Error('AI Provider (Gemini or Hugging Face) not configured');
     }
   }
 
@@ -226,7 +226,7 @@ class EnterpriseMonitoringService {
   }
 
   async getIntegrationsOverview(): Promise<IntegrationHealth[]> {
-    const integrations = ['database', 'cache', 'cloudinary', 'smtp', 'gemini'];
+    const integrations = ['database', 'cache', 'cloudinary', 'smtp', 'ai'];
     const results: IntegrationHealth[] = [];
 
     for (const integration of integrations) {

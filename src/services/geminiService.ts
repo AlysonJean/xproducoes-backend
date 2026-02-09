@@ -3,19 +3,24 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { prisma } from "../config/prisma";
 import logger from "../config/logger";
+import { HfInference } from "@huggingface/inference";
 
+/**
+ * ✅ IA SERVICE (GEMINI & HUGGING FACE)
+ * Fornece sugestões criativas de eventos baseadas no catálogo real de produtos.
+ */
 
-// Validate API key presence
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
 const HF_KEY = process.env.HF_API_KEY;
-// Default to true in development if not explicitly disabled
 const IS_DEV = process.env.NODE_ENV !== 'production';
+
+// Fallback logic
 const USE_MOCK_FALLBACK = process.env.GEMINI_MOCK_FALLBACK 
   ? String(process.env.GEMINI_MOCK_FALLBACK).toLowerCase() === 'true'
-  : IS_DEV; // Auto-enable mock in dev if variable is unset
+  : IS_DEV;
 
 let genAI: GoogleGenerativeAI | null = null;
-if (GEMINI_KEY && !GEMINI_KEY.startsWith('REDACTED_GEMINI_KEY_ROTATE_IF_STILL_ACTIVE')) {
+if (GEMINI_KEY && !GEMINI_KEY.startsWith('AIzaSy')) { // Simplified check
   try {
     genAI = new GoogleGenerativeAI(GEMINI_KEY);
     logger.info('Gemini AI inicializado com sucesso.');
@@ -23,17 +28,14 @@ if (GEMINI_KEY && !GEMINI_KEY.startsWith('REDACTED_GEMINI_KEY_ROTATE_IF_STILL_AC
     logger.error({obj:e}, 'Falha ao inicializar Gemini client:');
     genAI = null;
   }
-} else if (HF_KEY) {
-    logger.info('Usando Hugging Face como provedor de IA.');
-} else {
-  logger.warn('Nenhuma chave de API de IA (Gemini ou Hugging Face) configurada. Usando Mocks.');
 }
 
 const MOCK_SUGGESTIONS = [
-  "Que tal uma 'Festa Acústica ao Entardecer'? Use nosso kit acústico, iluminação suave e um pequeno palco para criar um clima intimista e inesquecível.",
-  "Experimente uma 'Noite de Cinema ao Ar Livre'! Com nosso projetor de alta definição e sistema de som surround, crie uma experiência mágica sob as estrelas.",
-  "Organize uma 'Balada Neon'! Nossos kits de iluminação UV, strobos e lasers vão transformar seu espaço em uma pista de dança vibrante e cheia de energia.",
-  "Sugerimos um 'Lounge Corporativo Premium'. Utilize nossa iluminação arquitetural e som ambiente de alta fidelidade para criar um networking elegante e produtivo."
+  "Que tal uma 'Festa Acústica ao Entardecer'? Use nossos equipamentos de som de alta fidelidade e iluminação decorativa para criar um clima íntimo e acolhedor.",
+  "Experimente uma 'Cinema Garden Night'! Com nossos projetores 4K e kits de sonorização externa, leve a magia das telas para o seu jardim.",
+  "Transforme seu espaço com uma 'Balada Neon Experience'! Nossos lasers, máquinas de fumaça e painéis de LED criam uma atmosfera futurista inigualável.",
+  "Para eventos corporativos, sugerimos o 'Lounge Networking Premium'. Som ambiente cristalino e iluminação cênica para impressionar seus parceiros.",
+  "Crie um 'Mini Festival em Casa'! Combine nossos kits de palco, PA potente e iluminação de pista para uma experiência de show real."
 ];
 
 function getMockSuggestion() {
@@ -41,32 +43,30 @@ function getMockSuggestion() {
   return MOCK_SUGGESTIONS[randomIndex];
 }
 
-// Importação dinâmica ou require para evitar falhas se a lib não estiver presente em builds legados
-// Mas como já instalamos, vamos usar import direto se possível, ou require dentro do método para segurança
-import { HfInference } from "@huggingface/inference";
-
-// ... (código existente)
-
 export class GeminiService {
   private async callHuggingFace(prompt: string): Promise<string> {
-    if (!HF_KEY) throw new Error("Chave HF ausente");
+    if (!HF_KEY) throw new Error("Chave Hugging Face ausente");
 
     try {
         const hf = new HfInference(HF_KEY);
-        // Usar Meta-Llama-3-8B-Instruct que validamos funcionar bem
+        // Meta-Llama-3-8B-Instruct é excelente para criatividade em português
         const response = await hf.chatCompletion({
             model: 'meta-llama/Meta-Llama-3-8B-Instruct',
             messages: [
+                { 
+                  role: "system", 
+                  content: "Você é um consultor criativo de eventos da X-Produções. Seu objetivo é sugerir festas incríveis e detalhadas usando produtos específicos do catálogo." 
+                },
                 { role: "user", content: prompt }
             ],
-            max_tokens: 300,
-            temperature: 0.7
+            max_tokens: 500,
+            temperature: 0.85
         });
 
         if (response.choices && response.choices.length > 0 && response.choices[0].message.content) {
              return response.choices[0].message.content.trim();
         }
-        return "Sugestão gerada com sucesso!";
+        return getMockSuggestion();
 
     } catch (err: any) {
         logger.error({err}, "Erro na chamada Hugging Face");
@@ -75,68 +75,70 @@ export class GeminiService {
   }
 
   async suggestEventTheme(): Promise<string> {
-    // Se não houver nenhum provedor configurado, tenta mock
+    // Se nenhum provedor configurado, mas mock ativo
     if (!genAI && !HF_KEY) {
-      if (USE_MOCK_FALLBACK) {
-        logger.info('IA indisponível: usando fallback mock auto-habilitado em DEV');
-        return getMockSuggestion();
-      }
-      throw new Error('Nenhuma chave de IA configurada e fallback desativado.');
+      if (USE_MOCK_FALLBACK) return getMockSuggestion();
+      throw new Error('Serviço de IA não configurado no ambiente.');
     }
 
     try {
-      // 1. Buscar contexto do banco de dados
-      const equipments = await prisma.equipment.findMany({
-        take: 15,
-        select: { name: true, description: true },
-      });
+      // 1. Coletar inteligência real do catálogo (Equipamentos, Kits e Serviços)
+      const [equipments, kits, services] = await Promise.all([
+        prisma.equipment.findMany({ 
+          where: { status: 'ACTIVE' },
+          take: 10, 
+          select: { name: true, description: true } 
+        }),
+        prisma.kit.findMany({ 
+          where: { status: 'ACTIVE' },
+          take: 5, 
+          select: { name: true, description: true } 
+        }),
+        prisma.service.findMany({ 
+          where: { status: 'ACTIVE' },
+          take: 5, 
+          select: { name: true, description: true } 
+        })
+      ]);
 
-      const kits = await prisma.kit.findMany({
-        take: 5,
-        select: { name: true, description: true },
-      });
-
-      const equipmentList = equipments.map((e) => `- ${e.name}: ${e.description}`).join("\n");
-      const kitList = kits.map((k) => `- ${k.name}: ${k.description}`).join("\n");
+      const itemsDescription = [
+        ...equipments.map(i => `Equipamento: ${i.name} (${i.description})`),
+        ...kits.map(i => `Kit Combo: ${i.name} (${i.description})`),
+        ...services.map(i => `Serviço Profissional: ${i.name} (${i.description})`)
+      ].join("\n");
 
       const promptContext = `
-        Você é um organizador de eventos criativo da empresa X-Produções.
-        Com base nestes equipamentos:
-        ${equipmentList}
-        
-        E nestes kits:
-        ${kitList}
-        
-        Crie uma sugestão curta (máximo 3 frases) e empolgante de tema para uma festa.
-        Use Português do Brasil.
-        Exemplo: "Que tal uma Festa Neon? Use nossos canhões de luz..."
-        
-        Sugestão:
+        Você é o Especialista Chefe de Produção da X-Produções. Sua missão é encantar o cliente com uma ideia de evento IRRESISTÍVEL.
+
+        CATÁLOGO DISPONÍVEL:
+        ${itemsDescription}
+
+        REQUISITOS DA RESPOSTA:
+        1. Crie um nome chamativo para o evento (Ex: "Neon Sunset Rave").
+        2. Explique o conceito brevemente (2 frases).
+        3. Liste 3 itens específicos do catálogo acima que serão essenciais.
+        4. Use um tom entusiasmado, profissional e persuasivo.
+        5. Máximo 150 palavras.
+        6. Idioma: Português do Brasil.
+
+        SUGESTÃO CRIATIVA:
       `;
 
-      // 2. Decidir qual provedor chamar
+      // 2. Execução (Hugging Face tem prioridade se configurado)
       if (HF_KEY) {
-          // Prioridade para HF se configurado (já que o usuário pediu a troca)
           return await this.callHuggingFace(promptContext);
       } else if (genAI) {
           const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
           const result = await model.generateContent(promptContext);
-          const response = await result.response;
-          return response.text();
+          return result.response.text();
       }
       
       return getMockSuggestion();
 
     } catch (error: any) {
-      const errMsg = error instanceof Error ? error.message : String(error);
-      logger.error({obj: errMsg}, 'Erro ao comunicar com a API de IA:');
-
-      if (USE_MOCK_FALLBACK) {
-        logger.warn('Falha na API de IA, retornando sugestão valida via mock.');
-        return getMockSuggestion();
-      }
-
-      throw new Error('Não foi possível gerar a sugestão no momento.');
+      logger.error('IA Sugestão falhou:', error?.message || error);
+      if (USE_MOCK_FALLBACK) return getMockSuggestion();
+      throw new Error('Não foi possível gerar a sugestão agora.');
     }
   }
 }
