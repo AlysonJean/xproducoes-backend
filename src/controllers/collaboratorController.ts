@@ -32,6 +32,7 @@ const createCollaboratorSchema = z.object({
   commissionRate: z.number().optional(),
   status: z.enum(["ACTIVE", "INACTIVE", "SUSPENDED"]).optional(),
   availabilityStatus: z.enum(["AVAILABLE", "BUSY", "OFF_DUTY"]).optional(),
+  functionId: z.string().optional(),
 });
 
 const assignCollaboratorSchema = z.object({
@@ -84,6 +85,7 @@ export class CollaboratorController {
       commissionRate: validatedData.commissionRate,
       status: validatedData.status,
       availabilityStatus: validatedData.availabilityStatus,
+      functionId: validatedData.functionId,
     };
 
     const collaborator =

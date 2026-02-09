@@ -42,6 +42,7 @@ export class CollaboratorRepository {
       userId: data.userId,
       phone: data.phone,
       collaboratorRole: data.collaboratorRole,
+      functionId: (data as any).functionId,
       specialties: data.specialties,
       hourlyRate: data.hourlyRate,
       status: data.status || "ACTIVE",

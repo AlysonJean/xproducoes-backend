@@ -17,6 +17,7 @@ interface CollaboratorCreateInput {
   email?: string;
   phone?: string;
   collaboratorRole: CollaboratorRole;
+  functionId?: string;
   specialties?: string[];
   hourlyRate?: number;
   fixedRate?: number;

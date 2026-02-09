@@ -1,3 +1,15 @@
+import { prisma } from "../config/prisma";
+import type { UserRole, Prisma } from "@prisma/client";
+import crypto from "crypto";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { config as envConfig } from "../config/environment";
+import logger from "../config/logger";
+import { queueEmail } from "../config/jobQueue";
+
+// Use centralized, cryptographically generated secret from environment config
+const config = { jwtSecret: envConfig.jwtSecret };
+
 // Listar todos os clientes (role CLIENT)
 export async function findAllClients() {
   return prisma.user.findMany({
@@ -162,19 +174,6 @@ export async function changePassword(userId: string, currentPassword: string, ne
   return true;
 }
 
-import { prisma } from "../config/prisma";
-import type { UserRole, Prisma } from "@prisma/client";
-import crypto from "crypto";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import { config as envConfig } from "../config/environment";
-import logger from "../config/logger";
-import { queueEmail } from "../config/jobQueue";
-
-
-// Use centralized, cryptographically generated secret from environment config
-const config = { jwtSecret: envConfig.jwtSecret };
-
 export type RegisterInput = { name: string; email: string; password: string; role?: string };
 export type LoginInput = { email: string; password: string };
 
@@ -248,7 +247,6 @@ export async function login(data: LoginInput) {
     case 'CLIENT':
       dashboardRoute = '/client/dashboard';
       break;
-    // FREELANCER não está no enum UserRole, removido
     default:
       dashboardRoute = '/dashboard';
   }
@@ -342,8 +340,6 @@ export async function forgotPassword(email: string) {
       passwordResetTokenExpiry: expires,
     },
   });
-  // Aqui você pode integrar com seu serviço de e-mail
-  // await sendEmail(user.email, `Seu token de recuperação: ${token}`);
   return true;
 }
 

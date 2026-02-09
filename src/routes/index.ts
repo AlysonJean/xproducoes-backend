@@ -32,6 +32,7 @@ import calendarRoutes from "./calendarRoutes";
 import serviceRoutes from "./serviceRoutes";
 import socialRoutes from "./socialRoutes";
 import sponsorRoutes from "./sponsorRoutes";
+import collaboratorFunctionRoutes from "./collaboratorFunctionRoutes";
 
 const router: RouterType = Router();
 
@@ -71,6 +72,7 @@ router.use("/profile", profileRoutes);
 router.use("/quotes", quoteRoutes);
 router.use("/gemini", geminiRoutes);
 router.use("/collaborators", collaboratorRoutes);
+router.use("/collaborator-functions", collaboratorFunctionRoutes);
 
 // Admin routes
 router.use("/admin", adminRoutes);
