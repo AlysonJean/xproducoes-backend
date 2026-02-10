@@ -349,20 +349,67 @@ export class AdminController {
       if (!id) {
         return res.status(400).json({ error: "ID é obrigatório" });
       }
-      // Remove perfil de cliente
-      let client: (Client & { user?: User | null }) | null = null;
-      try {
-        client = await clientService.getClientById(id);
-      } catch {/* ignore */}
-      await prisma.client.delete({ where: { id } });
-      // Remove usuário, se existir
-      if (client && client.userId) {
-        try {
-          await userService.deleteUser(client.userId);
-        } catch {}
+
+      // Buscar cliente para obter o userId antes de deletar
+      const client = await prisma.client.findUnique({
+        where: { id },
+        include: { user: true }
+      });
+
+      if (!client) {
+        return res.status(404).json({ error: "Cliente não encontrado" });
       }
+
+      // Executar limpeza em transação para evitar erros de constraint (FK)
+      await prisma.$transaction(async (tx) => {
+        // 1. Limpar favoritos
+        await tx.clientFavorite.deleteMany({ where: { clientId: id } });
+        
+        // 2. Limpar notificações do cliente
+        await tx.notification.deleteMany({ where: { clientId: id } });
+
+        // 3. Tratar Reservas (Bookings) - Deletar tudo relacionado
+        const bookings = await tx.booking.findMany({ where: { clientId: id } });
+        const bIds = bookings.map(b => b.id);
+        
+        if (bIds.length > 0) {
+          await tx.bookingAttachment.deleteMany({ where: { bookingId: { in: bIds } } });
+          await tx.bookingAuditLog.deleteMany({ where: { bookingId: { in: bIds } } });
+          await tx.eventCollaborator.deleteMany({ where: { bookingId: { in: bIds } } });
+          await tx.message.deleteMany({ where: { bookingId: { in: bIds } } });
+          await tx.review.deleteMany({ where: { bookingId: { in: bIds } } });
+          await tx.tVDevice.deleteMany({ where: { bookingId: { in: bIds } } });
+          
+          await tx.booking.deleteMany({ where: { clientId: id } });
+        }
+
+        // 4. Se o usuário for apenas um CLIENT, limpar seus dados de usuário também
+        if (client.userId && client.user?.role === 'CLIENT') {
+          // Limpar Bookings onde ele é o criador (mas não necessariamente o cliente)
+          await tx.booking.deleteMany({ where: { creatorId: client.userId } });
+          
+          // Limpar outras relações do usuário
+          await tx.notification.deleteMany({ where: { userId: client.userId } });
+          await tx.chatParticipant.deleteMany({ where: { userId: client.userId } });
+          await tx.bookingAuditLog.deleteMany({ where: { userId: client.userId } });
+          await tx.message.deleteMany({ 
+            where: { OR: [{ senderId: client.userId }, { recipientId: client.userId }] } 
+          });
+
+          // Deletar o perfil do cliente primeiro (devido à relação 1:1)
+          await tx.client.delete({ where: { id } });
+          // Deletar o usuário
+          await tx.user.delete({ where: { id: client.userId } });
+        } else {
+          // Se for admin ou outro role, deletar apenas o perfil de cliente
+          await tx.client.delete({ where: { id } });
+        }
+      });
+
+      logger.info(`Cliente deletado com sucesso: ${id}`);
       return res.status(204).send();
     } catch (error) {
+      logger.error('Erro ao deletar cliente: ' + String(error));
       return next(error);
     }
   };
@@ -413,7 +460,8 @@ export class AdminController {
   async deleteUser(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params as { id: string };
-      await userService.deleteUser(Number(id));
+      // O ID é um CUID (string), remover a conversão para Number que causava erro NaN
+      await userService.deleteUser(id);
       res.status(204).send();
     } catch (error) {
       logger.error('Erro ao deletar usuário: ' + String(error));

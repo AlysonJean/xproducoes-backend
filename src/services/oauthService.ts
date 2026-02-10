@@ -109,27 +109,49 @@ export async function handleGoogleCallback(params: { code?: string; state?: stri
   if (!email) throw new Error('Email não disponível pelo provedor');
 
   // Vincular ou criar usuário local
+  let isNewUser = false;
   let user = await prisma.user.findUnique({ where: { email } });
+  const avatarUrl = (claims as any).picture as string || null;
+
   if (!user) {
+    isNewUser = true;
     user = await prisma.user.create({
       data: {
         name: ((claims as any).name as string) || email.split('@')[0],
         email,
-        passwordHash: base64url(crypto.randomBytes(24)), // placeholder, login social
+        passwordHash: base64url(crypto.randomBytes(24)),
         verified: emailVerified || true,
+        avatarUrl,
       },
     });
     try { await prisma.client.create({ data: { userId: user.id } }); } catch {}
-  } else if (!user.verified && emailVerified) {
-    await prisma.user.update({ where: { id: user.id }, data: { verified: true } });
+  } else {
+    // Atualiza avatar se houver um novo e o atual for nulo
+    if (avatarUrl && !user.avatarUrl) {
+      await prisma.user.update({ where: { id: user.id }, data: { avatarUrl } });
+    }
+    if (!user.verified && emailVerified) {
+      await prisma.user.update({ where: { id: user.id }, data: { verified: true } });
+    }
   }
+
+  // Verificar se o perfil está completo (ex: tem telefone)
+  const clientProfile = await prisma.client.findUnique({ where: { userId: user.id } });
+  const shouldCompleteProfile = isNewUser || !clientProfile?.phone;
 
   // Emitir JWT da aplicação
   const appToken = jwt.sign({ userId: user.id, role: (user as any).role }, JWT_SECRET, { expiresIn: '7d' });
 
   return {
-    user: { id: user.id, name: user.name, email: user.email, role: (user as any).role },
+    user: { 
+      id: user.id, 
+      name: user.name, 
+      email: user.email, 
+      role: (user as any).role,
+      avatarUrl: user.avatarUrl 
+    },
     token: appToken,
+    shouldCompleteProfile
   };
 }
 
@@ -201,7 +223,7 @@ export async function handleFacebookCallback(params: { code?: string; state?: st
   const accessToken = tokenJson.access_token as string;
 
   // Buscar perfil básico
-  const meRes = await (await import('../utils/safeFetch')).safeFetch(`https://graph.facebook.com/v19.0/me?fields=id,name,email&access_token=${encodeURIComponent(accessToken)}`, { allowedHosts: new Set(['graph.facebook.com']) });
+  const meRes = await (await import('../utils/safeFetch')).safeFetch(`https://graph.facebook.com/v19.0/me?fields=id,name,email,picture.type(large)&access_token=${encodeURIComponent(accessToken)}`, { allowedHosts: new Set(['graph.facebook.com']) });
   const me: any = await meRes.json();
   if (!meRes.ok || !me?.id) {
     throw new Error(`Falha ao obter perfil do Facebook: ${me?.error?.message || meRes.statusText}`);
@@ -210,19 +232,41 @@ export async function handleFacebookCallback(params: { code?: string; state?: st
   if (!email) throw new Error('Email não disponível pelo provedor');
 
   // Vincular ou criar usuário local
+  let isNewUser = false;
   let user = await prisma.user.findUnique({ where: { email } });
+  const avatarUrl = me.picture?.data?.url || null;
+
   if (!user) {
+    isNewUser = true;
     user = await prisma.user.create({
       data: {
         name: (me.name as string) || email.split('@')[0],
         email,
         passwordHash: base64url(crypto.randomBytes(24)),
-        verified: true, // Facebook não expõe email_verified; assume-se consentido
+        verified: true,
+        avatarUrl,
       },
     });
     try { await prisma.client.create({ data: { userId: user.id } }); } catch {}
+  } else {
+    if (avatarUrl && !user.avatarUrl) {
+      await prisma.user.update({ where: { id: user.id }, data: { avatarUrl } });
+    }
   }
 
+  const clientProfile = await prisma.client.findUnique({ where: { userId: user.id } });
+  const shouldCompleteProfile = isNewUser || !clientProfile?.phone;
+
   const appToken = jwt.sign({ userId: user.id, role: (user as any).role }, JWT_SECRET, { expiresIn: '7d' });
-  return { user: { id: user.id, name: user.name, email: user.email, role: (user as any).role }, token: appToken };
+  return { 
+    user: { 
+      id: user.id, 
+      name: user.name, 
+      email: user.email, 
+      role: (user as any).role,
+      avatarUrl: user.avatarUrl
+    }, 
+    token: appToken,
+    shouldCompleteProfile
+  };
 }

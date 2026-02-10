@@ -6,6 +6,7 @@ import {
 } from "../utils/bookingErrors";
 import logger from "../config/logger";
 import { prisma } from "../config/prisma";
+import { generateSemanticBookingId } from "../utils/bookingIdGenerator";
 
 export class BookingService {
   /**
@@ -269,10 +270,14 @@ export class BookingService {
         throw new BookingValidationError("É necessário identificar um cliente para a reserva");
       }
 
+      // Gerar ID semântico (Ex: XP-JOAO-20260210-1430-8K2)
+      const bookingId = generateSemanticBookingId(data.clientName || "CLIENTE");
+
       // Criar a reserva com suporte a idempotência usando coluna dedicada.
       // Tentamos criar com idempotencyKey quando fornecida. Em caso de
       // violação de unicidade (P2002), buscamos o registro existente e o retornamos.
   const createData: any = {
+        id: bookingId,
         eventDate: eventDate,
         eventEndDate: eventEndDate,
         eventTitle: data.eventTitle || "Evento",

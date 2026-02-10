@@ -149,8 +149,17 @@ export class CollaboratorRepository {
   }
 
   async delete(id: string): Promise<Collaborator> {
-    return prisma.collaborator.delete({
-      where: { id },
+    return prisma.$transaction(async (tx) => {
+      // Desvincular avaliações antes de deletar
+      await tx.review.updateMany({
+        where: { collaboratorId: id },
+        data: { collaboratorId: null }
+      });
+
+      // Availabilities, payments e eventAssignments possuem onDelete: Cascade no schema
+      return tx.collaborator.delete({
+        where: { id },
+      });
     });
   }
 

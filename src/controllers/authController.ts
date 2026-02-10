@@ -298,32 +298,42 @@ export class AuthController {
       
       const email = validation.email!;
       const name = validation.name || email.split('@')[0];
+      const avatarUrl = (validation as any).picture || null;
       
       logger.info({ email, name }, `Token ${provider} validado com sucesso`);
       
-      // Buscar usuário pelo email
-      const user = await this.authService.findUserByEmail(email);
+      // Vincular ou criar usuário local
+      const { prisma } = await import('../config/prisma');
+      let user = await prisma.user.findUnique({ where: { email } });
+      let isNewUser = false;
 
-      if (user) {
-        // Se existe, fazer login
-        logger.info({ userId: user.id }, "Usuário encontrado, fazendo login");
-        const result = await this.authService.loginById(user.id);
-        res.status(200).json(result);
-      } else {
-        // Se não existe, criar novo utilizador
-        const randomPassword = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12);
-        
-        const registerResult = await this.authService.register({
-          name,
-          email,
-          password: randomPassword,
-          role: "CLIENT",
+      if (!user) {
+        isNewUser = true;
+        user = await prisma.user.create({
+          data: {
+            name,
+            email,
+            passwordHash: Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12),
+            verified: true,
+            avatarUrl,
+          },
         });
-        
-        // Após registro, fazer login para obter token
-        const loginResult = await this.authService.loginById(registerResult.id);
-        res.status(201).json(loginResult);
+        try { await prisma.client.create({ data: { userId: user.id } }); } catch {}
+      } else if (avatarUrl && !user.avatarUrl) {
+        await prisma.user.update({ where: { id: user.id }, data: { avatarUrl } });
       }
+
+      // Login para obter tokens
+      const result = await this.authService.loginById(user.id);
+      
+      // Verificar se perfil está completo
+      const clientProfile = await prisma.client.findUnique({ where: { userId: user.id } });
+      const shouldCompleteProfile = isNewUser || !clientProfile?.phone;
+
+      res.status(user ? 200 : 201).json({
+        ...result,
+        shouldCompleteProfile
+      });
       return;
     }
     
