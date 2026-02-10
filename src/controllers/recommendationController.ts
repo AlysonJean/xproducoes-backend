@@ -1,9 +1,7 @@
 // src/controllers/recommendationController.ts
 
 import type { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../config/prisma';
 
 /**
  * Controller para gerenciar recomendações de equipamentos e kits

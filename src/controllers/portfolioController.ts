@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import * as portfolioService from "../services/portfolioService";
+import { cacheService } from "../services/cacheService";
 
 export class PortfolioController {
   update = async (req: Request, res: Response, next: NextFunction) => {
@@ -9,6 +10,7 @@ export class PortfolioController {
         return res.status(400).json({ message: "ID é obrigatório." });
       }
         const updated = await portfolioService.updatePortfolio(id, req.body);
+        await cacheService.delete('portfolio:all'); // Invalidar cache
       return res.json(updated);
     } catch (error) {
       return next(error);
@@ -25,6 +27,7 @@ export class PortfolioController {
         });
       }
       const portfolio = await portfolioService.create(req.body);
+      await cacheService.delete('portfolio:all'); // Invalidar cache
       return res.status(201).json(portfolio);
     } catch (error) {
       if (error instanceof Error) {
@@ -40,7 +43,14 @@ export class PortfolioController {
 
   findAll = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const items = await portfolioService.findAll();
+      const cacheKey = 'portfolio:all';
+      let items = await cacheService.get(cacheKey);
+
+      if (!items) {
+        items = await portfolioService.findAll();
+        await cacheService.set(cacheKey, items, 600); // Cache por 10 minutos
+      }
+
       return res.json(items);
     } catch (error) {
       return next(error);
@@ -55,6 +65,7 @@ export class PortfolioController {
       }
 
       await portfolioService.deletePortfolio(id);
+      await cacheService.delete('portfolio:all'); // Invalidar cache
       return res.status(204).send();
     } catch (error) {
       return next(error);

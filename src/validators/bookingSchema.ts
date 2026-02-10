@@ -1,24 +1,21 @@
 import { z } from "zod";
 import { BookingStatus, DeliveryStatus } from "@prisma/client";
+import { idSchema, idArraySchema } from "../utils/sharedSchema";
 
 // Schema base (sem refinements)
 const bookingBaseSchema = z.object({
     // Cliente (ou user registrado ou dados manuais)
   // aceitar UUIDs ou CUIDs (seed usa cuid())
-  userId: z.union([z.string().uuid(), z.string().regex(/^[a-z0-9]{20,}$/i)]).optional(),
-  clientId: z.union([z.string().uuid(), z.string().regex(/^[a-z0-9]{20,}$/i)]).optional(),
+  userId: idSchema.optional(),
+  clientId: idSchema.optional(),
     clientName: z.string().min(1).optional(),
     clientContact: z.string().min(1).optional(),
     clientEmail: z.string().email().optional(),
 
     // Equipamentos/Kits/Serviços
-    kitId: z.union([z.string().uuid(), z.string().regex(/^[a-z0-9]{20,}$/i)]).optional(),
-    equipmentIds: z
-      .array(z.union([z.string().uuid(), z.string().regex(/^[a-z0-9]{20,}$/i)]))
-      .optional(),
-    serviceIds: z
-      .array(z.union([z.string().uuid(), z.string().regex(/^[a-z0-9]{20,}$/i)]))
-      .optional(),
+    kitId: idSchema.optional(),
+    equipmentIds: idArraySchema.optional(),
+    serviceIds: idArraySchema.optional(),
 
     // Datas do evento (aceita ISO datetime e datetime-local como 'YYYY-MM-DDTHH:mm')
     eventDate: z
@@ -114,11 +111,11 @@ export const bookingFiltersSchema = z.object({
   deliveryStatus: z.nativeEnum(DeliveryStatus).optional(),
   eventDateFrom: z.date().optional(),
   eventDateTo: z.date().optional(),
-  clientId: z.union([z.string().uuid(), z.string().regex(/^[a-z0-9]{20,}$/i)]).optional(),
-  creatorId: z.union([z.string().uuid(), z.string().regex(/^[a-z0-9]{20,}$/i)]).optional(),
-  assigneeId: z.union([z.string().uuid(), z.string().regex(/^[a-z0-9]{20,}$/i)]).optional(),
-  kitId: z.union([z.string().uuid(), z.string().regex(/^[a-z0-9]{20,}$/i)]).optional(),
-  equipmentIds: z.array(z.union([z.string().uuid(), z.string().regex(/^[a-z0-9]{20,}$/i)])).optional(),
+  clientId: idSchema.optional(),
+  creatorId: idSchema.optional(),
+  assigneeId: idSchema.optional(),
+  kitId: idSchema.optional(),
+  equipmentIds: idArraySchema.optional(),
 });
 
 // Schema para atualização de booking

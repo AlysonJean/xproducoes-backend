@@ -61,6 +61,11 @@ dashboardRoutes.get(
   dashboardController.getLiveStats, // Sem cache para dados em tempo real
 );
 dashboardRoutes.get(
+  "/top-collaborators",
+  cacheMiddleware,
+  dashboardController.getTopCollaborators,
+);
+dashboardRoutes.get(
   "/notifications",
   cacheMiddleware,
   dashboardController.getNotifications,

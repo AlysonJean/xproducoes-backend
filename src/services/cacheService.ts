@@ -216,13 +216,24 @@ export class CacheService {
     try {
       let deleted = false;
 
-      // Remove do Redis
+      // Remove do Redis de forma eficiente (sem bloquear o server)
       if (this.isRedisAvailable()) {
-        const keys = await this.redis!.keys(pattern);
-        if (keys.length > 0) {
-          await this.redis!.del(...keys);
-          deleted = true;
-          logger.debug(`🗑️ Redis DELETE pattern: ${pattern} (${keys.length} keys)`);
+        let cursor = '0';
+        let totalDeleted = 0;
+        
+        do {
+          const [nextCursor, keys] = await this.redis!.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+          cursor = nextCursor;
+          
+          if (keys.length > 0) {
+            await this.redis!.del(...keys);
+            totalDeleted += keys.length;
+            deleted = true;
+          }
+        } while (cursor !== '0');
+
+        if (totalDeleted > 0) {
+          logger.debug(`🗑️ Redis DELETE pattern: ${pattern} (${totalDeleted} keys)`);
         }
       }
 

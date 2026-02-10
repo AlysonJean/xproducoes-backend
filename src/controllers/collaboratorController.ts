@@ -6,6 +6,8 @@ import logger from "../config/logger";
 import emailServiceInstance from "../services/emailService";
 import { BadRequestError, NotFoundError, ForbiddenError, UnauthorizedError } from "../utils/errors";
 
+import { idSchema } from "../utils/sharedSchema";
+
 const collaboratorService = new CollaboratorService();
 
 // Schemas de validação
@@ -36,8 +38,8 @@ const createCollaboratorSchema = z.object({
 });
 
 const assignCollaboratorSchema = z.object({
-  eventId: z.string().uuid("ID do evento inválido"),
-  collaboratorId: z.string().uuid("ID do colaborador inválido"),
+  eventId: idSchema,
+  collaboratorId: idSchema,
   role: z.enum([
     "PHOTOGRAPHER",
     "VIDEOGRAPHER",
@@ -448,7 +450,7 @@ export class CollaboratorController {
 
   async createAvailability(req: Request, res: Response, _next: NextFunction) {
     const availabilitySchema = z.object({
-      collaboratorId: z.string().uuid().optional(),
+      collaboratorId: idSchema.optional(),
       startDate: z.string().min(1),
       endDate: z.string().min(1),
       startTime: z.string().default("00:00"),
@@ -527,8 +529,8 @@ export class CollaboratorController {
 
   async createPayment(req: Request, res: Response, _next: NextFunction) {
     const paymentSchema = z.object({
-      collaboratorId: z.string().uuid(),
-      eventId: z.string().uuid().optional(),
+      collaboratorId: idSchema,
+      eventId: idSchema.optional(),
       amount: z.number().min(0),
       type: z.enum(["HOURLY", "FIXED", "COMMISSION", "BONUS", "DEDUCTION"]),
       description: z.string().optional(),

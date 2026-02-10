@@ -58,9 +58,16 @@ export async function getAllUsers(options: { page: number; limit: number; search
 
 // Atualizar role do usuário
 export async function updateUserRole(id: number, role: UserRole) {
+  const updateData: Prisma.UserUpdateInput = { role };
+  if (role === 'ADMIN') {
+    // Quando promovido a ADMIN, marcar como verificado e limpar tokens pendentes
+    updateData.verified = true;
+    updateData.emailVerificationToken = null;
+    updateData.emailVerificationTokenExpiry = null;
+  }
   return prisma.user.update({
     where: { id: String(id) },
-    data: { role }
+    data: updateData
   });
 }
 
@@ -135,6 +142,8 @@ export async function verifyEmailByToken(token: string) {
 export async function resendEmailVerification(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new Error('Usuário não encontrado');
+  // ADMINs não precisam concluir verificação
+  if (user.role === 'ADMIN') return { success: true };
   if (user.verified) throw new Error('E-mail já verificado');
   const token = await generateEmailVerificationToken(userId);
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
@@ -183,31 +192,38 @@ export async function register(data: RegisterInput) {
   });
   if (existing) throw new Error("Email já está em uso.");
   const hash = await bcrypt.hash(data.password, 10);
+  const role = (data.role as any) || "CLIENT";
   const user = await prisma.user.create({
     data: { 
       name: data.name, 
       email: data.email, 
       passwordHash: hash,
-      role: (data.role as any) || "CLIENT"
+      role,
+      // Marcar admins como verificados automaticamente
+      verified: role === 'ADMIN' ? true : undefined,
     },
     select: { id: true, name: true, email: true, role: true, createdAt: true },
   });
-  // Cria perfil de cliente por padrão (não bloqueante)
+  // Cria perfil de cliente por padrão (não bloqueante) — evita criar para ADMIN
   try {
-    await prisma.client.create({ data: { userId: user.id } });
+    if (role !== 'ADMIN') {
+      await prisma.client.create({ data: { userId: user.id } });
+    }
   } catch (e) {
     logger.warn({obj:e}, 'Falha ao criar perfil de cliente (não bloqueante):');
   }
-  // Envia e-mail de verificação (não bloqueante)
-  try {
-    const token = await generateEmailVerificationToken(user.id);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-    const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
-    await (await import('./emailService')).default.sendVerificationEmail(user.email, verifyUrl);
-  } catch (e) {
-    logger.warn({obj:e}, 'Falha ao enviar e-mail de verificação (não bloqueante):');
+  // Envia e-mail de verificação (não bloqueante) — não envia para ADMIN
+  if (role !== 'ADMIN') {
+    try {
+      const token = await generateEmailVerificationToken(user.id);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+      const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
+      await (await import('./emailService')).default.sendVerificationEmail(user.email, verifyUrl);
+    } catch (e) {
+      logger.warn({obj:e}, 'Falha ao enviar e-mail de verificação (não bloqueante):');
+    }
   }
-  return { ...user, needsEmailVerification: true } as const;
+  return { ...user, needsEmailVerification: role !== 'ADMIN' } as const;
 }
 
 export async function login(data: LoginInput) {
@@ -215,8 +231,8 @@ export async function login(data: LoginInput) {
   if (!user) throw new Error("Usuário não encontrado");
   const valid = await bcrypt.compare(data.password, user.passwordHash);
   if (!valid) throw new Error("Senha inválida");
-  // Exigir verificação de e-mail se habilitado por ambiente
-  if (process.env.REQUIRE_EMAIL_VERIFICATION === 'true' && !user.verified) {
+  // Exigir verificação de e-mail se habilitado por ambiente; ADMINs são dispensados
+  if (process.env.REQUIRE_EMAIL_VERIFICATION === 'true' && !user.verified && user.role !== 'ADMIN') {
     const err = new Error('E-mail não verificado') as Error & { code?: string };
     err.code = 'EMAIL_NOT_VERIFIED';
     throw err;
@@ -299,6 +315,34 @@ export async function updateProfile(
   if (password) {
     updateData.passwordHash = await bcrypt.hash(password, 10);
   }
+
+  // Campos relacionados a perfis (Client/Collaborator) não pertencem ao modelo `User`.
+  // Extrair `phone` e atualizá-lo no perfil relacionado, removendo-o do payload do `User`.
+  const phone = (data as any).phone;
+  if (phone !== undefined) {
+    // Remover do payload do User para evitar erro de validação do Prisma
+    delete (updateData as any).phone;
+
+    const [client, collaborator] = await Promise.all([
+      prisma.client.findUnique({ where: { userId } }),
+      prisma.collaborator.findUnique({ where: { userId } }),
+    ]);
+
+    if (client) {
+      await prisma.client.update({ where: { userId }, data: { phone } });
+    } else if (collaborator) {
+      await prisma.collaborator.update({ where: { userId }, data: { phone } });
+    } else {
+      // Se não existir perfil, cria o mais apropriado baseado no role do usuário
+      const currentUser = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+      if (currentUser && currentUser.role === 'COLLABORATOR') {
+        await prisma.collaborator.create({ data: { userId, phone } });
+      } else {
+        await prisma.client.create({ data: { userId, phone } });
+      }
+    }
+  }
+
   try {
     const user = await prisma.user.update({
       where: { id: userId },

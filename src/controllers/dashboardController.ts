@@ -155,4 +155,17 @@ export class DashboardController {
       return next(error);
     }
   };
+
+  getTopCollaborators = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const collaborators = await dashboardService.getTopCollaboratorsData();
+      return res.json(collaborators);
+    } catch (error) {
+      return next(error);
+    }
+  };
 }

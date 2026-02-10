@@ -11,6 +11,7 @@ import { initializeQueues, closeQueues } from "./config/jobQueue";
 import { startSocialScheduler } from "./cron/socialScheduler";
 
 
+
 const PORT = Number(process.env.PORT) || 3001;
 
 /**
@@ -215,6 +216,8 @@ initializeSocket(server);
  * Inicia o servidor com tentativas robustas caso a porta esteja em uso
  */
 async function startServerWithRetries(initialPort: number, maxRetries = 10) {
+  // Inicializar cache Redis
+  // O novo CacheService inicializa automaticamente e gerencia fallback para memória
   let port = initialPort;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {

@@ -7,6 +7,7 @@ import {
 import logger from "../config/logger";
 import { prisma } from "../config/prisma";
 import { generateSemanticBookingId } from "../utils/bookingIdGenerator";
+import { cacheService } from "./cacheService";
 
 export class BookingService {
   /**
@@ -338,6 +339,8 @@ export class BookingService {
       }
 
       logger.info(`Booking created successfully: ${booking.id}`);
+      // Invalida cache do dashboard
+      void cacheService.invalidateBookingCaches(booking.id);
       return booking;
 
     } catch (error) {
@@ -573,6 +576,8 @@ export class BookingService {
       });
 
       logger.info(`Booking updated successfully: ${id}`);
+      // Invalida cache do dashboard
+      void cacheService.invalidateBookingCaches(id);
       return updatedBooking;
 
     } catch (error) {
@@ -598,6 +603,8 @@ export class BookingService {
       });
 
       logger.info(`Booking status updated: ${id} -> ${status}`);
+      // Invalida cache do dashboard
+      void cacheService.invalidateBookingCaches(id);
       return updatedBooking;
 
     } catch (error) {
@@ -623,6 +630,8 @@ export class BookingService {
       });
 
       logger.info(`Booking delivery status updated: ${id} -> ${deliveryStatus}`);
+      // Invalida cache do dashboard
+      void cacheService.invalidateBookingCaches(id);
       return updatedBooking;
 
     } catch (error) {
@@ -646,6 +655,8 @@ export class BookingService {
       });
 
       logger.info(`Booking deleted: ${id}`);
+      // Invalida cache do dashboard
+      void cacheService.invalidateBookingCaches(id);
 
     } catch (error) {
       if (error instanceof BookingNotFoundError) {
@@ -746,6 +757,9 @@ export class BookingService {
         logger.warn({ error: e }, 'Erro ao disparar webhook de confirmação (delegado)');
       }
 
+      // Invalida cache do dashboard
+      void cacheService.invalidateBookingCaches(id);
+
       return updatedBooking;
     } catch (error) {
       throw error;
@@ -769,6 +783,8 @@ export class BookingService {
       });
 
       logger.info(`Booking cancelled: ${id}`);
+      // Invalida cache do dashboard
+      void cacheService.invalidateBookingCaches(id);
       return updatedBooking;
 
     } catch (error) {

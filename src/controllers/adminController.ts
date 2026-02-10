@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { idSchema } from "../utils/sharedSchema";
 
 // ✅ Schemas Zod para validação completa
 // (Preparados para uso futuro em endpoints específicos)
@@ -48,7 +49,7 @@ const createClientSchema = z.object({
   companySize: z.enum(['1-10', '11-50', '51-200', '201-500', '500+']).optional(),
   status: z.enum(['ACTIVE','INACTIVE','SUSPENDED']).optional(),
   password: z.string().min(8).optional(),
-  userId: z.string().uuid().optional(),
+  userId: idSchema.optional(),
 }).strict();
 // Caminho: backend/src/controllers/adminController.ts
 

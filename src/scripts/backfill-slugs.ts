@@ -1,9 +1,7 @@
 
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../config/prisma';
 import { generateSlug } from '../utils/slug';
 import { randomBytes } from 'crypto';
-
-const prisma = new PrismaClient();
 
 async function backfillSlugs() {
   console.log('🚀 Starting slug backfill...');
