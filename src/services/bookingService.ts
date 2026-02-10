@@ -181,19 +181,37 @@ export class BookingService {
       }
 
       // Calcular preço total
+      // Kits e Equipamentos são por HORA. Serviços são fixos.
       let totalPrice = data.totalPrice || 0;
+      const duration = data.eventDuration || 0;
+
       if (!totalPrice) {
+        let kitsPrice = 0;
+        let equipmentsPrice = 0;
+        let servicesPrice = 0;
+
         if (data.kitId) {
           const kit = await this.prisma.kit.findUnique({
             where: { id: data.kitId }
           });
-          totalPrice = kit?.price ? Number(kit.price) : 0;
-        } else if (data.equipmentIds && data.equipmentIds.length > 0) {
+          kitsPrice = kit?.price ? Number(kit.price) * duration : 0;
+        }
+
+        if (data.equipmentIds && data.equipmentIds.length > 0) {
           const equipments = await this.prisma.equipment.findMany({
             where: { id: { in: data.equipmentIds } }
           });
-          totalPrice = equipments.reduce((sum, eq) => sum + Number(eq.pricePerHour), 0);
+          equipmentsPrice = equipments.reduce((sum, eq) => sum + Number(eq.pricePerHour), 0) * duration;
         }
+
+        if ((data as any).serviceIds && (data as any).serviceIds.length > 0) {
+          const services = await this.prisma.service.findMany({
+            where: { id: { in: (data as any).serviceIds } }
+          });
+          servicesPrice = services.reduce((sum, s) => sum + Number(s.price), 0);
+        }
+
+        totalPrice = kitsPrice + equipmentsPrice + servicesPrice;
       }
 
       // Lidar com cliente
@@ -278,6 +296,9 @@ export class BookingService {
         paymentProofUrl: data.paymentProofUrl,
         equipments: data.equipmentIds ? {
           connect: data.equipmentIds.map(id => ({ id }))
+        } : undefined,
+        services: (data as any).serviceIds ? {
+          connect: (data as any).serviceIds.map((id: string) => ({ id }))
         } : undefined
       };
 

@@ -46,6 +46,11 @@ export class CartController {
     return res.status(200).json(cart);
   };
 
+  removeKit = async (req: Request, res: Response) => {
+    const cart = await cartService.removeKitFromCart(req.userId!);
+    return res.status(200).json(cart);
+  };
+
   checkout = async (req: Request, res: Response) => {
     try {
       const data = { ...req.body, userId: req.userId! };

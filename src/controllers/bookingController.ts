@@ -9,25 +9,56 @@ import { BadRequestError, ForbiddenError, NotFoundError } from "../utils/errors"
 const bookingService = new BookingService();
 
 export class BookingController {
-  create = async (req: Request, res: Response, _next: NextFunction) => {
-    // Validação do schema
-    const validatedData = bookingCreateSchema.parse(req.body);
-    
-    // Validação de negócio
-    const { kitId, equipmentIds } = validatedData;
-    if (!kitId && (!equipmentIds || !Array.isArray(equipmentIds) || equipmentIds.length === 0)) {
-      throw new BadRequestError("É necessário fornecer um kit ou uma lista de equipamentos.");
-    }
+  create = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Validação do schema
+      const validatedData = bookingCreateSchema.parse(req.body);
+      
+      // Validação de negócio (redundante com schema mas mantida por segurança)
+      const { kitId, equipmentIds } = validatedData;
+      if (!kitId && (!equipmentIds || !Array.isArray(equipmentIds) || equipmentIds.length === 0)) {
+        throw new BadRequestError("É necessário fornecer um kit ou uma lista de equipamentos.");
+      }
 
-    // Suporte a idempotency
-    const idempotencyKey = (req.header('Idempotency-Key') || req.header('x-idempotency-key')) as string | undefined;
-    const booking = await bookingService.createBooking(validatedData, req.userId!, idempotencyKey);
-    
-    res.status(201).json({
-      success: true,
-      message: "Reserva criada com sucesso",
-      data: booking
-    });
+      // Suporte a idempotency
+      const idempotencyKey = (req.header('Idempotency-Key') || req.header('x-idempotency-key')) as string | undefined;
+      const booking = await bookingService.createBooking(validatedData, req.userId!, idempotencyKey);
+      
+      return res.status(201).json({
+        success: true,
+        message: "Reserva criada com sucesso",
+        data: booking
+      });
+    } catch (error) {
+      logger.error({ err: error }, "Erro no controller Booking.create");
+      
+      if (error instanceof Error && error.name === 'ZodError') {
+        return res.status(422).json({
+          success: false,
+          error: "Erro de validação",
+          message: (error as any).errors?.map((e: any) => e.message).join(', ') || error.message
+        });
+      }
+
+      if (error instanceof BadRequestError || error instanceof ForbiddenError || error instanceof NotFoundError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.name,
+          message: error.message
+        });
+      }
+
+      // BookingValidationError do Service
+      if (error instanceof Error && error.constructor.name === 'BookingValidationError') {
+        return res.status(400).json({
+          success: false,
+          error: "Erro de Negócio",
+          message: error.message
+        });
+      }
+
+      next(error);
+    }
   };
 
   findByUser = async (req: Request, res: Response, next: NextFunction) => {
@@ -631,7 +662,7 @@ export class BookingController {
   getCollaboratorEvents = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { collaboratorId } = req.params as { collaboratorId: string };
-      const { month, year } = req.query;
+
 
       if (!collaboratorId) {
         res.status(400).json({ 

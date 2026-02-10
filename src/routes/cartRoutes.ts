@@ -16,6 +16,7 @@ cartRoutes.post("/add-kit", cartController.addKit);
 cartRoutes.post("/checkout", cartController.checkout);
 cartRoutes.delete("/remove/:equipmentId", cartController.removeItem);
 cartRoutes.delete("/remove-service/:serviceId", cartController.removeService);
+cartRoutes.delete("/remove-kit/:kitId", cartController.removeKit);
 cartRoutes.post("/clear", cartController.clearCart);
 
 export default cartRoutes;

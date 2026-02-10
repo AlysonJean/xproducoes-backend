@@ -42,6 +42,12 @@ export class CartService {
     return updated;
   }
 
+  async removeKitFromCart(userId: string) {
+    const cart = await this.getOrCreateCart(userId);
+    const updated = await this.repo.clearKit(cart.id);
+    return updated;
+  }
+
   async clearCart(userId: string) {
     const cart = await this.getOrCreateCart(userId);
     await this.repo.clearEquipments(cart.id);

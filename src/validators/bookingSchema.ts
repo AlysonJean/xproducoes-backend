@@ -11,11 +11,13 @@ const bookingBaseSchema = z.object({
     clientContact: z.string().min(1).optional(),
     clientEmail: z.string().email().optional(),
 
-    // Equipamentos/Kits
+    // Equipamentos/Kits/Serviços
     kitId: z.union([z.string().uuid(), z.string().regex(/^[a-z0-9]{20,}$/i)]).optional(),
     equipmentIds: z
       .array(z.union([z.string().uuid(), z.string().regex(/^[a-z0-9]{20,}$/i)]))
-      .min(1, "Selecione pelo menos um equipamento")
+      .optional(),
+    serviceIds: z
+      .array(z.union([z.string().uuid(), z.string().regex(/^[a-z0-9]{20,}$/i)]))
       .optional(),
 
     // Datas do evento (aceita ISO datetime e datetime-local como 'YYYY-MM-DDTHH:mm')
@@ -81,11 +83,13 @@ export const bookingCreateSchema = bookingBaseSchema
   )
   .refine(
     (data) => {
-      // Garante que pelo menos um kit ou equipamentos sejam fornecidos
-      return data.kitId || (data.equipmentIds && data.equipmentIds.length > 0);
+      // Garante que pelo menos um kit, equipamentos ou serviços sejam fornecidos
+      return data.kitId || 
+             (data.equipmentIds && data.equipmentIds.length > 0) ||
+             (data.serviceIds && data.serviceIds.length > 0);
     },
     {
-      message: "É necessário fornecer um kit ou uma lista de equipamentos.",
+      message: "É necessário fornecer um kit, equipamentos ou serviços para o orçamento.",
       path: ["kitId"],
     }
   )

@@ -166,7 +166,7 @@ export const dynamicRateLimit = rateLimit({
 
 export const criticalEndpointRateLimit = rateLimit({
   windowMs: 5 * 60 * 1000,
-  max: 3,
+  max: 10, // Aumentado para teste/dev de 3 para 10
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req: Request, res: Response) => {
@@ -205,7 +205,7 @@ export const paymentRateLimit = rateLimit({
 // Rate limiting para carrinho - Moderado
 export const cartRateLimit = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minuto
-  max: 20, // 20 operações por minuto
+  max: 100, // Aumentado de 20 para 100
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req: Request, res: Response) => {
