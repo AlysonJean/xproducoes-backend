@@ -15,122 +15,127 @@ export class DashboardService {
     return cacheService.getOrSet(
       'dashboard:global_stats',
       async () => {
-        const today = new Date();
-        const startOfCurrentMonth = startOfMonth(today);
-        const endOfCurrentMonth = endOfMonth(today);
-        const lastMonth = subMonths(today, 1);
-        const startOfLastMonth = startOfMonth(lastMonth);
-        const endOfLastMonth = endOfMonth(lastMonth);
+        try {
+          const today = new Date();
+          const startOfCurrentMonth = startOfMonth(today);
+          const endOfCurrentMonth = endOfMonth(today);
+          const lastMonth = subMonths(today, 1);
+          const startOfLastMonth = startOfMonth(lastMonth);
+          const endOfLastMonth = endOfMonth(lastMonth);
 
-        // Receita do mês atual (apenas COMPLETED, por data do evento)
-        const currentMonthRevenueAgg = await prisma.booking.aggregate({
-          where: {
-            status: 'COMPLETED',
-            eventDate: {
-              gte: startOfCurrentMonth,
-              lte: endOfCurrentMonth,
+          // Receita do mês atual (apenas COMPLETED, por data do evento)
+          const currentMonthRevenueAgg = await prisma.booking.aggregate({
+            where: {
+              status: 'COMPLETED',
+              eventDate: {
+                gte: startOfCurrentMonth,
+                lte: endOfCurrentMonth,
+              },
             },
-          },
-          _sum: { totalPrice: true },
-        });
+            _sum: { totalPrice: true },
+          });
 
-        // Receita do mês passado (apenas COMPLETED, por data do evento)
-        const lastMonthRevenueAgg = await prisma.booking.aggregate({
-          where: {
-            status: 'COMPLETED',
-            eventDate: {
-              gte: startOfLastMonth,
-              lte: endOfLastMonth,
+          // Receita do mês passado (apenas COMPLETED, por data do evento)
+          const lastMonthRevenueAgg = await prisma.booking.aggregate({
+            where: {
+              status: 'COMPLETED',
+              eventDate: {
+                gte: startOfLastMonth,
+                lte: endOfLastMonth,
+              },
             },
-          },
-          _sum: { totalPrice: true },
-        });
+            _sum: { totalPrice: true },
+          });
 
-        // Contagens por criação mantidas para novos/variações de volume
-        const currentMonthBookingsCount = await prisma.booking.count({
-          where: {
-            createdAt: {
-              gte: startOfCurrentMonth,
-              lte: endOfCurrentMonth,
+          // Contagens por criação mantidas para novos/variações de volume
+          const currentMonthBookingsCount = await prisma.booking.count({
+            where: {
+              createdAt: {
+                gte: startOfCurrentMonth,
+                lte: endOfCurrentMonth,
+              },
             },
-          },
-        });
+          });
 
-        const lastMonthBookingsCount = await prisma.booking.count({
-          where: {
-            createdAt: {
-              gte: startOfLastMonth,
-              lte: endOfLastMonth,
+          const lastMonthBookingsCount = await prisma.booking.count({
+            where: {
+              createdAt: {
+                gte: startOfLastMonth,
+                lte: endOfLastMonth,
+              },
             },
-          },
-        });
+          });
 
-        // Total de clientes
-        const totalClients = await prisma.user.count({
-          where: { role: "CLIENT" },
-        });
+          // Total de clientes
+          const totalClients = await prisma.user.count({
+            where: { role: "CLIENT" },
+          });
 
-        // Total de reservas
-        const totalBookings = await prisma.booking.count();
+          // Total de reservas
+          const totalBookings = await prisma.booking.count();
 
-        // Total de equipamentos
-        const totalEquipments = await prisma.equipment.count();
+          // Total de equipamentos
+          const totalEquipments = await prisma.equipment.count();
 
-        // Colaboradores ativos (que têm reservas nos últimos 30 dias)
-        const activeCollaborators = await prisma.user.count({
-          where: {
-            role: "COLLABORATOR",
-            updatedAt: {
-              gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+          // Colaboradores ativos (que têm reservas nos últimos 30 dias)
+          const activeCollaborators = await prisma.user.count({
+            where: {
+              role: "COLLABORATOR",
+              updatedAt: {
+                gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+              }
             }
-          }
-        });
+          });
 
-        const currentRevenue = Number(currentMonthRevenueAgg._sum.totalPrice || 0);
-        const lastRevenue = Number(lastMonthRevenueAgg._sum.totalPrice || 0);
-        const currentBookings = currentMonthBookingsCount;
-        const lastBookings = lastMonthBookingsCount;
+          const currentRevenue = Number(currentMonthRevenueAgg._sum.totalPrice || 0);
+          const lastRevenue = Number(lastMonthRevenueAgg._sum.totalPrice || 0);
+          const currentBookings = currentMonthBookingsCount;
+          const lastBookings = lastMonthBookingsCount;
 
-        // Calcular variações percentuais
-        const revenueGrowth = this.calculateGrowth(currentRevenue, lastRevenue);
-        const bookingsGrowth = this.calculateGrowth(currentBookings, lastBookings);
+          // Calcular variações percentuais
+          const revenueGrowth = this.calculateGrowth(currentRevenue, lastRevenue);
+          const bookingsGrowth = this.calculateGrowth(currentBookings, lastBookings);
 
-        // Buscar top colaboradores
-        const topCollaborators = await this.getTopCollaboratorsData();
+          // Buscar top colaboradores
+          const topCollaborators = await this.getTopCollaboratorsData();
 
-        // Receita total acumulada (todas COMPLETED)
-        const allTimeRevenueAgg = await prisma.booking.aggregate({
-          where: { status: 'COMPLETED' },
-          _sum: { totalPrice: true },
-        });
+          // Receita total acumulada (todas COMPLETED)
+          const allTimeRevenueAgg = await prisma.booking.aggregate({
+            where: { status: 'COMPLETED' },
+            _sum: { totalPrice: true },
+          });
 
-        const allTimeRevenue = Number(allTimeRevenueAgg._sum.totalPrice || 0);
+          const allTimeRevenue = Number(allTimeRevenueAgg._sum.totalPrice || 0);
 
-        return {
-          totalRevenue: allTimeRevenue,
-          revenueGrowth,
-          currentMonthRevenue: currentRevenue,
-          lastMonthRevenue: lastRevenue,
-          newBookingsThisMonth: currentBookings,
-          bookingsGrowth,
-          totalClients,
-          totalBookings,
-          totalEquipments,
-          activeCollaborators,
-          pendingBookings: await prisma.booking.count({
-            where: { status: "PENDING" },
-          }),
-          completedBookings: await prisma.booking.count({
-            where: { status: "COMPLETED" },
-          }),
-          confirmedBookings: await prisma.booking.count({
-            where: { status: "CONFIRMED" },
-          }),
-          conversionRate: totalBookings > 0 ? (await prisma.booking.count({
-            where: { status: "COMPLETED" }
-          }) / totalBookings) * 100 : 0,
-          topCollaborators
-        };
+          return {
+            totalRevenue: allTimeRevenue,
+            revenueGrowth,
+            currentMonthRevenue: currentRevenue,
+            lastMonthRevenue: lastRevenue,
+            newBookingsThisMonth: currentBookings,
+            bookingsGrowth,
+            totalClients,
+            totalBookings,
+            totalEquipments,
+            activeCollaborators,
+            pendingBookings: await prisma.booking.count({
+              where: { status: "PENDING" },
+            }),
+            completedBookings: await prisma.booking.count({
+              where: { status: "COMPLETED" },
+            }),
+            confirmedBookings: await prisma.booking.count({
+              where: { status: "CONFIRMED" },
+            }),
+            conversionRate: totalBookings > 0 ? (await prisma.booking.count({
+              where: { status: "COMPLETED" }
+            }) / totalBookings) * 100 : 0,
+            topCollaborators
+          };
+        } catch (error) {
+          logger.error({ err: error }, "Erro ao calcular estatísticas do dashboard");
+          throw error; // Re-throw para o controller lidar
+        }
       },
       300 // 5 minutos de cache
     );

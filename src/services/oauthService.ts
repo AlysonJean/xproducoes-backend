@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/prisma';
 import { config as envConfig } from '../config/environment';
+import bcrypt from 'bcrypt';
 
 const JWT_SECRET = envConfig.jwtSecret;
 
@@ -119,7 +120,7 @@ export async function handleGoogleCallback(params: { code?: string; state?: stri
       data: {
         name: ((claims as any).name as string) || email.split('@')[0],
         email,
-        passwordHash: base64url(crypto.randomBytes(24)),
+        passwordHash: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10),
         verified: emailVerified || true,
         avatarUrl,
       },
@@ -140,18 +141,21 @@ export async function handleGoogleCallback(params: { code?: string; state?: stri
   const shouldCompleteProfile = isNewUser || !clientProfile?.phone;
 
   // Emitir JWT da aplicação
-  const appToken = jwt.sign({ userId: user.id, role: (user as any).role }, JWT_SECRET, { expiresIn: '7d' });
+  const appToken = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '15m' });
+  const refreshToken = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
 
   return {
     user: { 
       id: user.id, 
       name: user.name, 
       email: user.email, 
-      role: (user as any).role,
+      role: user.role,
       avatarUrl: user.avatarUrl 
     },
     token: appToken,
-    shouldCompleteProfile
+    refreshToken,
+    shouldCompleteProfile,
+    redirectTo: user.role === 'ADMIN' ? '/admin/painel' : '/dashboard'
   };
 }
 
@@ -242,7 +246,7 @@ export async function handleFacebookCallback(params: { code?: string; state?: st
       data: {
         name: (me.name as string) || email.split('@')[0],
         email,
-        passwordHash: base64url(crypto.randomBytes(24)),
+        passwordHash: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10),
         verified: true,
         avatarUrl,
       },
@@ -257,16 +261,20 @@ export async function handleFacebookCallback(params: { code?: string; state?: st
   const clientProfile = await prisma.client.findUnique({ where: { userId: user.id } });
   const shouldCompleteProfile = isNewUser || !clientProfile?.phone;
 
-  const appToken = jwt.sign({ userId: user.id, role: (user as any).role }, JWT_SECRET, { expiresIn: '7d' });
+  const appToken = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '15m' });
+  const refreshToken = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+
   return { 
     user: { 
       id: user.id, 
       name: user.name, 
       email: user.email, 
-      role: (user as any).role,
+      role: user.role,
       avatarUrl: user.avatarUrl
     }, 
     token: appToken,
-    shouldCompleteProfile
+    refreshToken,
+    shouldCompleteProfile,
+    redirectTo: user.role === 'ADMIN' ? '/admin/painel' : '/dashboard'
   };
 }
