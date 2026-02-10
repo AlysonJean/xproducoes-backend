@@ -147,6 +147,15 @@ export class BookingService {
         mimeType: true,
         createdAt: true
       }
+    },
+    services: {
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        imageUrl: true,
+        duration: true
+      }
     }
   };
 
@@ -291,9 +300,11 @@ export class BookingService {
         totalPrice: totalPrice,
         idempotencyKey: idempotencyKey || undefined,
         kitId: data.kitId,
-        // Campos admin-only
+        // Campos admin-only e logísticos
         serviceValue: data.serviceValue,
         paymentProofUrl: data.paymentProofUrl,
+        setupTime: (data as any).setupTime ? new Date((data as any).setupTime) : undefined,
+        pickupTime: (data as any).pickupTime ? new Date((data as any).pickupTime) : undefined,
         equipments: data.equipmentIds ? {
           connect: data.equipmentIds.map(id => ({ id }))
         } : undefined,

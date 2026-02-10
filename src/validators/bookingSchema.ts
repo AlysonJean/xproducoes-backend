@@ -64,9 +64,11 @@ const bookingBaseSchema = z.object({
     // Preço total (calculado automaticamente)
     totalPrice: z.number().positive().optional(),
 
-    // Campos admin-only
+    // Campos admin-only e logísticos
     serviceValue: z.number().positive().optional(),
     paymentProofUrl: z.string().url().optional(),
+    setupTime: z.string().optional(),
+    pickupTime: z.string().optional(),
   });
 
 // Schema para criação de booking (com validações cruzadas)
