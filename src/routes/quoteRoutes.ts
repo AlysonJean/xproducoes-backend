@@ -1,9 +1,9 @@
-import { Router } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import { QuoteController } from "../controllers/quoteController";
 import { authenticate, requireAdmin } from "../middlewares/unifiedAuth";
 import { quoteRateLimit } from "../middlewares/rateLimitMiddleware";
 
-const router = Router();
+const router = createSafeRouter();
 const quoteController = new QuoteController();
 
 // Rota pública para submeter quote (com rate limit anti-spam)

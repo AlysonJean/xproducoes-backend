@@ -1,79 +1,19 @@
 import { Request, Response, NextFunction } from "express";
 import { CollaboratorService } from "../services/collaboratorService";
-import { z } from "zod";
+
 import { prisma } from "../config/prisma";
 import logger from "../config/logger";
 import emailServiceInstance from "../services/emailService";
 import { BadRequestError, NotFoundError, ForbiddenError, UnauthorizedError } from "../utils/errors";
 
-import { idSchema } from "../utils/sharedSchema";
-
 const collaboratorService = new CollaboratorService();
 
-// Schemas de validação
-const createCollaboratorSchema = z.object({
-  name: z.string().min(1, "Nome é obrigatório"),
-  email: z.string().email("Email inválido"),
-  phone: z.string().optional(),
-  role: z.enum([
-    "PHOTOGRAPHER",
-    "VIDEOGRAPHER",
-    "SOUND_TECHNICIAN",
-    "LIGHTING_TECHNICIAN",
-    "DJ",
-    "PRESENTER",
-    "COORDINATOR",
-    "ASSISTANT",
-    "SECURITY",
-    "TRANSPORT",
-    "OTHER",
-  ]),
-  specialties: z.array(z.string()).default([]),
-  hourlyRate: z.number().min(0, "Taxa deve ser positiva"),
-  fixedRate: z.number().optional(),
-  commissionRate: z.number().optional(),
-  status: z.enum(["ACTIVE", "INACTIVE", "SUSPENDED"]).optional(),
-  availabilityStatus: z.enum(["AVAILABLE", "BUSY", "OFF_DUTY"]).optional(),
-  functionId: z.string().optional(),
-});
 
-const assignCollaboratorSchema = z.object({
-  eventId: idSchema,
-  collaboratorId: idSchema,
-  role: z.enum([
-    "PHOTOGRAPHER",
-    "VIDEOGRAPHER",
-    "SOUND_TECHNICIAN",
-    "LIGHTING_TECHNICIAN",
-    "DJ",
-    "PRESENTER",
-    "COORDINATOR",
-    "ASSISTANT",
-    "SECURITY",
-    "TRANSPORT",
-    "OTHER",
-  ]),
-  startTime: z.string().min(1, "Hora de início é obrigatória"),
-  endTime: z.string().min(1, "Hora de fim é obrigatória"),
-  hourlyRate: z.number().optional(),
-  fixedRate: z.number().optional(),
-  status: z
-    .enum([
-      "ASSIGNED",
-      "CONFIRMED",
-      "IN_PROGRESS",
-      "COMPLETED",
-      "CANCELLED",
-      "NO_SHOW",
-    ])
-    .optional(),
-  notes: z.string().optional(),
-});
 
 export class CollaboratorController {
   // CRUD de Colaboradores
   async createCollaborator(req: Request, res: Response, _next: NextFunction) {
-    const validatedData = createCollaboratorSchema.parse(req.body);
+    const validatedData = req.body;
 
     // Mapear 'role' para 'collaboratorRole' e incluir dados do usuário
     const collaboratorData = {
@@ -154,10 +94,10 @@ export class CollaboratorController {
 
   // Gestão de Eventos
   async assignCollaboratorToEvent(req: Request, res: Response, _next: NextFunction) {
-    const validatedData = assignCollaboratorSchema.parse(req.body);
+    const validatedData = req.body;
 
     const assignment = await collaboratorService.assignCollaboratorToEvent({
-      bookingId: validatedData.eventId,
+      bookingId: validatedData.bookingId || validatedData.eventId,
       collaboratorId: validatedData.collaboratorId,
       role: validatedData.role as any,
       status: (validatedData.status as any) || "ASSIGNED",
@@ -449,17 +389,7 @@ export class CollaboratorController {
   }
 
   async createAvailability(req: Request, res: Response, _next: NextFunction) {
-    const availabilitySchema = z.object({
-      collaboratorId: idSchema.optional(),
-      startDate: z.string().min(1),
-      endDate: z.string().min(1),
-      startTime: z.string().default("00:00"),
-      endTime: z.string().default("23:59"),
-      status: z.enum(["AVAILABLE", "BUSY", "OFF_DUTY"]).default("AVAILABLE"),
-      notes: z.string().optional(),
-    });
-
-    const validatedData = availabilitySchema.parse(req.body);
+    const validatedData = req.body;
     let collaboratorId = validatedData.collaboratorId;
 
     if (!collaboratorId && req.userId) {
@@ -471,9 +401,9 @@ export class CollaboratorController {
 
     const avail = await collaboratorService.createAvailability({
       collaboratorId,
-      date: new Date(validatedData.startDate), 
-      startTime: validatedData.startTime,
-      endTime: validatedData.endTime,
+      date: new Date(validatedData.date || validatedData.startDate), 
+      startTime: validatedData.startTime || "00:00",
+      endTime: validatedData.endTime || "23:59",
       status: validatedData.status as any,
       notes: validatedData.notes || null,
       eventId: null
@@ -484,15 +414,7 @@ export class CollaboratorController {
 
   async updateAvailability(req: Request, res: Response, _next: NextFunction) {
     const { id } = req.params as { id: string };
-    const updateSchema = z.object({
-      date: z.string().optional(),
-      startTime: z.string().optional(),
-      endTime: z.string().optional(),
-      status: z.enum(["AVAILABLE", "BUSY", "OFF_DUTY"]).optional(),
-      notes: z.string().optional(),
-    });
-
-    const validatedData = updateSchema.parse(req.body);
+    const validatedData = req.body;
     const updateData: Record<string, unknown> = { ...validatedData };
     if (validatedData.date) updateData.date = new Date(validatedData.date);
 
@@ -528,25 +450,14 @@ export class CollaboratorController {
   }
 
   async createPayment(req: Request, res: Response, _next: NextFunction) {
-    const paymentSchema = z.object({
-      collaboratorId: idSchema,
-      eventId: idSchema.optional(),
-      amount: z.number().min(0),
-      type: z.enum(["HOURLY", "FIXED", "COMMISSION", "BONUS", "DEDUCTION"]),
-      description: z.string().optional(),
-      paymentDate: z.string().min(1),
-      status: z.enum(["PENDING", "PAID", "CANCELLED"]).default("PENDING"),
-      notes: z.string().optional(),
-    });
-
-    const validatedData = paymentSchema.parse(req.body);
+    const validatedData = req.body;
     const payment = await collaboratorService.createPaymentRecord({
       collaboratorId: validatedData.collaboratorId,
       eventId: validatedData.eventId,
       amount: validatedData.amount,
       type: validatedData.type as any,
       description: validatedData.description || "Pagamento manual",
-      dueDate: new Date(validatedData.paymentDate),
+      dueDate: new Date(validatedData.dueDate || validatedData.paymentDate),
       notes: validatedData.notes,
     });
     return res.status(201).json({ success: true, data: payment });

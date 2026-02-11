@@ -1,8 +1,8 @@
-import { Router } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import { enterpriseMonitoringController } from "../controllers/enterpriseMonitoringController";
 import { authenticate, requireAdmin } from "../middlewares/unifiedAuth";
 
-const router = Router();
+const router = createSafeRouter();
 
 // ===== PROTEÇÃO DE ROTAS =====
 // Todas as rotas de monitoramento requerem autenticação de admin

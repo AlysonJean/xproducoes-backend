@@ -1,10 +1,12 @@
-import { Router } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import { PortfolioController } from "../controllers/portfolioController";
 import { authenticate, adminOnly } from "../middlewares/unifiedAuth";
-import { uploadMultiple } from "../middlewares/upload";
+import { uploadMultiple, processUpload } from "../middlewares/upload";
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
+import { validateBody, validateId } from "../config/validation";
+import { portfolioCreateSchema, portfolioUpdateSchema, portfolioReorderSchema } from "../schemas/portfolio.schema";
 
-const portfolioRoutes: Router = Router();
+const portfolioRoutes = createSafeRouter();
 const portfolioController = new PortfolioController();
 
 // Rota pública para qualquer visitante ver o portfólio
@@ -17,6 +19,7 @@ portfolioRoutes.put(
   "/reorder",
   authenticate,
   adminOnly,
+  validateBody(portfolioReorderSchema),
   portfolioController.reorder
 );
 portfolioRoutes.post(
@@ -24,21 +27,25 @@ portfolioRoutes.post(
   authenticate,
   adminOnly,
   uploadRateLimit, uploadMultiple("media"),
-  require("../middlewares/upload").processUpload,
+  processUpload,
+  validateBody(portfolioCreateSchema),
   portfolioController.create,
 );
 portfolioRoutes.put(
   "/:id",
   authenticate,
   adminOnly,
+  validateId(),
   uploadRateLimit, uploadMultiple("media"),
-  require("../middlewares/upload").processUpload,
+  processUpload,
+  validateBody(portfolioUpdateSchema),
   portfolioController.update,
 );
 portfolioRoutes.delete(
   "/:id",
   authenticate,
   adminOnly,
+  validateId(),
   portfolioController.delete,
 );
 

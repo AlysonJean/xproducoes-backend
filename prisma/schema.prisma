@@ -350,6 +350,7 @@ model Booking {
   deliveryStatus     DeliveryStatus      @default(PENDING)
   setupTime          DateTime?
   pickupTime         DateTime?
+  reminderEmailSent  Boolean             @default(false)
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   clientId           String?

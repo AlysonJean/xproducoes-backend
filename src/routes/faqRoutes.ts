@@ -1,8 +1,8 @@
-import { Router, type Router as RouterType } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import { FaqController } from "../controllers/faqController";
 import { authenticate, adminOnly } from "../middlewares/unifiedAuth";
 
-const faqRoutes: RouterType = Router();
+const faqRoutes = createSafeRouter();
 const faqController = new FaqController();
 
 // Rota pública para qualquer visitante ver o FAQ

@@ -9,6 +9,7 @@ import fs from "fs";
 import logger from "./config/logger";
 import { initializeQueues, closeQueues } from "./config/jobQueue";
 import { startSocialScheduler } from "./cron/socialScheduler";
+import { startReminderScheduler } from "./cron/sendReminders";
 
 
 
@@ -262,6 +263,8 @@ startServerWithRetries(Number(process.env.PORT) || PORT)
     await initializeQueues();
     // Iniciar agendador de redes sociais
     startSocialScheduler();
+    // Iniciar agendador de lembretes
+    startReminderScheduler();
   })
   .catch(err => {
     logger.error({obj:err}, 'Erro fatal ao iniciar servidor:');

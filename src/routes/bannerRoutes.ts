@@ -1,9 +1,9 @@
 
-import { Router } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import { BannerController } from "../controllers/bannerController";
 import { authenticate, requireAdmin } from "../middlewares/unifiedAuth";
 
-const router = Router();
+const router = createSafeRouter();
 const controller = new BannerController();
 
 // Rotas Públicas

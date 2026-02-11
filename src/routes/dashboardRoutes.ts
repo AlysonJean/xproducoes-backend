@@ -1,12 +1,12 @@
 // Caminho: backend/src/routes/dashboardRoutes.ts
 
-import { Router, type Router as RouterType } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import { DashboardController } from "../controllers/dashboardController";
 import { authenticate, requireAdmin } from "../middlewares/unifiedAuth";
 import { cacheMiddleware } from "../middlewares/cacheMiddleware";
 import { dashboardRateLimit } from "../middlewares/rateLimitMiddleware";
 
-const dashboardRoutes: RouterType = Router();
+const dashboardRoutes = createSafeRouter();
 const dashboardController = new DashboardController();
 
 // Todas as rotas do dashboard requerem login de admin + rate limit

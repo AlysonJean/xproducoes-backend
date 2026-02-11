@@ -101,32 +101,32 @@ export class AuthController {
   register = async (
     req: Request,
     res: Response,
-    _next: NextFunction,
+    next: NextFunction,
   ): Promise<void> => {
-    const { name, email, password, role, phone, companyName } = req.body;
-    if (!name || !email || !password) {
-      throw new BadRequestError('Nome, e-mail e senha são obrigatórios');
+    try {
+      const { name, email, password, role, phone, companyName } = req.body;
+
+      const result = await this.authService.register({
+        name,
+        email,
+        password,
+        role,
+        phone,
+        companyName,
+      });
+      res.status(201).json(result);
+    } catch (error) {
+      next(error);
     }
-    const result = await this.authService.register({
-      name,
-      email,
-      password,
-      role,
-      phone,
-      companyName,
-    });
-    res.status(201).json(result);
   };
 
   login = async (
     req: Request,
     res: Response,
-    _next: NextFunction,
+    next: NextFunction,
   ): Promise<void> => {
     const { email, password } = req.body;
-    if (!email || !password) {
-      throw new BadRequestError("Email e senha são obrigatórios");
-    }
+
 
     try {
       const result = await this.authService.login({ email, password });
@@ -141,21 +141,21 @@ export class AuthController {
       });
     } catch (error: unknown) {
       if (error instanceof Error && ('code' in error && error.code === 'EMAIL_NOT_VERIFIED' || error.message.includes('verificado'))) {
-        throw new ForbiddenError('E-mail não verificado. Verifique sua caixa de entrada.', 'EMAIL_NOT_VERIFIED');
+        return next(new ForbiddenError('E-mail não verificado. Verifique sua caixa de entrada.', 'EMAIL_NOT_VERIFIED'));
       }
       
-      if (error instanceof Error && (error.message === "Credenciais inválidas." || error.message.includes('not found') || error.message.includes('invalid'))) {
-        throw new UnauthorizedError('Credenciais inválidas.');
+      if (error instanceof Error && (error.message === "Credenciais inválidas." || error.message.includes('not found') || error.message.includes('não encontrado') || error.message.includes('invalid'))) {
+        return next(new UnauthorizedError('Credenciais inválidas.'));
       }
       
-      throw error;
+      next(error);
     }
   };
 
   requestPasswordReset = async (
     req: Request,
     res: Response,
-    _next: NextFunction,
+    next: NextFunction,
   ): Promise<void> => {
     const { email } = req.body;
     const ipAddress = req.ip || req.socket.remoteAddress || undefined;
@@ -166,9 +166,9 @@ export class AuthController {
       res.status(200).json(result);
     } catch (error: any) {
       if (error.message === 'Usuário não encontrado') {
-        throw new NotFoundError('Não encontramos nenhuma conta com este e-mail.');
+        return next(new NotFoundError('Não encontramos nenhuma conta com este e-mail.'));
       }
-      throw error;
+      next(error);
     }
   };
 
@@ -191,16 +191,16 @@ export class AuthController {
   verifyEmail = async (
     req: Request,
     res: Response,
-    _next: NextFunction,
+    next: NextFunction,
   ): Promise<void> => {
     const token = (req.query.token as string) || req.body.token;
-    if (!token) throw new BadRequestError('Token é obrigatório');
+    if (!token) return next(new BadRequestError('Token é obrigatório'));
     
     try {
       await (await import('../services/userService')).verifyEmailByToken(token);
       res.status(200).json({ success: true });
     } catch (e: any) {
-      throw new BadRequestError(e.message || 'Token inválido');
+      next(new BadRequestError(e.message || 'Token inválido'));
     }
   };
 
@@ -208,78 +208,94 @@ export class AuthController {
   resendVerificationPublic = async (
     req: Request,
     res: Response,
-    _next: NextFunction,
+    next: NextFunction,
   ): Promise<void> => {
-    const { email } = req.body;
-    if (!email) throw new BadRequestError('Email é obrigatório');
-    
-    const user = await this.authService.findUserByEmail(email);
-    if (!user) throw new NotFoundError('Usuário não encontrado');
-    
-    await (await import('../services/userService')).resendEmailVerification(user.id);
-    res.json({ success: true });
+    try {
+      const { email } = req.body;
+      if (!email) return next(new BadRequestError('Email é obrigatório'));
+      
+      const user = await this.authService.findUserByEmail(email);
+      if (!user) return next(new NotFoundError('Usuário não encontrado'));
+      
+      await (await import('../services/userService')).resendEmailVerification(user.id);
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
   };
 
   getProfile = async (
     req: Request,
     res: Response,
-    _next: NextFunction,
+    next: NextFunction,
   ): Promise<void> => {
-    if (!req.userId) {
-      throw new UnauthorizedError("ID do utilizador não encontrado no token.");
+    try {
+      if (!req.userId) {
+        return next(new UnauthorizedError("ID do utilizador não encontrado no token."));
+      }
+      const user = await this.authService.getProfile(req.userId);
+      res.json(user);
+    } catch (error) {
+      next(error);
     }
-    const user = await this.authService.getProfile(req.userId);
-    res.json(user);
   };
 
   updateProfile = async (
     req: Request,
     res: Response,
-    _next: NextFunction,
+    next: NextFunction,
   ): Promise<void> => {
-    if (!req.userId) {
-      throw new UnauthorizedError("ID do utilizador não encontrado no token.");
+    try {
+      if (!req.userId) {
+        return next(new UnauthorizedError("ID do utilizador não encontrado no token."));
+      }
+      const { name, avatarUrl } = req.body;
+      const user = await this.authService.updateProfile(req.userId, {
+        name,
+        avatarUrl,
+      });
+      res.json(user);
+    } catch (error) {
+      next(error);
     }
-    const { name, avatarUrl } = req.body;
-    const user = await this.authService.updateProfile(req.userId, {
-      name,
-      avatarUrl,
-    });
-    res.json(user);
   };
 
   inviteCollaborator = async (
     req: Request,
     res: Response,
-    _next: NextFunction,
+    next: NextFunction,
   ): Promise<void> => {
-    const { name, email, collaboratorRole, hourlyRate, specialties } =
-      req.body;
-    const result = await this.authService.inviteCollaborator({
-      name,
-      email,
-      collaboratorRole,
-      hourlyRate,
-      specialties,
-    });
-    res.status(201).json(result);
+    try {
+      const { name, email, collaboratorRole, hourlyRate, specialties } =
+        req.body;
+      const result = await this.authService.inviteCollaborator({
+        name,
+        email,
+        collaboratorRole,
+        hourlyRate,
+        specialties,
+      });
+      res.status(201).json(result);
+    } catch (error) {
+      next(error);
+    }
   };
 
   // Método para colaboradores completarem o registo
   completeRegistration = async (
     req: Request,
     res: Response,
-    _next: NextFunction,
+    next: NextFunction,
   ): Promise<void> => {
     const { token, password } = req.body;
     if (!token || !password) {
-      throw new BadRequestError('Token e password são obrigatórios');
+      return next(new BadRequestError('Token e password são obrigatórios'));
     }
     try {
       await this.authService.resetPassword(token, password);
       res.status(200).json({ success: true });
     } catch (e: any) {
-      throw new BadRequestError(e.message || 'Falha ao completar registro');
+      next(new BadRequestError(e.message || 'Falha ao completar registro'));
     }
   };
 
@@ -292,7 +308,7 @@ export class AuthController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const { accessToken } = req.body;
+      const { accessToken, userData } = req.body;
       
       // Detectar provider pela rota
       const isFacebook = req.path.includes('facebook');
@@ -308,7 +324,7 @@ export class AuthController {
         
         if (!validation.valid) {
           logger.warn({ error: validation.error }, `Token ${provider} inválido`);
-          throw new UnauthorizedError(validation.error || "Token inválido");
+          return next(new UnauthorizedError(validation.error || "Token inválido"));
         }
         
         const email = validation.email!;
@@ -380,12 +396,11 @@ export class AuthController {
     // Fallback: userData enviado diretamente (legado - menos seguro)
     logger.warn("Login social sem validação de token - modo legado");
     
-    if (!userData || typeof userData !== 'object') {
-      throw new BadRequestError("Token ou dados de usuário são obrigatórios");
-    }
+
 
     const email = (userData.email && typeof userData.email === 'string') ? userData.email : null;
-    if (!email) throw new BadRequestError("E-mail é obrigatório");
+    // Email validate by Zod
+
 
     const user = await this.authService.findUserByEmail(email);
 
@@ -517,14 +532,18 @@ export class AuthController {
   getCurrentUser = async (
     req: Request,
     res: Response,
-    _next: NextFunction
+    next: NextFunction
   ): Promise<void> => {
-    if (!req.userId) {
-      throw new UnauthorizedError("Não autorizado");
+    try {
+      if (!req.userId) {
+        return next(new UnauthorizedError("Não autorizado"));
+      }
+      
+      const user = await this.authService.getProfile(req.userId);
+      res.json(user);
+    } catch (error) {
+      next(error);
     }
-    
-    const user = await this.authService.getProfile(req.userId);
-    res.json(user);
   };
 
   logout = async (
@@ -546,12 +565,12 @@ export class AuthController {
   refresh = async (
     req: Request,
     res: Response,
-    _next: NextFunction,
+    next: NextFunction,
   ): Promise<void> => {
     const refreshToken = req.cookies?.x_refresh_token || req.body.refreshToken;
     
     if (!refreshToken) {
-      throw new BadRequestError('Refresh token é obrigatório');
+      return next(new BadRequestError('Refresh token é obrigatório'));
     }
 
     const jwt = require('jsonwebtoken');
@@ -562,7 +581,7 @@ export class AuthController {
 
       const user = await this.authService.getProfile(decoded.userId);
       if (!user) {
-        throw new UnauthorizedError('Usuário não encontrado');
+        return next(new UnauthorizedError('Usuário não encontrado'));
       }
 
       const newToken = jwt.sign(
@@ -591,7 +610,7 @@ export class AuthController {
       });
     } catch {
       clearAuthCookies(res);
-      throw new UnauthorizedError('Refresh token inválido');
+      next(new UnauthorizedError('Refresh token inválido'));
     }
   };
 
@@ -603,42 +622,46 @@ export class AuthController {
   facebookDataDeletion = async (
     req: Request,
     res: Response,
-    _next: NextFunction,
+    next: NextFunction,
   ): Promise<void> => {
-    const signedRequest = req.body.signed_request;
-    
-    if (!signedRequest) {
-      throw new BadRequestError('signed_request é obrigatório');
-    }
+    try {
+      const signedRequest = req.body.signed_request;
+      
+      if (!signedRequest) {
+        return next(new BadRequestError('signed_request é obrigatório'));
+      }
 
-    // Decodificar o signed_request do Facebook
-    const parts = signedRequest.split('.');
-    if (parts.length !== 2) throw new BadRequestError('signed_request inválido');
-    
-    const payload = parts[1];
-    
-    // Decodificar o payload (base64url)
-    const data = JSON.parse(
-      Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8')
-    );
-    
-    const userId = data.user_id;
-    
-    if (!userId) {
-      throw new BadRequestError('user_id não encontrado no signed_request');
+      // Decodificar o signed_request do Facebook
+      const parts = signedRequest.split('.');
+      if (parts.length !== 2) return next(new BadRequestError('signed_request inválido'));
+      
+      const payload = parts[1];
+      
+      // Decodificar o payload (base64url)
+      const data = JSON.parse(
+        Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8')
+      );
+      
+      const userId = data.user_id;
+      
+      if (!userId) {
+        return next(new BadRequestError('user_id não encontrado no signed_request'));
+      }
+      
+      logger.info({ facebookUserId: userId }, 'Solicitação de exclusão de dados do Facebook recebida');
+      
+      const confirmationCode = `FB-DEL-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      
+      logger.info({ facebookId: userId }, 'Solicitação de exclusão registrada (Facebook ID não mapeado para usuário local)');
+      
+      const statusUrl = `${process.env.FRONTEND_URL || 'https://xproducoeseeventos.com.br'}/data-deletion-status?code=${confirmationCode}`;
+      
+      res.status(200).json({
+        url: statusUrl,
+        confirmation_code: confirmationCode
+      });
+    } catch (error) {
+      next(error);
     }
-    
-    logger.info({ facebookUserId: userId }, 'Solicitação de exclusão de dados do Facebook recebida');
-    
-    const confirmationCode = `FB-DEL-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    
-    logger.info({ facebookId: userId }, 'Solicitação de exclusão registrada (Facebook ID não mapeado para usuário local)');
-    
-    const statusUrl = `${process.env.FRONTEND_URL || 'https://xproducoeseeventos.com.br'}/data-deletion-status?code=${confirmationCode}`;
-    
-    res.status(200).json({
-      url: statusUrl,
-      confirmation_code: confirmationCode
-    });
   };
 }

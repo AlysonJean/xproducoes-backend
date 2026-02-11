@@ -1,28 +1,13 @@
-import { Router } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import { AuthController } from "../controllers/authController";
 import { authenticate, requireAdmin } from "../middlewares/unifiedAuth";
 import { authRateLimit, passwordResetRateLimit } from "../middlewares/rateLimitMiddleware";
 import { validateJsonContentType } from "../middlewares/contentTypeValidation";
-import { z } from 'zod';
-import { userRegisterSchema, userLoginSchema } from '../validators/userSchema';
+import { validateBody } from "../config/validation";
+import { loginSchema, registerSchema, requestPasswordResetSchema, resetPasswordSchema, socialLoginSchema } from "../schemas/auth.schema";
 import { registerFromInvite } from '../controllers/inviteController';
 
-// Middleware simples de validação com Zod
-const validate = (schema: z.ZodSchema<any>) => (req: any, res: any, next: any) => {
-  try {
-    req.body = schema.parse(req.body);
-    next();
-  } catch (err: any) {
-    if (err?.name === 'ZodError') {
-      return res.status(422).json({ message: 'Dados inválidos', details: err.issues });
-    }
-    next(err);
-  }
-};
-
-const resetSchema = z.object({ email: z.string().email().optional(), token: z.string().min(10).optional(), password: z.string().min(8).optional() });
-
-const authRoutes: any = Router();
+const authRoutes = createSafeRouter();
 const authController = new AuthController();
 
 /**
@@ -50,7 +35,7 @@ const authController = new AuthController();
  *       409:
  *         description: Email já cadastrado
  */
-authRoutes.post("/register", validateJsonContentType, authRateLimit, validate(userRegisterSchema), authController.register);
+authRoutes.post("/register", validateJsonContentType, authRateLimit, validateBody(registerSchema), authController.register);
 
 /**
  * @openapi
@@ -82,22 +67,22 @@ authRoutes.post("/register", validateJsonContentType, authRateLimit, validate(us
  *       403:
  *         description: Email não verificado
  */
-authRoutes.post("/login", validateJsonContentType, authRateLimit, validate(userLoginSchema), authController.login);
+authRoutes.post("/login", validateJsonContentType, authRateLimit, validateBody(loginSchema), authController.login);
 // Registro público a partir de convite
 authRoutes.post('/register-from-invite', registerFromInvite);
 authRoutes.get('/verify-email', authController.verifyEmail);
-authRoutes.post('/resend-verification', authRateLimit, authController.resendVerificationPublic);
+authRoutes.post('/resend-verification', authRateLimit, validateBody(requestPasswordResetSchema), authController.resendVerificationPublic);
 // Alias para compatibilidade REST/testes
-authRoutes.post("/auth/register", authRateLimit, validate(userRegisterSchema), authController.register);
-authRoutes.post("/auth/login", authRateLimit, validate(userLoginSchema), authController.login);
-authRoutes.post("/request-password-reset", passwordResetRateLimit, validate(resetSchema.pick({ email: true })), authController.requestPasswordReset);
-authRoutes.post("/reset-password", passwordResetRateLimit, validate(resetSchema.pick({ token: true, password: true })), authController.resetPassword);
+authRoutes.post("/auth/register", authRateLimit, validateBody(registerSchema), authController.register);
+authRoutes.post("/auth/login", authRateLimit, validateBody(loginSchema), authController.login);
+authRoutes.post("/request-password-reset", passwordResetRateLimit, validateBody(requestPasswordResetSchema), authController.requestPasswordReset);
+authRoutes.post("/reset-password", passwordResetRateLimit, validateBody(resetPasswordSchema), authController.resetPassword);
 authRoutes.post("/complete-registration", authController.completeRegistration);
 authRoutes.post("/refresh", authController.refresh);
 
 // Autenticação social
-authRoutes.post("/social/google", authRateLimit, authController.socialLogin);
-authRoutes.post("/social/facebook", authRateLimit, authController.socialLogin);
+authRoutes.post("/social/google", authRateLimit, validateBody(socialLoginSchema), authController.socialLogin);
+authRoutes.post("/social/facebook", authRateLimit, validateBody(socialLoginSchema), authController.socialLogin);
 // OAuth Google (OIDC Authorization Code + PKCE)
 authRoutes.get('/oauth/google/authorize', authRateLimit, authController.googleAuthorize);
 authRoutes.get('/oauth/google/callback', authRateLimit, authController.googleCallback);

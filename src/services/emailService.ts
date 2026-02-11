@@ -103,19 +103,51 @@ export class EmailService {
     const mailOptions = {
       from: FROM,
       to: user.email,
-      subject: `Confirmação da sua Reserva #${String(booking.id).substring(0, 8)}`,
+      subject: `Solicitação da sua Reserva #${String(booking.id).substring(0, 8)}`,
       html: `
         <h1>Olá, ${user.name}!</h1>
-        <p>A sua reserva foi recebida e está agora pendente de confirmação.</p>
+        <p>A sua reserva foi recebida e está agora aguardando confirmação da equipe.</p>
         <p><strong>Detalhes do Pedido:</strong></p>
         <ul>
           ${(booking.equipments || []).map((eq: any) => `<li>${eq.name}</li>`).join("")}
         </ul>
-        <p><strong>Total:</strong> R$ ${Number(booking.totalPrice).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-        <p>Obrigado!</p>
+        <p><strong>Total Estimado:</strong> R$ ${Number(booking.totalPrice || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+        <p>Você será notificado assim que confirmarmos a disponibilidade.</p>
       `,
     };
     return this.sendMail(user.email, mailOptions.subject, mailOptions.html);
+  }
+
+  async sendBookingApproved(user: { name: string; email: string }, booking: any) {
+    const frontendUrl = process.env.FRONTEND_URL || 'https://xproducoeseeventos.com.br';
+    const bookingUrl = `${frontendUrl}/cliente/reservas/${booking.id}`;
+    
+    // Gerar link formatado do GCal seria ideal aqui, mas vamos focar no link da plataforma
+    
+    const subject = `Reserva Confirmada! #${String(booking.id).substring(0, 8)}`;
+    const html = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #10b981;">Sua reserva foi confirmada! 🎉</h1>
+        <p>Olá, <strong>${user.name}</strong>.</p>
+        <p>Temos o prazer de informar que sua reserva para <strong>${booking.eventTitle || 'Seu Evento'}</strong> está confirmada.</p>
+        
+        <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 5px 0;"><strong>Data:</strong> ${new Date(booking.eventDate).toLocaleDateString('pt-BR')} às ${new Date(booking.eventDate).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</p>
+          <p style="margin: 5px 0;"><strong>Local:</strong> ${booking.location || 'A definir'}</p>
+          <p style="margin: 5px 0;"><strong>Status:</strong> <span style="color: #10b981; font-weight: bold;">Confirmada</span></p>
+        </div>
+
+        <p>Já adicionamos este evento à sua agenda (se você conectou sua conta Google).</p>
+        
+        <p>
+          <a href="${bookingUrl}" style="display: inline-block; background-color: #000; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+            Ver Detalhes da Reserva
+          </a>
+        </p>
+      </div>
+    `;
+    
+    return this.sendMail(user.email, subject, html);
   }
 
   async sendStatusUpdate(user: any, booking: any) {
@@ -163,6 +195,33 @@ export class EmailService {
       eventDetails.role,
       eventDetails.location,
       eventDetails.bookingUrl
+    );
+
+    return this.sendMail(email, template.subject, template.html, template.text);
+  }
+
+  async sendBookingReminder(
+    email: string,
+    clientName: string,
+    eventDetails: {
+      id: string;
+      title: string;
+      date: string;
+      time: string;
+      location: string;
+      googleCalendarLink: string;
+    }
+  ) {
+    const bookingUrl = `https://xproducoeseeventos.com.br/cliente/reservas/${eventDetails.id}`;
+    
+    const template = EmailTemplates.bookingReminder(
+      clientName,
+      eventDetails.title,
+      eventDetails.date,
+      eventDetails.time,
+      eventDetails.location,
+      bookingUrl,
+      eventDetails.googleCalendarLink
     );
 
     return this.sendMail(email, template.subject, template.html, template.text);

@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
-import { UserRole } from "@prisma/client";
+
 import * as userService from "../services/userService";
 import {
   userRegisterSchema,
   userLoginSchema,
-  profileUpdateSchema,
+
 } from "../validators/userSchema";
 import { getErrorMessage } from "../types/common";
 import { AuthenticatedRequest } from "../middlewares/unifiedAuth";
@@ -46,29 +46,18 @@ export async function getProfile(req: Request, res: Response) {
 }
 
 export async function updateProfile(req: Request, res: Response) {
-  const parse = profileUpdateSchema.safeParse(req.body);
-  if (!parse.success) {
-    return res.status(400).json({ errors: parse.error.flatten() });
-  }
   try {
     const authReq = req as AuthenticatedRequest;
-    // Converter role de string para UserRole se fornecido
-    const updateData: Record<string, unknown> = { ...parse.data };
-    if (updateData.role && typeof updateData.role === 'string') {
-      // Validar se é um valor válido do enum UserRole
-      if (Object.values(UserRole).includes(updateData.role as UserRole)) {
-        updateData.role = updateData.role as UserRole;
-      } else {
-        delete updateData.role; // Remove role inválido
-      }
-    }
+    // req.body já validado/sanitizado pelo Zod middleware
     
     const user = await userService.updateProfile(
       authReq.userId!,
-      updateData,
+      req.body,
       req.file,
     );
     return res.json(user);
+    
+
   } catch (error: unknown) {
     return res.status(400).json({ error: getErrorMessage(error) });
   }

@@ -1,9 +1,9 @@
-import { Router, type Router as RouterType } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import { PaymentController } from "../controllers/paymentController";
 import { authenticate, requireAdmin } from "../middlewares/unifiedAuth";
 import { paymentRateLimit } from "../middlewares/rateLimitMiddleware";
 
-const paymentRoutes: RouterType = Router();
+const paymentRoutes = createSafeRouter();
 const paymentController = new PaymentController();
 
 paymentRoutes.use(authenticate);

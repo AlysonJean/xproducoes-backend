@@ -1,4 +1,4 @@
-import { Router, type Router as RouterType } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import {
   createCollaborator,
   getAllCollaborators,
@@ -36,16 +36,27 @@ import {
 } from "../controllers/collaboratorController";
 import { sendInvite } from '../controllers/inviteController';
 import { authenticate, requireAdminOrCollaborator, adminOnly } from "../middlewares/unifiedAuth";
+import { validateBody, validateId } from "../config/validation";
+import { 
+  collaboratorCreateSchema, 
+  collaboratorUpdateSchema, 
+  inviteCreateSchema, 
+  availabilityCreateSchema, 
+  availabilityUpdateSchema, 
+  paymentCreateSchema, 
+  paymentUpdateSchema,
+  eventAssignmentSchema 
+} from "../schemas/collaborator.schema";
 
-const router: RouterType = Router();
+const router = createSafeRouter();
 
 // Todas as rotas requerem autenticação
 router.use(authenticate);
 
 // Rotas de CRUD de Colaboradores (apenas admin)
-router.post("/", adminOnly, createCollaborator);
+router.post("/", adminOnly, validateBody(collaboratorCreateSchema), createCollaborator);
 // Rota para enviar convite por email
-router.post('/invite', adminOnly, sendInvite);
+router.post('/invite', adminOnly, validateBody(inviteCreateSchema), sendInvite);
 router.get("/", getAllCollaborators);
 router.get("/search", searchCollaborators);
 router.get("/available", getAvailableCollaborators);
@@ -55,20 +66,20 @@ router.get("/available", getAvailableCollaborators);
 router.get('/me/dashboard', requireAdminOrCollaborator, getMyDashboard);
 // Perfil do colaborador (me)
 router.get('/me/profile', requireAdminOrCollaborator, getMyProfile);
-router.put('/me/profile', requireAdminOrCollaborator, updateMyProfile);
+router.put('/me/profile', requireAdminOrCollaborator, validateBody(collaboratorUpdateSchema), updateMyProfile);
 // Rotas ME adicionais
 router.get('/me/availability', requireAdminOrCollaborator, getMyAvailability);
-router.post('/me/availability', requireAdminOrCollaborator, createAvailability); // Suporta criação
-router.put('/me/availability', requireAdminOrCollaborator, createAvailability); // Compatibilidade frontend (PUT agindo como create/upsert)
+router.post('/me/availability', requireAdminOrCollaborator, validateBody(availabilityCreateSchema), createAvailability);
+router.put('/me/availability', requireAdminOrCollaborator, validateBody(availabilityCreateSchema), createAvailability);
 router.get('/me/payments', requireAdminOrCollaborator, getMyPayments);
 router.get('/me/stats', requireAdminOrCollaborator, getMyStats);
 router.get('/me/events', requireAdminOrCollaborator, getMyEvents);
 router.get('/me/notifications', requireAdminOrCollaborator, getMyNotifications);
 // ---------------------------------------------
 
-router.get("/:id", getCollaboratorById);
-router.put("/:id", adminOnly, updateCollaborator);
-router.delete("/:id", adminOnly, deleteCollaborator);
+router.get("/:id", validateId(), getCollaboratorById);
+router.put("/:id", adminOnly, validateId(), validateBody(collaboratorUpdateSchema), updateCollaborator);
+router.delete("/:id", adminOnly, validateId(), deleteCollaborator);
 
 // Rotas de estatísticas
 router.get("/:id/stats", getCollaboratorStats);
@@ -76,9 +87,9 @@ router.get("/:collaboratorId/events", getCollaboratorEvents);
 
 // Rotas de disponibilidades (CRUD genérico)
 router.post("/availabilities", adminOnly, createAvailability);
-router.get("/events/:eventId/collaborators", getEventCollaborators);
-router.post("/event-assignments", adminOnly, assignCollaboratorToEvent); // Rota adicionada
-router.put("/event-assignments/:id", adminOnly, updateEventCollaborator);
+router.get("/events/:eventId/collaborators", getEventCollaborators); // validateId('eventId')?
+router.post("/event-assignments", adminOnly, validateBody(eventAssignmentSchema), assignCollaboratorToEvent);
+router.put("/event-assignments/:id", adminOnly, validateId(), validateBody(eventAssignmentSchema.partial()), updateEventCollaborator);
 router.delete(
   "/event-assignments/:id",
   adminOnly,
@@ -87,17 +98,17 @@ router.delete(
 
 // Rotas de disponibilidades
 router.get("/availabilities", getAllAvailabilities);
-router.post("/availabilities", adminOnly, createAvailability);
-router.put("/availabilities/:id", adminOnly, updateAvailability);
-router.delete("/availabilities/:id", adminOnly, deleteAvailability);
+router.post("/availabilities", adminOnly, validateBody(availabilityCreateSchema), createAvailability);
+router.put("/availabilities/:id", adminOnly, validateId(), validateBody(availabilityUpdateSchema), updateAvailability);
+router.delete("/availabilities/:id", adminOnly, validateId(), deleteAvailability);
 router.get("/:collaboratorId/availabilities", getCollaboratorAvailabilities);
 
 // Rotas de Pagamentos
 router.get("/payments/all", adminOnly, getAllPayments);
 router.get("/payments/stats", adminOnly, getPaymentStats);
-router.post("/payments", adminOnly, createPayment);
-router.put("/payments/:id", adminOnly, updatePayment);
-router.delete("/payments/:id", adminOnly, deletePayment);
+router.post("/payments", adminOnly, validateBody(paymentCreateSchema), createPayment);
+router.put("/payments/:id", adminOnly, validateId(), validateBody(paymentUpdateSchema), updatePayment);
+router.delete("/payments/:id", adminOnly, validateId(), deletePayment);
 router.get("/:collaboratorId/payments", getCollaboratorPayments);
 
 // Rota global de atribuições

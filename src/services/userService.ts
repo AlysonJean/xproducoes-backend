@@ -288,9 +288,10 @@ export async function getProfile(userId: string) {
       name: true,
       email: true,
       role: true,
-  avatarUrl: true,
-  isVip: true,
+      avatarUrl: true,
+      isVip: true,
       createdAt: true,
+      googleCalendarEmail: true,
     },
   });
   if (!user) throw new Error("Usuário não encontrado");
@@ -422,22 +423,36 @@ export async function resetPassword(token: string, newPassword: string, ipAddres
 
 export async function getUserStats(userId: string) {
   try {
+    // Buscar o perfil de cliente vinculado ao usuário
+    const client = await prisma.client.findUnique({
+      where: { userId }
+    });
+
+    if (!client) {
+      return {
+        totalBookings: 0,
+        totalSpent: 0,
+        upcomingBookings: 0,
+        recentBookings: 0
+      };
+    }
+
     const [bookingsCount, bookingsTotal, upcomingBookings, recentBookings] = await Promise.all([
       // Total de reservas do usuário
       prisma.booking.count({
-        where: { clientId: userId }
+        where: { clientId: client.id }
       }),
       
       // Valor total das reservas
       prisma.booking.aggregate({
-        where: { clientId: userId },
+        where: { clientId: client.id },
         _sum: { totalPrice: true }
       }),
       
       // Próximas reservas (próximos 30 dias)
       prisma.booking.count({
         where: {
-          clientId: userId,
+          clientId: client.id,
           eventDate: {
             gte: new Date(),
             lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
@@ -448,7 +463,7 @@ export async function getUserStats(userId: string) {
       // Reservas recentes (últimos 30 dias)
       prisma.booking.count({
         where: {
-          clientId: userId,
+          clientId: client.id,
           createdAt: {
             gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
           }
@@ -458,7 +473,7 @@ export async function getUserStats(userId: string) {
 
     return {
       totalBookings: bookingsCount,
-      totalSpent: bookingsTotal._sum?.totalPrice || 0,
+      totalSpent: Number(bookingsTotal._sum?.totalPrice || 0),
       upcomingBookings,
       recentBookings
     };

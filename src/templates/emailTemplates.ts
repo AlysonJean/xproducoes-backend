@@ -426,4 +426,124 @@ Se houver algum impedimento, entre em contato imediatamente.
       text
     };
   }
+  /**
+   * Template para lembrete de reserva (24h antes)
+   */
+  static bookingReminder(
+    clientName: string,
+    eventName: string,
+    eventDate: string,
+    eventTime: string,
+    location: string,
+    bookingUrl: string,
+    googleCalendarLink: string
+  ): EmailTemplate {
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lembrete de Reserva</title>
+</head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background-color:#f3f4f6;">
+  <table role="presentation" style="width:100%;border-collapse:collapse;border:0;border-spacing:0;background:#f3f4f6;">
+    <tr>
+      <td align="center" style="padding:40px 0;">
+        <table role="presentation" style="width:600px;border-collapse:collapse;background:#ffffff;border-radius:16px;box-shadow:0 4px 6px rgba(0,0,0,0.05);">
+          
+          <tr>
+            <td style="padding:30px 40px;text-align:center;background-color:#fffbeb;border-bottom:4px solid #f59e0b;border-radius:16px 16px 0 0;">
+              <h1 style="margin:0;font-size:24px;font-weight:700;color:#92400e;">
+                🔔 Lembrete de Reserva
+              </h1>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:40px;">
+              <p style="margin:0 0 20px;font-size:16px;color:#111827;">
+                Olá <strong>${clientName}</strong>,
+              </p>
+              
+              <p style="margin:0 0 24px;font-size:16px;color:#374151;">
+                Sua reserva está chegando! Aqui estão os detalhes para amanhã:
+              </p>
+
+              <div style="background-color:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:24px;margin-bottom:24px;">
+                <h3 style="margin:0 0 16px;font-size:18px;color:#92400e;text-align:center;">${eventName}</h3>
+                
+                <table style="width:100%;">
+                  <tr>
+                    <td style="padding-bottom:12px;color:#78350f;font-size:14px;width:100px;">📅 Data:</td>
+                    <td style="padding-bottom:12px;color:#451a03;font-weight:600;">${eventDate}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-bottom:12px;color:#78350f;font-size:14px;">⏰ Horário:</td>
+                    <td style="padding-bottom:12px;color:#451a03;font-weight:600;">${eventTime}</td>
+                  </tr>
+                  <tr>
+                    <td style="color:#78350f;font-size:14px;">📍 Local:</td>
+                    <td style="color:#451a03;font-weight:600;">${location}</td>
+                  </tr>
+                </table>
+              </div>
+
+              <div style="text-align:center;margin-bottom:24px;">
+                <a href="${bookingUrl}" 
+                   style="display:inline-block;padding:14px 32px;background-color:${this.PRIMARY_COLOR};color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;margin-bottom:12px;width:200px;">
+                  Ver Detalhes
+                </a>
+                <br>
+                <a href="${googleCalendarLink}" 
+                   style="display:inline-block;padding:12px 24px;background-color:#ffffff;color:#4b5563;text-decoration:none;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-weight:500;width:200px;">
+                  📅 Adicionar à Agenda
+                </a>
+              </div>
+              
+              <p style="margin:0;font-size:14px;color:#6b7280;text-align:center;">
+                Precisa fazer alguma alteração? Entre em contato conosco.
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:30px 40px;background-color:#f9fafb;border-radius:0 0 16px 16px;border-top:1px solid #e5e7eb;">
+              <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">
+                © ${new Date().getFullYear()} ${this.COMPANY_NAME}
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const text = `
+Olá ${clientName},
+
+🔔 Lembrete: Sua reserva é amanhã!
+
+Evento: ${eventName}
+Data: ${eventDate}
+Horário: ${eventTime}
+Local: ${location}
+
+Acesse os detalhes: ${bookingUrl}
+Adicionar ao Google Calendar: ${googleCalendarLink}
+
+Atenciosamente,
+${this.COMPANY_NAME}
+    `.trim();
+
+    return {
+      subject: `Lembrete: Sua reserva é amanhã! - ${eventName}`,
+      html,
+      text
+    };
+  }
 }

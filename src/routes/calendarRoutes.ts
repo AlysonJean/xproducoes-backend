@@ -1,9 +1,9 @@
-import { Router } from 'express';
+import { createSafeRouter } from '../middlewares/safeRouter';
 import { googleCalendarService } from '../services/googleCalendarService';
 import { AuthenticatedRequest, authenticate } from '../middlewares/unifiedAuth';
 import logger from '../config/logger';
 
-const router = Router();
+const router = createSafeRouter();
 
 // Rota para iniciar a conexão com o Google (retorna a URL de auth)
 router.get('/auth', authenticate, (req, res) => {

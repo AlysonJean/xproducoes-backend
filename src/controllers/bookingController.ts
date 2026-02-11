@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from "express";
 import { BookingService } from "../services/bookingService";
 import { prisma } from "../config/prisma";
 import { BookingStatus, DeliveryStatus } from "@prisma/client";
-import { bookingCreateSchema } from "../validators/bookingSchema";
 import logger from "../config/logger";
 import { BadRequestError, ForbiddenError, NotFoundError } from "../utils/errors";
 
@@ -11,14 +10,9 @@ const bookingService = new BookingService();
 export class BookingController {
   create = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Validação do schema
-      const validatedData = bookingCreateSchema.parse(req.body);
-      
-      // Validação de negócio (redundante com schema mas mantida por segurança)
-      const { kitId, equipmentIds } = validatedData;
-      if (!kitId && (!equipmentIds || !Array.isArray(equipmentIds) || equipmentIds.length === 0)) {
-        throw new BadRequestError("É necessário fornecer um kit ou uma lista de equipamentos.");
-      }
+      // Dados validados pelo middleware Zod
+      const validatedData = req.body;
+
 
       // Suporte a idempotency
       const idempotencyKey = (req.header('Idempotency-Key') || req.header('x-idempotency-key')) as string | undefined;
@@ -31,14 +25,7 @@ export class BookingController {
       });
     } catch (error) {
       logger.error({ err: error }, "Erro no controller Booking.create");
-      
-      if (error instanceof Error && error.name === 'ZodError') {
-        return res.status(422).json({
-          success: false,
-          error: "Erro de validação",
-          message: (error as any).errors?.map((e: any) => e.message).join(', ') || error.message
-        });
-      }
+
 
       if (error instanceof BadRequestError || error instanceof ForbiddenError || error instanceof NotFoundError) {
         return res.status(error.statusCode).json({
@@ -87,7 +74,7 @@ export class BookingController {
     }
   };
 
-  findAll = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  findAll = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const status = req.query.status as BookingStatus | undefined;
       const userId = req.query.userId as string | undefined;
@@ -151,7 +138,7 @@ export class BookingController {
     }
   };
 
-  updateStatus = async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+  updateStatus = async (req: Request, res: Response, _next: NextFunction) => {
     if (req.userRole !== "ADMIN") {
       throw new ForbiddenError("Acesso negado.");
     }
@@ -160,7 +147,7 @@ export class BookingController {
     const { status } = req.body as { status: BookingStatus };
 
     if (!id) throw new BadRequestError("ID da reserva é obrigatório.");
-    if (!Object.values(BookingStatus).includes(status)) throw new BadRequestError("Estado inválido.");
+
 
     const updatedBooking = await bookingService.updateBookingStatus(id, status);
     
@@ -171,7 +158,7 @@ export class BookingController {
     });
   };
 
-  updateDeliveryStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  updateDeliveryStatus = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params as { id: string };
       const { status } = req.body as { status: DeliveryStatus };
@@ -184,13 +171,7 @@ export class BookingController {
         return;
       }
 
-      if (!Object.values(DeliveryStatus).includes(status)) {
-        res.status(400).json({ 
-          success: false,
-          message: "Estado de entrega inválido." 
-        });
-        return;
-      }
+
 
       const updatedBooking = await bookingService.updateDeliveryStatus(id, status);
       
@@ -212,7 +193,7 @@ export class BookingController {
     }
   };
 
-  getCalendarBookings = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getCalendarBookings = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { month, year } = req.query;
       
@@ -239,7 +220,7 @@ export class BookingController {
     }
   };
 
-  findOne = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  findOne = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params as { id: string };
 
@@ -293,7 +274,7 @@ export class BookingController {
     }
   };
 
-  update = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  update = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params as { id: string };
       
@@ -349,7 +330,7 @@ export class BookingController {
   };
 
   // Adicionar attachment (comprovante) à reserva
-  addAttachment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  addAttachment = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params as { id: string };
       if (!id) {
@@ -389,7 +370,7 @@ export class BookingController {
     }
   };
 
-  removeAttachment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  removeAttachment = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id, attachmentId } = req.params as { id: string; attachmentId: string };
       if (!id || !attachmentId) {
@@ -422,7 +403,7 @@ export class BookingController {
     }
   };
 
-  delete = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  delete = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params as { id: string };
       
@@ -471,7 +452,7 @@ export class BookingController {
     }
   };
 
-  confirm = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  confirm = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params as { id: string };
       
@@ -504,7 +485,7 @@ export class BookingController {
   };
 
   // Confirmação com detalhes (valor acordado e atribuição de colaboradores)
-  confirmWithDetails = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  confirmWithDetails = async (req: Request, res: Response, next: NextFunction) => {
     if (req.userRole !== 'ADMIN') {
       res.status(403).json({ success: false, message: 'Acesso negado.' });
       return;
@@ -527,7 +508,7 @@ export class BookingController {
     }
   };
 
-  cancel = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  cancel = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params as { id: string };
       const { reason } = req.body;
@@ -560,9 +541,14 @@ export class BookingController {
     }
   };
 
-  getUpcoming = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getUpcoming = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const bookings = await bookingService.getUpcoming(req.userId!);
+      const client = await prisma.client.findFirst({ where: { userId: req.userId } });
+      if (!client) {
+        return res.json({ success: true, data: [] });
+      }
+
+      const bookings = await bookingService.getUpcoming(client.id);
       
       res.json({
         success: true,
@@ -581,9 +567,14 @@ export class BookingController {
     }
   };
 
-  getHistory = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getHistory = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const bookings = await bookingService.getHistory(req.userId!);
+      const client = await prisma.client.findFirst({ where: { userId: req.userId } });
+      if (!client) {
+        return res.json({ success: true, data: [] });
+      }
+
+      const bookings = await bookingService.getHistory(client.id);
       
       res.json({
         success: true,
@@ -602,7 +593,7 @@ export class BookingController {
     }
   };
 
-  getDashboardStats = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getDashboardStats = async (req: Request, res: Response, next: NextFunction) => {
     if (req.userRole !== "ADMIN") {
       res.status(403).json({ 
         success: false,
@@ -631,7 +622,7 @@ export class BookingController {
     }
   };
 
-  getCalendar = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getCalendar = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { month, year } = req.query;
       
@@ -659,7 +650,7 @@ export class BookingController {
   };
 
   // Método legado mantido para compatibilidade
-  getCollaboratorEvents = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getCollaboratorEvents = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { collaboratorId } = req.params as { collaboratorId: string };
 

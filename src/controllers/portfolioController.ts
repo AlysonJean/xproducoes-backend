@@ -6,9 +6,7 @@ export class PortfolioController {
   update = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params as { id: string };
-      if (!id) {
-        return res.status(400).json({ message: "ID é obrigatório." });
-      }
+
         const updated = await portfolioService.updatePortfolio(id, req.body);
         await cacheService.delete('portfolio:all'); // Invalidar cache
       return res.json(updated);
@@ -18,14 +16,8 @@ export class PortfolioController {
   };
   create = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { title, description, eventDate } = req.body;
-      // Validação dos campos obrigatórios
-      if (!title || !description || !eventDate) {
-        return res.status(400).json({ 
-          message: "Campos obrigatórios: title, description, eventDate",
-          received: { title: !!title, description: !!description, eventDate: !!eventDate }
-        });
-      }
+
+
       const portfolio = await portfolioService.create(req.body);
       await cacheService.delete('portfolio:all'); // Invalidar cache
       return res.status(201).json(portfolio);
@@ -76,9 +68,7 @@ export class PortfolioController {
     try {
       const { items } = req.body; // Espera { items: [{id, sortOrder}, ...] }
       
-      if (!Array.isArray(items)) {
-        return res.status(400).json({ message: "Formato inválido. Esperado array de itens." });
-      }
+
 
       await portfolioService.updateOrder(items);
       return res.json({ message: "Ordem atualizada com sucesso" });

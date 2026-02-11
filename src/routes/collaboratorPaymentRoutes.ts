@@ -1,4 +1,4 @@
-import { Router, type Router as RouterType } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import {
   getAllPayments,
   createPayment,
@@ -9,7 +9,7 @@ import {
 } from "../controllers/collaboratorController";
 import { authenticate, adminOnly } from "../middlewares/unifiedAuth";
 
-const router: RouterType = Router();
+const router = createSafeRouter();
 
 // Todas as rotas requerem autenticação
 router.use(authenticate);
@@ -24,4 +24,4 @@ router.delete("/:id", adminOnly, deletePayment);
 router.get("/collaborator/:collaboratorId", getCollaboratorPayments);
 router.get("/collaborator/:collaboratorId/stats", getPaymentStats);
 
-export default Router;
+export default router;

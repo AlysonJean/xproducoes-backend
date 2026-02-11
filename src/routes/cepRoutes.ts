@@ -1,8 +1,8 @@
-import { Router } from 'express';
+import { createSafeRouter } from '../middlewares/safeRouter';
 import { safeFetch } from '../utils/safeFetch';
 import { apiRateLimit } from '../middlewares/rateLimitMiddleware';
 
-const router = Router();
+const router = createSafeRouter();
 
 // Proxy para ViaCEP
 router.get('/:cep', apiRateLimit, async (req, res) => {

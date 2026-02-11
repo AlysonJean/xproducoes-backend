@@ -1,39 +1,48 @@
-import { Router } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import { BookingController } from "../controllers/bookingController";
 import { criticalEndpointRateLimit } from '../middlewares/rateLimitMiddleware';
 import { validateJsonContentType } from "../middlewares/contentTypeValidation";
 import { authenticate, adminOnly, adminOrCollaborator } from "../middlewares/unifiedAuth";
+import { validateBody, validateId } from "../config/validation";
+import { 
+  bookingCreateSchema, 
+  bookingUpdateSchema, 
+  bookingStatusUpdateSchema,
+  deliveryStatusUpdateSchema,
+  bookingCancelSchema 
+} from "../validators/bookingSchema";
 
-const router = Router();
+const router = createSafeRouter();
 const bookingController = new BookingController();
 
 // Todas as rotas requerem autenticação
 router.use(authenticate);
 
 // Rotas públicas (qualquer usuário autenticado)
-router.get("/user", bookingController.findByUser); // Reservas do usuário logado
-router.get("/upcoming", bookingController.getUpcoming); // Próximas reservas
-router.get("/history", bookingController.getHistory); // Histórico de reservas
-router.get("/calendar", bookingController.getCalendar); // Calendário de eventos
-router.post("/", validateJsonContentType, criticalEndpointRateLimit, bookingController.create); // Criar nova reserva
-router.get("/:id", bookingController.findOne); // Buscar reserva específica
-router.put("/:id", validateJsonContentType, bookingController.update); // Atualizar reserva
-router.delete("/:id", bookingController.delete); // Deletar reserva
-router.put("/:id/confirm", bookingController.confirm); // Confirmar reserva
-router.put("/:id/cancel", bookingController.cancel); // Cancelar reserva
+router.get("/me", bookingController.findByUser);
+router.get("/user", bookingController.findByUser);
+router.get("/upcoming", bookingController.getUpcoming);
+router.get("/history", bookingController.getHistory);
+router.get("/calendar", bookingController.getCalendar);
+router.post("/", validateJsonContentType, criticalEndpointRateLimit, validateBody(bookingCreateSchema), bookingController.create);
+router.get("/:id", validateId(), bookingController.findOne);
+router.put("/:id", validateId(), validateJsonContentType, validateBody(bookingUpdateSchema), bookingController.update);
+router.delete("/:id", validateId(), bookingController.delete);
+router.put("/:id/confirm", validateId(), bookingController.confirm);
+router.put("/:id/cancel", validateId(), validateJsonContentType, validateBody(bookingCancelSchema), bookingController.cancel);
 	// Confirmar com detalhes (preço acordado e atribuição de colaboradores) - apenas ADMIN
-	router.put("/:id/confirm-details", adminOnly, bookingController.confirmWithDetails);
+	router.put("/:id/confirm-details", adminOnly, validateId(), bookingController.confirmWithDetails);
 
 // Rotas administrativas (apenas para administradores)
-router.get("/", adminOnly, bookingController.findAll); // Todas as reservas
-router.put("/:id/status", adminOnly, bookingController.updateStatus); // Atualizar status
-router.put("/:id/delivery-status", adminOnly, bookingController.updateDeliveryStatus); // Atualizar status entrega
-router.get("/calendar/events", adminOnly, bookingController.getCalendarBookings); // Eventos do calendário
-router.get("/dashboard/stats", adminOnly, bookingController.getDashboardStats); // Estatísticas
+router.get("/", adminOnly, bookingController.findAll);
+router.put("/:id/status", adminOnly, validateId(), validateJsonContentType, validateBody(bookingStatusUpdateSchema), bookingController.updateStatus);
+router.put("/:id/delivery-status", adminOnly, validateId(), validateJsonContentType, validateBody(deliveryStatusUpdateSchema), bookingController.updateDeliveryStatus);
+router.get("/calendar/events", adminOnly, bookingController.getCalendarBookings);
+router.get("/dashboard/stats", adminOnly, bookingController.getDashboardStats);
 
 // Attachments (comprovantes)
-router.post('/:id/attachments', bookingController.addAttachment);
-router.delete('/:id/attachments/:attachmentId', bookingController.removeAttachment);
+router.post('/:id/attachments', validateId(), bookingController.addAttachment);
+router.delete('/:id/attachments/:attachmentId', validateId(), bookingController.removeAttachment);
 
 // Rotas específicas de colaboradores (futuro)
 router.get("/collaborator/:collaboratorId/events", adminOrCollaborator, bookingController.getCollaboratorEvents);

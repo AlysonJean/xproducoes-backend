@@ -1,19 +1,17 @@
 // Caminho: backend/src/routes/adminRoutes.ts
 
-import { Router, type Router as RouterType } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import { authenticate, requireAdmin } from "../middlewares/unifiedAuth";
 import { AdminController } from "../controllers/adminController";
 import { UploadService } from "../services/uploadService";
 import { ContactController } from "../controllers/contactController";
-import { BookingController } from "../controllers/bookingController";
 import adminBookingRoutes from "./adminBookingRoutes";
 import { securityMonitor } from "../config/securityMonitor";
 
-const adminRoutes: RouterType = Router();
+const adminRoutes = createSafeRouter();
 
 const adminController = new AdminController();
 const contactController = new ContactController();
-const bookingController = new BookingController();
 const uploadService = new UploadService();
 
 adminRoutes.use(authenticate, requireAdmin);

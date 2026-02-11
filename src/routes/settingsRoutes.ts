@@ -1,7 +1,7 @@
-import { Router } from 'express';
+import { createSafeRouter } from '../middlewares/safeRouter';
 import { getAppSettings, updateAppSettings } from '../controllers/settingsController';
 
-const router = Router();
+const router = createSafeRouter();
 
 // Rotas para configurações da aplicação
 router.get('/', getAppSettings);

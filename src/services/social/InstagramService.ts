@@ -165,7 +165,11 @@ export class InstagramService {
       return newPostsCount;
 
     } catch (error: any) {
-      logger.error({ error: error.message, settingId }, 'Failed to fetch Instagram media');
+      logger.error({ 
+        error: error.message, 
+        settingId,
+        stack: error.stack 
+      }, 'Failed to fetch Instagram media');
       throw error;
     }
   }
@@ -176,7 +180,7 @@ export class InstagramService {
     try {
       const u = new URL(`${InstagramService.GRAPH_API_URL}/ig_hashtag_search`);
       u.searchParams.append('user_id', userId); // This must be the IG Business User ID
-      u.searchParams.append('q', hashtag);
+      u.searchParams.append('q', hashtag.replace('#', '')); // Instagram API expects hashtag without #
       u.searchParams.append('access_token', token);
 
       const res = await fetch(u.toString());
@@ -185,65 +189,69 @@ export class InstagramService {
       if (data.data && data.data.length > 0) {
         return data.data[0].id;
       }
+      
+      if (data.error) {
+        logger.error({ igError: data.error, hashtag }, 'Instagram Hashtag Search API error');
+      }
+      
       return null;
     } catch (e) {
-      logger.error({ error: e }, 'Error fetching hashtag ID');
+      logger.error({ error: e, hashtag }, 'Error fetching hashtag ID');
       return null;
     }
   }
   
   private async getHashtagMedia(hashtagId: string, token: string): Promise<InstagramMedia[]> {
     // GET /{hashtag-id}/recent_media?user_id={user-id}&fields=...
-    // Note: 'recent_media' might effectively be 'top_media' or similar depending on permission content
     try {
-        // We actually need the user_id context to call this endpoint usually
-        // Let's assume the token allows generic access or we pass the right ID
-        const u = new URL(`${InstagramService.GRAPH_API_URL}/${hashtagId}/recent_media`);
-        u.searchParams.append('user_id', 'ME'); // Should be the user id from credential
-        u.searchParams.append('fields', 'id,media_type,media_url,permalink,caption,timestamp,username,children{media_url,media_type}');
-        u.searchParams.append('access_token', token);
-        
-        // Mocking return for development if real API fails (or if we don't have real creds)
-        // Check environment to decide if we mock
         if (process.env.MOCK_INSTAGRAM === 'true') {
             return this.getMockMedia();
         }
 
+        const u = new URL(`${InstagramService.GRAPH_API_URL}/${hashtagId}/recent_media`);
+        u.searchParams.append('user_id', 'ME'); 
+        u.searchParams.append('fields', 'id,media_type,media_url,permalink,caption,timestamp,username,children{media_url,media_type}');
+        u.searchParams.append('access_token', token);
+        
         const res = await fetch(u.toString());
         if (!res.ok) {
              const err = await res.json();
-             logger.error({ igError: err }, 'Instagram API error');
+             logger.error({ igError: err, hashtagId }, 'Instagram Recent Media API error');
              return [];
         }
         const data = await res.json() as InstagramResponse;
         return data.data || [];
     } catch (e) {
-        logger.error({ error: e }, 'Error fetching hashtag media');
+        logger.error({ error: e, hashtagId }, 'Error fetching hashtag media');
         return [];
     }
   }
 
   private getMockMedia(): InstagramMedia[] {
-    return [
-        {
-            id: `mock_${Date.now()}_1`,
-            media_type: 'IMAGE',
-            media_url: 'https://images.unsplash.com/photo-1533174072545-e8d4aa97edf9?auto=format&fit=crop&w=1080&q=80',
-            permalink: 'https://instagram.com/p/mock1',
-            caption: 'Amazing event! #party',
-            timestamp: new Date().toISOString(),
-            username: 'mock_user_1'
-        },
-         {
-            id: `mock_${Date.now()}_2`,
-            media_type: 'IMAGE',
-            media_url: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1080&q=80',
-            permalink: 'https://instagram.com/p/mock2',
-            caption: 'Having fun! #party',
-            timestamp: new Date().toISOString(),
-            username: 'mock_user_2'
-        }
+    const users = ['noiva_feliz', 'fotografo_x', 'convidado_vip', 'decoracao_top'];
+    const captions = [
+        'Que dia inesquecível! #casamento #felicidade',
+        'Tudo perfeito nesta celebração. #eventos #xproducoes',
+        'Agradeço por fazer parte deste momento. #gratidao',
+        'Detalhes que encantam. #decor #festa'
     ];
+    const images = [
+        'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=1080&q=80',
+        'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1080&q=80',
+        'https://images.unsplash.com/photo-1469334031218-e382a71b716b?auto=format&fit=crop&w=1080&q=80',
+        'https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&w=1080&q=80',
+        'https://images.unsplash.com/photo-1520854221256-17451cc331bf?auto=format&fit=crop&w=1080&q=80'
+    ];
+
+    return Array.from({ length: 6 }).map((_, i) => ({
+        id: `mock_${Date.now()}_${i}`,
+        media_type: 'IMAGE',
+        media_url: images[i % images.length],
+        permalink: `https://instagram.com/p/mock${i}`,
+        caption: captions[i % captions.length],
+        timestamp: new Date(Date.now() - i * 3600000).toISOString(),
+        username: users[i % users.length]
+    }));
   }
 }
 

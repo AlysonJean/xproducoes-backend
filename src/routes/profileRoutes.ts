@@ -1,8 +1,8 @@
-import { Router, type Router as RouterType } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import { profileController } from "../controllers/profileController";
 import { authenticate } from "../middlewares/unifiedAuth";
 
-const router: RouterType = Router();
+const router = createSafeRouter();
 
 // Todas as rotas de perfil requerem autenticação
 router.use(authenticate);

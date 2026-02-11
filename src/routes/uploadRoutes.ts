@@ -1,10 +1,10 @@
-import { Router } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import { UploadController } from "../controllers/uploadController";
 import { uploadSingle } from "../middlewares/upload";
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
 import { authenticate } from "../middlewares/unifiedAuth";
 
-const uploadRoutes: Router = Router();
+const uploadRoutes = createSafeRouter();
 const uploadController = new UploadController();
 
 

@@ -424,11 +424,21 @@ export class CacheService {
 
     if (this.isRedisAvailable()) {
       try {
-        const [size, keys] = await Promise.all([
-          this.redis!.dbsize(),
-          this.redis!.keys('*')
-        ]);
-        stats.redis = { size, keys };
+        const size = await this.redis!.dbsize();
+        
+        // Usar SCAN em vez de keys('*') para evitar travar o Redis em produção
+        let cursor = '0';
+        const allKeys: string[] = [];
+        do {
+          const [nextCursor, keys] = await this.redis!.scan(cursor, 'COUNT', 100);
+          cursor = nextCursor;
+          allKeys.push(...keys);
+          
+          // Limite de segurança para stats (não queremos retornar 1 milhão de chaves)
+          if (allKeys.length >= 1000) break;
+        } while (cursor !== '0');
+
+        stats.redis = { size, keys: allKeys };
       } catch (error) {
         logger.error(`Erro ao obter stats Redis: ${String(error)}`);
       }

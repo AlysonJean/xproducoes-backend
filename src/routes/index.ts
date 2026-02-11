@@ -31,6 +31,8 @@ import bannerRoutes from "./bannerRoutes";
 import calendarRoutes from "./calendarRoutes";
 import serviceRoutes from "./serviceRoutes";
 import socialRoutes from "./socialRoutes";
+import googleRoutes from "./googleRoutes";
+import whatsappRoutes from "./whatsappRoutes";
 import sponsorRoutes from "./sponsorRoutes";
 import collaboratorFunctionRoutes from "./collaboratorFunctionRoutes";
 
@@ -96,6 +98,8 @@ router.use(socialRoutes);
 // Recommendation routes (optional auth - better results when authenticated)
 import recommendationRoutes from './recommendationRoutes';
 router.use('/recommendations', recommendationRoutes);
+router.use('/google', googleRoutes);
+router.use('/whatsapp', whatsappRoutes);
 
 // Health endpoint
 router.get("/health", (req, res) => {

@@ -1,11 +1,11 @@
-import { Router } from 'express';
+import { createSafeRouter } from '../middlewares/safeRouter';
 import { prisma } from '../config/prisma';
 import { authenticate } from "../middlewares/unifiedAuth";
 import { requireCollaborator } from "../middlewares/unifiedAuth";
 import logger from "../config/logger";
 
 
-const router = Router();
+const router = createSafeRouter();
 
 // Middleware de autenticação para todas as rotas
 router.use(authenticate);

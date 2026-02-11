@@ -1,9 +1,9 @@
-import { Router, type Router as RouterType } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import { CartController } from "../controllers/cartController";
 import { authenticate } from "../middlewares/unifiedAuth";
 import { cartRateLimit } from "../middlewares/rateLimitMiddleware";
 
-const cartRoutes: RouterType = Router();
+const cartRoutes = createSafeRouter();
 const cartController = new CartController();
 
 cartRoutes.use(authenticate);

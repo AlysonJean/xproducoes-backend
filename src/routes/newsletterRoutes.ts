@@ -1,11 +1,14 @@
-import { Router } from 'express';
+import { createSafeRouter } from '../middlewares/safeRouter';
 import { newsletterController } from '../controllers/newsletterController';
 import { authenticate, requireAdmin } from '../middlewares/unifiedAuth';
 
-const router = Router();
+const router = createSafeRouter();
+
+import { validateBody } from '../config/validation';
+import { newsletterSubscribeSchema } from '../schemas/cms.schema';
 
 // Public route
-router.post('/subscribe', newsletterController.subscribe);
+router.post('/subscribe', validateBody(newsletterSubscribeSchema), newsletterController.subscribe);
 
 // Admin routes
 router.get('/subscribers', authenticate, requireAdmin, newsletterController.list);

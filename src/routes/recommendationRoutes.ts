@@ -1,6 +1,6 @@
 // src/routes/recommendationRoutes.ts
 
-import express from 'express';
+import { createSafeRouter } from '../middlewares/safeRouter';
 import {
   getPersonalizedRecommendations,
   getSimilarRecommendations,
@@ -14,7 +14,7 @@ import {
 } from '../controllers/recommendationController';
 import { optionalAuth } from '../middlewares/unifiedAuth';
 
-const router = express.Router();
+const router = createSafeRouter();
 
 /**
  * Rotas de Recomendações

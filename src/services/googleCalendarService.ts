@@ -2,13 +2,15 @@ import { google } from 'googleapis';
 import { prisma } from '../config/prisma';
 import logger from '../config/logger';
 
-const SCOPES = ['https://www.googleapis.com/auth/calendar'];
+// Escopos necessários para ler/escrever no calendário
+const SCOPES = [
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/userinfo.email' // Para pegar o email do user
+];
 
 export class GoogleCalendarService {
-  private oauth2Client;
-
-  constructor() {
-    this.oauth2Client = new google.auth.OAuth2(
+  private getClient() {
+    return new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
       process.env.GOOGLE_REDIRECT_URI
@@ -17,40 +19,37 @@ export class GoogleCalendarService {
 
   // Gera a URL para o usuário autorizar
   generateAuthUrl(userId: string) {
-    return this.oauth2Client.generateAuthUrl({
+    const client = this.getClient();
+    return client.generateAuthUrl({
       access_type: 'offline', // Importante para receber refresh_token
       scope: SCOPES,
-      state: userId, // Passamos o ID do usuário para saber quem é no callback
+      state: userId, // Passamos o ID do usuário para saber quem é no callback (CSRF mitigation seria ideal, mas id serve por enquanto)
       prompt: 'consent' // Força o Google a pedir consentimento (e refresh token) novamente
     });
   }
 
   // Processa o callback do Google
   async handleCallback(code: string, userId: string) {
+    const client = this.getClient();
     try {
-      const { tokens } = await this.oauth2Client.getToken(code);
+      const { tokens } = await client.getToken(code);
       
+      client.setCredentials(tokens);
+
+      // Busca informações do perfil para salvar o email do calendário (UX)
+      const oauth2 = google.oauth2({ version: 'v2', auth: client });
+      const userInfo = await oauth2.userinfo.get();
+      const calendarEmail = userInfo.data.email;
+
       // Salva no banco
       await prisma.user.update({
         where: { id: userId },
         data: {
-          googleRefreshToken: tokens.refresh_token,
-          // Opcional: Pegar o email do usuário do token ID se necessário
+          googleRefreshToken: tokens.refresh_token, // Guardamos apenas o refresh token (access token expira rápido)
+          googleCalendarEmail: calendarEmail
         }
       });
       
-      // Busca informações do perfil para salvar o email do calendário (UX)
-      this.oauth2Client.setCredentials(tokens);
-      const oauth2 = google.oauth2({ version: 'v2', auth: this.oauth2Client });
-      const userInfo = await oauth2.userinfo.get();
-      
-      if (userInfo.data.email) {
-        await prisma.user.update({
-          where: { id: userId },
-          data: { googleCalendarEmail: userInfo.data.email }
-        });
-      }
-
       return true;
     } catch (error) {
       logger.error('Erro ao autenticar com Google Calendar', error);
@@ -71,12 +70,13 @@ export class GoogleCalendarService {
         return null;
       }
 
-      // Configura credenciais com Refresh Token (Access Token é gerado auto)
-      this.oauth2Client.setCredentials({
+      const client = this.getClient();
+      // Configura credenciais com Refresh Token (Lib gerencia o refresh do access token)
+      client.setCredentials({
         refresh_token: user.googleRefreshToken
       });
 
-      const calendar = google.calendar({ version: 'v3', auth: this.oauth2Client });
+      const calendar = google.calendar({ version: 'v3', auth: client });
 
       const event = {
         summary: eventData.title,
@@ -95,12 +95,23 @@ export class GoogleCalendarService {
         requestBody: event,
       });
 
+      logger.info({ userId, eventId: response.data.id }, 'Evento criado no Google Calendar');
       return response.data;
     } catch (error) {
       logger.error(`Erro ao criar evento para usuário ${userId}`, error);
       // Não joga erro para não travar o fluxo principal do app (soft fail)
       return null;
     }
+  }
+
+  async disconnect(userId: string) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        googleRefreshToken: null,
+        googleCalendarEmail: null
+      }
+    });
   }
 }
 

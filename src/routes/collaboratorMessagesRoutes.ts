@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { createSafeRouter } from '../middlewares/safeRouter';
 import {
   getMyChats,
   getChatMessages,
@@ -7,7 +7,7 @@ import {
 } from '../controllers/collaboratorMessagesController';
 import { authenticate, requireAdminOrCollaborator } from "../middlewares/unifiedAuth";
 
-const router = Router();
+const router = createSafeRouter();
 
 // Todas as rotas requerem autenticação
 router.use(authenticate);

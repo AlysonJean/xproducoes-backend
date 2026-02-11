@@ -1,10 +1,10 @@
-import { Router } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import { KitController } from "../controllers/kitController";
 import { authenticate, adminOnly, optionalAuth } from "../middlewares/unifiedAuth";
 import { uploadSingle } from "../middlewares/upload";
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
 
-const kitRoutes: Router = Router();
+const kitRoutes = createSafeRouter();
 const kitController = new KitController();
 
 // Rotas Públicas

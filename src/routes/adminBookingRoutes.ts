@@ -1,7 +1,7 @@
-import { Router, type Router as RouterType } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import { BookingController } from "../controllers/bookingController";
 
-const adminBookingRoutes: RouterType = Router();
+const adminBookingRoutes = createSafeRouter();
 
 // Usar a instância única do controller
 const bookingController = new BookingController();

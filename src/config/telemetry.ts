@@ -50,7 +50,8 @@ class MetricsCollector {
 
   addAlert(alert: Omit<Alert, "timestamp">) {
     this.alerts.push({
-      ...alert,
+      level: alert.level,
+      message: alert.message,
       timestamp: new Date(),
     });
   }

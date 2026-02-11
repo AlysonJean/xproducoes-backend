@@ -250,9 +250,10 @@ export const reviewRateLimit = rateLimit({
 // Rate limiting para dashboard queries - Proteção de recursos
 export const dashboardRateLimit = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minuto
-  max: 30, // 30 queries por minuto
+  max: process.env.NODE_ENV === 'production' ? 30 : 150, // 30 prod, 150 dev
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: userKeyGenerator, // Rate limit por usuário, não por IP
   handler: (req: Request, res: Response) => {
     res.status(429).json({
       success: false,

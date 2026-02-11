@@ -1,7 +1,7 @@
-import { Router } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import { CollaboratorFunctionController } from "../controllers/collaboratorFunctionController";
 
-const router = Router();
+const router = createSafeRouter();
 const controller = new CollaboratorFunctionController();
 
 router.get("/", controller.getAll);

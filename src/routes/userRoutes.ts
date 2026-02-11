@@ -1,10 +1,12 @@
-import { Router } from "express";
+import { createSafeRouter } from "../middlewares/safeRouter";
 import * as userController from "../controllers/userController";
 import { authenticate } from "../middlewares/unifiedAuth";
-import { uploadSingle } from "../middlewares/upload";
+import { uploadSingle, processUpload } from "../middlewares/upload";
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
+import { validateBody } from "../config/validation";
+import { updateUserSchema, changePasswordSchema } from "../schemas/user.schema";
 
-const userRoutes = Router();
+const userRoutes = createSafeRouter();
 
 userRoutes.post("/register", userController.register);
 userRoutes.post("/login", userController.login);
@@ -14,7 +16,8 @@ userRoutes.put(
   "/profile",
   authenticate,
   uploadRateLimit, uploadSingle("avatar"),
-  require("../middlewares/upload").processUpload,
+  processUpload,
+  validateBody(updateUserSchema),
   userController.updateProfile,
 );
 
@@ -36,9 +39,10 @@ userRoutes.get("/stats", authenticate, userController.getStats);
 userRoutes.post("/promote-vip", authenticate, userController.promoteVip);
 
 // Rota para alterar senha
-userRoutes.post("/change-password", authenticate, async (req, res) => {
+userRoutes.post("/change-password", authenticate, validateBody(changePasswordSchema), async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
+
     
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
@@ -53,7 +57,7 @@ userRoutes.post("/change-password", authenticate, async (req, res) => {
       success: true,
       message: "Senha alterada com sucesso"
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({
       success: false,
       message: "Erro interno do servidor"

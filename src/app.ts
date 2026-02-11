@@ -141,28 +141,8 @@ app.use((req, res) => {
 // Sentry error handler (deve vir antes do error handler global)
 app.use(sentryErrorHandler());
 
-// Error handler global
-import { Request, Response, NextFunction } from "express";
-import logger from "./config/logger";
-
-app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
-  const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header("Access-Control-Allow-Origin", origin);
-    res.header("Access-Control-Allow-Credentials", "true");
-    res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
-     res.header(
-       "Access-Control-Allow-Headers",
-       "Origin, X-Requested-With, Content-Type, Accept, Authorization, Idempotency-Key, X-Idempotency-Key, x-svg-proxy-token",
-     );
-  }
-  logger.error({obj:err}, "Erro global:");
-  res.status(500).json({
-    success: false,
-    error: err.message || "Erro interno",
-    message: "Erro interno do servidor",
-    data: null,
-  });
-});
+// Error handler global enterprise-grade
+import { globalErrorHandler } from "./middlewares/globalErrorHandler";
+app.use(globalErrorHandler);
 
 export default app;

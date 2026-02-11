@@ -8,6 +8,8 @@ import logger from "../config/logger";
 import { prisma } from "../config/prisma";
 import { generateSemanticBookingId } from "../utils/bookingIdGenerator";
 import { cacheService } from "./cacheService";
+import { googleCalendarService } from "./googleCalendarService";
+import { whatsappService } from "./whatsappService";
 
 export class BookingService {
   /**
@@ -605,6 +607,41 @@ export class BookingService {
       logger.info(`Booking status updated: ${id} -> ${status}`);
       // Invalida cache do dashboard
       void cacheService.invalidateBookingCaches(id);
+
+      if (status === BookingStatus.CONFIRMED) {
+        // Sync automático com Google Calendar
+        void this.syncGoogleCalendar(updatedBooking);
+
+        // Enviar email de confirmação
+        try {
+          const EmailService = (await import('./emailService')).default;
+          const clientUser = updatedBooking.client?.user;
+          const clientEmail = clientUser?.email || updatedBooking.clientEmail || (updatedBooking as any).clientContact;
+          const clientName = clientUser?.name || updatedBooking.clientName || '';
+          
+          if (clientEmail) {
+            void EmailService.sendBookingApproved({ name: clientName, email: clientEmail }, updatedBooking);
+          }
+        } catch (e) {
+          logger.warn({ error: e }, 'Erro ao enviar email de aprovação via updateBookingStatus');
+        }
+
+        // WhatsApp Notification
+        void whatsappService.sendBookingConfirmation(updatedBooking).catch(e => {
+            logger.warn({ error: e }, 'Erro ao enviar notificação WhatsApp');
+        });
+
+        // Notify Collaborators (WhatsApp + Google Calendar)
+        void this.notifyCollaborators(updatedBooking).catch(e => {
+            logger.warn({ error: e }, 'Erro ao notificar colaboradores');
+        });
+
+        // Sync Admin Calendars (Master Agenda)
+        void this.syncAdminCalendars(updatedBooking).catch(e => {
+            logger.warn({ error: e }, 'Erro ao sincronizar agendas dos admins');
+        });
+      }
+
       return updatedBooking;
 
     } catch (error) {
@@ -743,11 +780,19 @@ export class BookingService {
         const clientEmail = updatedBooking.client?.user?.email || updatedBooking.clientEmail || (updatedBooking as any).clientContact;
         const clientName = updatedBooking.client?.user?.name || updatedBooking.clientName || '';
         if (clientEmail) {
-          await EmailService.sendBookingConfirmation({ email: clientEmail, name: clientName }, updatedBooking);
+          await EmailService.sendBookingApproved({ email: clientEmail, name: clientName }, updatedBooking);
         }
       } catch (e) {
         logger.warn({ error: e }, 'Erro ao enviar email de confirmação');
       }
+
+      // Sync Google Calendar (Automático)
+      void this.syncGoogleCalendar(updatedBooking);
+
+      // WhatsApp Notification
+      void whatsappService.sendBookingConfirmation(updatedBooking).catch(e => {
+        logger.warn({ error: e }, 'Erro ao enviar notificação WhatsApp (confirmWithDetails)');
+      });
 
       // Webhook: delegate to WebhookService for dispatching & persistence
       try {
@@ -792,6 +837,179 @@ export class BookingService {
         throw error;
       }
       throw new Error(`Erro ao cancelar reserva: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+    }
+  }
+
+  /**
+   * Sincroniza automaticamente com o Google Calendar se o cliente tiver conectado
+   */
+  private async syncGoogleCalendar(booking: any) {
+    try {
+      if (!booking.clientId) return;
+
+      // Precisamos buscar o status da conexão do usuário
+      // O bookingInclude já traz client.user.googleRefreshToken ?
+      // bookingInclude traz client -> user -> email, name, id. NÃO traz googleRefreshToken.
+      // Então precisamos buscar explicitamente ou assumir que falha.
+      // Melhor buscar para garantir.
+
+      const client = await this.prisma.client.findUnique({
+        where: { id: booking.clientId },
+        select: { user: { select: { id: true, googleRefreshToken: true } } }
+      });
+
+      if (!client?.user?.googleRefreshToken) return;
+
+      // Format event data (similar ao controller)
+      const addressParts = [
+          booking.street, 
+          booking.addressNumber,
+          booking.neighborhood, 
+          booking.city
+        ].filter(Boolean);
+        
+      const venueString = booking.location 
+          ? `${booking.location}${addressParts.length > 0 ? ` (${addressParts.join(', ')})` : ''}`
+          : (addressParts.join(', ') || 'Local a definir');
+
+      const eventData = {
+          title: booking.eventTitle || 'Reserva Confirmada',
+          description: `Reserva #${booking.id.substring(0,8)}\nStatus: ${booking.status}\n\nDetalhes:\n${(booking.equipments || []).map((e:any) => `- ${(e as any).equipment?.name || (e as any).name || 'Item'}`).join('\n')}`,
+          location: venueString,
+          startDate: booking.eventDate,
+          endDate: booking.eventEndDate || new Date(new Date(booking.eventDate).getTime() + 4 * 3600 * 1000)
+      };
+
+      await googleCalendarService.createEvent(client.user.id, eventData);
+      logger.info(`Reserva ${booking.id} sincronizada automaticamente com Google Calendar`);
+    } catch (e) {
+      logger.warn({ error: e }, 'Falha na sincronização automática com Google Calendar');
+    }
+  }
+
+  /**
+   * Notifica colaboradores escalados sobre confirmação/alteração
+   */
+  private async notifyCollaborators(booking: any) {
+    try {
+      // Buscar colaboradores designados
+      const collaborators = await this.prisma.eventCollaborator.findMany({
+        where: { 
+            bookingId: booking.id,
+            status: 'ASSIGNED'
+        },
+        include: {
+            collaborator: {
+                include: { user: true }
+            },
+            function: true
+        }
+      });
+      
+      if (collaborators.length === 0) return;
+
+      logger.info(`Notificando ${collaborators.length} colaboradores da reserva ${booking.id}`);
+
+      // Data do evento
+      const eventDateStr = new Date(booking.eventDate).toLocaleDateString('pt-BR');
+
+      for (const ec of collaborators) {
+        const user = ec.collaborator.user;
+        const roleName = ec.function?.name || (ec.role !== 'OTHER' ? ec.role : 'Colaborador');
+        
+        // 1. Google Calendar Sync (se conectado)
+        if (user.googleRefreshToken) {
+             try {
+                let startDateTime = new Date(booking.eventDate);
+                let endDateTime = new Date(booking.eventEndDate || new Date(booking.eventDate.getTime() + 4 * 3600 * 1000));
+                
+                if (ec.startTime) {
+                    const [h, m] = ec.startTime.split(':').map(Number);
+                    if (!isNaN(h)) startDateTime.setHours(h, m || 0, 0, 0);
+                }
+                if (ec.endTime) {
+                    const [h, m] = ec.endTime.split(':').map(Number);
+                    if (!isNaN(h)) {
+                        endDateTime = new Date(startDateTime);
+                        endDateTime.setHours(h, m || 0, 0, 0);
+                        if (endDateTime < startDateTime) {
+                            endDateTime.setDate(endDateTime.getDate() + 1);
+                        }
+                    }
+                }
+
+                 const eventData = {
+                    title: `TRABALHO: ${booking.eventTitle || 'Evento X-Produções'}`,
+                    description: `Você foi escalado como: ${roleName}\nLocal: ${booking.location || 'A definir'}\nNotas: ${ec.notes || ''}\nReserva #${booking.id.substring(0,8)}`,
+                    location: booking.location,
+                    startDate: startDateTime,
+                    endDate: endDateTime
+                };
+
+                await googleCalendarService.createEvent(user.id, eventData);
+                logger.info(`Agenda colaborador ${user.email} sincronizada`);
+             } catch (err) {
+                 logger.warn(`Erro ao sync agenda colaborador ${user.email}`, err);
+             }
+        }
+
+        // 2. WhatsApp Notification
+        const phone = ec.collaborator.phone;
+        if (phone) {
+             const message = 
+`👷 *Nova Escala de Trabalho*
+
+Olá *${user.name.split(' ')[0]}*,
+Você foi escalado para o evento *${booking.eventTitle || 'Evento'}*.
+
+📅 *Data:* ${eventDateStr}
+⏰ *Horário:* ${ec.startTime} - ${ec.endTime}
+📍 *Local:* ${booking.location || 'A definir'}
+🔧 *Função:* ${roleName}
+
+Confirme sua presença no painel.`;
+
+             await whatsappService.sendMessage(phone, message).catch(e => logger.warn('Erro zap collab', e));
+        }
+      }
+
+    } catch (e) {
+      logger.error('Erro ao notificar colaboradores', e);
+    }
+  }
+
+  /**
+   * Sincroniza a reserva com a agenda de todos os admins conectados
+   */
+  private async syncAdminCalendars(booking: any) {
+    try {
+        const admins = await this.prisma.user.findMany({
+            where: {
+                role: 'ADMIN',
+                googleRefreshToken: { not: null }
+            }
+        });
+
+        if (admins.length === 0) return;
+
+        const eventData = {
+            title: `[X] ${booking.eventTitle || 'Evento'} - ${booking.client?.user?.name || 'Cliente'}`,
+            description: `Evento Confirmado\nCliente: ${booking.client?.user?.name}\nLocal: ${booking.location}\nValor: R$ ${booking.totalPrice}\n\nGestão: ${process.env.FRONTEND_URL}/admin/reservas/${booking.id}`,
+            location: booking.location,
+            startDate: booking.eventDate,
+            endDate: booking.eventEndDate || new Date(booking.eventDate.getTime() + 4 * 3600 * 1000)
+        };
+
+        for (const admin of admins) {
+            try {
+                await googleCalendarService.createEvent(admin.id, eventData);
+                logger.info(`Agenda Admin ${admin.email} atualizada`);
+            } catch (error) {
+                logger.warn(`Erro ao atualizar agenda admin ${admin.email}`, error);
+            }
+        }
+    } catch (error) {
+        logger.error('Erro ao sync admins calendars', error);
     }
   }
 

@@ -1,10 +1,10 @@
-import { Router } from 'express';
+import { createSafeRouter } from '../middlewares/safeRouter';
 import socialController from '../controllers/socialController';
 import { authenticate } from '../middlewares/unifiedAuth';
 import multer from 'multer';
 
 const upload = multer({ storage: multer.memoryStorage() });
-const router = Router();
+const router = createSafeRouter();
 
 // --- Admin Routes ---
 // GET /api/admin/social/posts
