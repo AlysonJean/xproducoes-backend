@@ -34,6 +34,7 @@ model Portfolio {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   sortOrder   Int              @default(0)
+  isPinned    Boolean          @default(false)
   slug        String?          @unique
   coverImage  String?
   media       PortfolioMedia[]

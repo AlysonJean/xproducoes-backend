@@ -3,10 +3,16 @@ import logger from "../config/logger";
 import type { Prisma } from "@prisma/client";
 
 
-export async function updatePortfolio(id: string, data: Partial<{ title: string; description: string; eventDate: string | Date; imageUrl?: string; uploadedFiles?: any[]; coverIndex?: string | number }>) {
+export async function updatePortfolio(id: string, data: Partial<{ title: string; description: string; eventDate: string | Date; imageUrl?: string; isPinned?: boolean; uploadedFiles?: any[]; coverIndex?: string | number }>) {
   const updateData: Prisma.PortfolioUpdateInput = {};
   if (data.title) updateData.title = data.title.trim();
   if (data.description) updateData.description = data.description.trim();
+  
+  // Handle boolean coercion from string (common with FormData)
+  if (data.isPinned !== undefined) {
+    updateData.isPinned = data.isPinned === true || (data.isPinned as any) === 'true';
+  }
+
   if (data.eventDate) {
     const eventDate = typeof data.eventDate === 'string' ? new Date(data.eventDate) : data.eventDate;
     if (!isNaN(eventDate.getTime())) updateData.eventDate = eventDate;
@@ -60,6 +66,7 @@ export async function create(
     description: string;
     eventDate: string | Date;
     imageUrl?: string;
+    isPinned?: boolean;
     uploadedFiles?: Array<{ url: string; filename: string; mimetype: string; size: number }>;
     coverIndex?: string | number;
   }
@@ -115,6 +122,7 @@ export async function create(
           imageUrl: coverUrl,
           coverImage: coverUrl,
           sortOrder: sortOrder,
+          isPinned: data.isPinned === true || (data.isPinned as any) === 'true',
         }
       });
 
@@ -151,6 +159,7 @@ export async function findAll() {
       }
     },
     orderBy: [
+      { isPinned: "desc" },
       { sortOrder: "asc" },
       { eventDate: "desc" }
     ] 
