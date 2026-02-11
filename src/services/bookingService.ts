@@ -10,6 +10,7 @@ import { generateSemanticBookingId } from "../utils/bookingIdGenerator";
 import { cacheService } from "./cacheService";
 import { googleCalendarService } from "./googleCalendarService";
 import { whatsappService } from "./whatsappService";
+import { createDateFromBRT } from '../utils/timeZone';
 
 export class BookingService {
   /**
@@ -883,7 +884,7 @@ export class BookingService {
       await googleCalendarService.createEvent(client.user.id, eventData);
       logger.info(`Reserva ${booking.id} sincronizada automaticamente com Google Calendar`);
     } catch (e) {
-      logger.warn({ error: e }, 'Falha na sincronização automática com Google Calendar');
+      logger.warn({ error: e instanceof Error ? e.message : 'Unknown error' }, 'Falha na sincronização automática com Google Calendar');
     }
   }
 
@@ -920,23 +921,20 @@ export class BookingService {
         // 1. Google Calendar Sync (se conectado)
         if (user.googleRefreshToken) {
              try {
-                let startDateTime = new Date(booking.eventDate);
-                let endDateTime = new Date(booking.eventEndDate || new Date(booking.eventDate.getTime() + 4 * 3600 * 1000));
-                
-                if (ec.startTime) {
-                    const [h, m] = ec.startTime.split(':').map(Number);
-                    if (!isNaN(h)) startDateTime.setHours(h, m || 0, 0, 0);
-                }
-                if (ec.endTime) {
-                    const [h, m] = ec.endTime.split(':').map(Number);
-                    if (!isNaN(h)) {
-                        endDateTime = new Date(startDateTime);
-                        endDateTime.setHours(h, m || 0, 0, 0);
-                        if (endDateTime < startDateTime) {
-                            endDateTime.setDate(endDateTime.getDate() + 1);
-                        }
-                    }
-                }
+                 // Garantir fuso horário BRT
+                 const startDateTime = createDateFromBRT(booking.eventDate, ec.startTime);
+                 let endDateTime;
+
+                 if (ec.endTime) {
+                     endDateTime = createDateFromBRT(booking.eventDate, ec.endTime);
+                     // Se o horário de fim for menor que o de início, assume dia seguinte
+                     if (endDateTime < startDateTime) {
+                         endDateTime.setDate(endDateTime.getDate() + 1);
+                     }
+                 } else {
+                     // Duração padrão de 4h se não especificado
+                     endDateTime = new Date(startDateTime.getTime() + 4 * 3600 * 1000);
+                 }
 
                  const eventData = {
                     title: `TRABALHO: ${booking.eventTitle || 'Evento X-Produções'}`,
@@ -949,7 +947,7 @@ export class BookingService {
                 await googleCalendarService.createEvent(user.id, eventData);
                 logger.info(`Agenda colaborador ${user.email} sincronizada`);
              } catch (err) {
-                 logger.warn(`Erro ao sync agenda colaborador ${user.email}`, err);
+                 logger.warn(`Erro ao sync agenda colaborador ${user.email}: ${err instanceof Error ? err.message : 'Unknown error'}`);
              }
         }
 
