@@ -2,14 +2,22 @@
 
 import { Request, Response, NextFunction } from "express";
 import { ContactService } from "../services/contactService";
+import { z } from "zod";
 
 const contactService = new ContactService();
+
+const contactSchema = z.object({
+  name: z.string().min(2, "Nome deve ter ao menos 2 caracteres").max(100, "Nome muito longo"),
+  email: z.string().email("E-mail inválido").max(150, "E-mail muito longo"),
+  message: z.string().min(10, "Mensagem curta demais").max(2000, "A mensagem excede o limite permitido"),
+});
 
 export class ContactController {
   // Rota Pública
   submitForm = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const submission = await contactService.createSubmission(req.body);
+      const validatedData = contactSchema.parse(req.body);
+      const submission = await contactService.createSubmission(validatedData);
       return res.status(201).json(submission);
     } catch (error) {
       return next(error);
