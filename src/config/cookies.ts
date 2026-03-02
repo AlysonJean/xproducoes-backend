@@ -11,7 +11,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 const baseOptions: CookieOptions = {
   httpOnly: true, // Previne acesso via JavaScript (XSS)
   secure: isProduction, // HTTPS apenas em produção
-  sameSite: isProduction ? 'strict' : 'lax', // CSRF protection
+  sameSite: isProduction ? 'none' : 'lax', // Permite cross-origin (Frontend em domínio separado do Backend)
   path: '/',
 };
 
