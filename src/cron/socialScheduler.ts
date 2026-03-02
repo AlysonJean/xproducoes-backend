@@ -4,12 +4,21 @@ import logger from '../config/logger';
 import instagramService from '../services/social/InstagramService';
 
 // Run every 2 minutes to respect rate limits
-const POLL_INTERVAL = '*/2 * * * *'; 
+// Changed from '*/2 * * * *' (every 2 mins) to hourly to save Neon DB compute tier
+const POLL_INTERVAL = '0 * * * *';
+
+let isRunning = false;
 
 export const startSocialScheduler = () => {
     logger.info('[SocialScheduler] Starting scheduler...');
-    
+
     cron.schedule(POLL_INTERVAL, async () => {
+        if (isRunning) {
+            logger.warn('[SocialScheduler] Previous job is still processing. Skipping this cycle to save DB connections.');
+            return;
+        }
+
+        isRunning = true;
         try {
             // optimized: Only fetch settings that have a hashtag defined
             const settings = await prisma.eventSocialSetting.findMany({
@@ -27,7 +36,7 @@ export const startSocialScheduler = () => {
             }
 
             logger.info({ count: settings.length }, '[SocialScheduler] Running polling job');
-            
+
             for (const setting of settings) {
                 try {
                     logger.info({ settingId: setting.id }, '[SocialScheduler] Syncing wall');
@@ -40,6 +49,8 @@ export const startSocialScheduler = () => {
 
         } catch (error) {
             logger.error({ error }, '[SocialScheduler] Job failed');
+        } finally {
+            isRunning = false;
         }
     });
 };

@@ -16,8 +16,18 @@ declare global {
 }
 
 // Singleton pattern for database connection
+// Configurando limite hard max para Pool (Neon Free Tier restringe chamadas concorrentes)
+const POOL_MAX_CONNECTIONS = process.env.DB_MAX_CONNECTIONS 
+  ? parseInt(process.env.DB_MAX_CONNECTIONS) 
+  : 10;
+
 if (process.env.NODE_ENV === "production") {
-  const pool = new Pool({ connectionString });
+  const pool = new Pool({ 
+    connectionString, 
+    max: POOL_MAX_CONNECTIONS,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000 
+  });
   const adapter = new PrismaPg(pool);
   prisma = new PrismaClient({
     adapter,
@@ -25,7 +35,12 @@ if (process.env.NODE_ENV === "production") {
   });
 } else {
   if (!global.__prisma) {
-    const pool = new Pool({ connectionString });
+    const pool = new Pool({ 
+      connectionString,
+      max: POOL_MAX_CONNECTIONS,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000 
+    });
     const adapter = new PrismaPg(pool);
     global.__prisma = new PrismaClient({
       adapter,

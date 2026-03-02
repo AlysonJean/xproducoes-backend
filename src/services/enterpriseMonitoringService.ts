@@ -62,9 +62,11 @@ class EnterpriseMonitoringService {
     if (this.isMonitoring) return;
     
     this.isMonitoring = true;
-    setInterval(async () => {
-      await this.performHealthChecks();
-    }, 30000); // Check every 30 seconds
+    // Modificado para evitar uso excessivo de DB Neon em tier free
+    // setInterval(() => this.performHealthChecks(), 30000); // Removido: poll a cada 30 segundos
+    
+    // Opção: Pode usar um endpoint de health check ao invés de background polling
+
   }
 
   private async performHealthChecks(): Promise<void> {
