@@ -51,7 +51,7 @@ class SecurityMonitor {
       if (this.cleanupTimer && typeof (this.cleanupTimer as any).unref === 'function') {
         (this.cleanupTimer as any).unref();
       }
-    } catch (e) {
+    } catch (_e) {
       // ignore - fall back to default behaviour
     }
   }

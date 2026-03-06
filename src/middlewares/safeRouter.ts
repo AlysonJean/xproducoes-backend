@@ -1,8 +1,7 @@
-import { Router, Request, Response, NextFunction, RequestHandler } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { asyncHandler } from './asyncHandler';
 
 type AsyncRequestHandler = (req: Request, res: Response, next: NextFunction) => Promise<void>;
-type RouteHandler = RequestHandler | AsyncRequestHandler;
 
 /**
  * Router seguro que envolve automaticamente handlers async em asyncHandler().

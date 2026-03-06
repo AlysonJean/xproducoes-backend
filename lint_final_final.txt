@@ -1,0 +1,8 @@
+
+> xproducoes-backend@1.0.0 lint
+> eslint src --ext .ts,.js
+
+(node:8732) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Z:/xproducoes/backend/eslint.config.js?mtime=1772824788465 is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to Z:\xproducoes\backend\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)

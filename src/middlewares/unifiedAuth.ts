@@ -18,7 +18,7 @@ import { securityMonitor } from "../config/securityMonitor";
 import { prisma } from "../config/prisma";
 import { UserRole } from "@prisma/client";
 import logger from "../config/logger";
-import { extractToken, COOKIE_NAMES } from "../config/cookies";
+import { extractToken } from "../config/cookies";
 
 // ===== INTERFACES E TIPOS =====
 

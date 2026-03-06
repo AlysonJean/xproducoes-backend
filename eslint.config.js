@@ -5,7 +5,6 @@ const config = async () => {
   const prettierRules = (await import('eslint-config-prettier')).default;
   return [
     {
-      files: ['**/*.ts', '**/*.tsx'],
       ignores: [
         'dist/',
         'build/',
@@ -22,14 +21,14 @@ const config = async () => {
         'docs/',
         'patches/',
         'coverage/',
-        'tests/',
+        'tests/**',
         '**/*.test.ts',
         '**/*.test.js',
-        '**/__tests__/',
-        'src/utils/__tests__/',
-        'jest.config.js',
-        'jest.setup.js',
+        '**/__tests__/**',
       ],
+    },
+    {
+      files: ['**/*.ts', '**/*.tsx'],
       languageOptions: {
         parser: tsParser,
         parserOptions: {
@@ -45,7 +44,11 @@ const config = async () => {
       },
       rules: {
         '@typescript-eslint/no-explicit-any': 'off',
-        '@typescript-eslint/no-unused-vars': ['error', { 'argsIgnorePattern': '^_' }],
+        '@typescript-eslint/no-unused-vars': ['error', { 
+          'argsIgnorePattern': '^_',
+          'varsIgnorePattern': '^_',
+          'caughtErrorsIgnorePattern': '^_'
+        }],
         '@typescript-eslint/explicit-function-return-type': 'off',
       },
     },
@@ -66,7 +69,11 @@ const config = async () => {
       },
       rules: {
         '@typescript-eslint/no-explicit-any': 'off',
-        '@typescript-eslint/no-unused-vars': ['error', { 'argsIgnorePattern': '^_' }],
+        '@typescript-eslint/no-unused-vars': ['error', { 
+          'argsIgnorePattern': '^_',
+          'varsIgnorePattern': '^_',
+          'caughtErrorsIgnorePattern': '^_'
+        }],
         '@typescript-eslint/explicit-function-return-type': 'off',
       },
     },
@@ -87,7 +94,11 @@ const config = async () => {
       },
       rules: {
         '@typescript-eslint/no-explicit-any': 'off',
-        '@typescript-eslint/no-unused-vars': ['error', { 'argsIgnorePattern': '^_' }],
+        '@typescript-eslint/no-unused-vars': ['error', { 
+          'argsIgnorePattern': '^_',
+          'varsIgnorePattern': '^_',
+          'caughtErrorsIgnorePattern': '^_'
+        }],
         '@typescript-eslint/explicit-function-return-type': 'off',
       },
     },

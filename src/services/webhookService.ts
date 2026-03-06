@@ -11,7 +11,6 @@ class WebhookService {
     if (!this.webhookUrl) return;
 
     const payload = { event: 'booking_confirmed', booking };
-    const payloadJson = JSON.stringify(payload);
   const id = (typeof crypto !== 'undefined' && (crypto as any).randomUUID) ? (crypto as any).randomUUID() : require('uuid').v4();
 
     try {

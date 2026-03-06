@@ -15,7 +15,7 @@ router.get('/:cep', apiRateLimit, async (req, res) => {
   const response = await safeFetch(viaCepUrl, { allowedHosts: new Set(['viacep.com.br']) });
   const data = await response.json();
     res.json(data);
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ erro: true, message: 'Erro ao buscar CEP' });
   }
 });

@@ -9,7 +9,7 @@ import logger from "./logger";
 const SENTRY_DSN = process.env.SENTRY_DSN_BACKEND;
 const isProduction = process.env.NODE_ENV === "production";
 
-export function initSentry(app: Express): void {
+export function initSentry(_app: Express): void {
   if (!SENTRY_DSN) {
     if (isProduction) {
       logger.warn("SENTRY_DSN_BACKEND não configurado. Monitoramento de erros desabilitado.");

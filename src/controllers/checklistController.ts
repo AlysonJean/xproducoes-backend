@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../config/database';
 import logger from '../config/logger';
-import { ChecklistItemStatus, ChecklistAssignmentStatus, ChecklistStatus, Prisma } from '@prisma/client';
+import { ChecklistItemStatus, ChecklistAssignmentStatus, Prisma } from '@prisma/client';
 
 // ================================
 // CONTROLLER DE CHECKLIST

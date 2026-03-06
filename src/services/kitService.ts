@@ -63,7 +63,7 @@ export async function create(data: any, _file?: Express.Multer.File) {
     if (existing) {
       slug = `${slug}-${randomBytes(2).toString('hex')}`;
     }
-  } catch (e) {
+  } catch (_e) {
     // Se findOne falhar (ex: erro de banco), prosseguir com slug original ou lançar erro
   }
   kitData.slug = slug;

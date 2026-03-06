@@ -2,7 +2,6 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import jwt from 'jsonwebtoken';
-import { MessageType } from '@prisma/client';
 import { prisma } from './prisma';
 import { config } from './environment';
 import logger from './logger';

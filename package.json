@@ -1,6 +1,7 @@
 {
   "name": "xproducoes-backend",
   "version": "1.0.0",
+  "type": "module",
   "description": "X Produçoes e Eventos - API Express + Prisma + PostgreSQL",
   "main": "dist/index.js",
   "scripts": {

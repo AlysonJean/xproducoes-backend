@@ -167,7 +167,7 @@ router.get('/me/portfolio', async (req, res) => {
 router.post('/me/portfolio', async (req, res) => {
   try {
     const userId = req.userId;
-    const { title, description, eventDate, tags, isPublic } = req.body;
+    const { title: _title, description: _description, eventDate: _eventDate, tags: _tags, isPublic: _isPublic } = req.body;
 
     if (!userId) {
       return res.status(401).json({ error: 'Usuário não autenticado' });
@@ -185,8 +185,8 @@ router.post('/me/portfolio', async (req, res) => {
 router.put('/me/portfolio/:id', async (req, res) => {
   try {
     const userId = req.userId;
-    const { id } = req.params;
-    const { title, description, eventDate, tags, isPublic } = req.body;
+    const { id: _id } = req.params;
+    const { title: _title, description: _description, eventDate: _eventDate, tags: _tags, isPublic: _isPublic } = req.body;
 
     if (!userId) {
       return res.status(401).json({ error: 'Usuário não autenticado' });
@@ -204,7 +204,7 @@ router.put('/me/portfolio/:id', async (req, res) => {
 router.delete('/me/portfolio/:id', async (req, res) => {
   try {
     const userId = req.userId;
-    const { id } = req.params;
+    const { id: _id } = req.params;
 
     if (!userId) {
       return res.status(401).json({ error: 'Usuário não autenticado' });
@@ -258,7 +258,7 @@ router.get('/me/settings', async (req, res) => {
 router.put('/me/settings', async (req, res) => {
   try {
     const userId = req.userId;
-    const { notifications, privacy, preferences } = req.body;
+    const { notifications: _notifications, privacy: _privacy, preferences: _preferences } = req.body;
 
     if (!userId) {
       return res.status(401).json({ error: 'Usuário não autenticado' });
@@ -356,7 +356,7 @@ router.get('/me/availability', async (req, res) => {
 router.put('/me/availability', async (req, res) => {
   try {
     const userId = req.userId;
-    const { availabilities } = req.body;
+    const { availabilities: _availabilities } = req.body;
 
     if (!userId) {
       return res.status(401).json({ error: 'Usuário não autenticado' });
@@ -438,8 +438,8 @@ router.get('/me/reviews', async (req, res) => {
 router.post('/me/reviews/:reviewId/respond', async (req, res) => {
   try {
     const userId = req.userId;
-    const { reviewId } = req.params;
-    const { response } = req.body;
+    const { reviewId: _reviewId } = req.params;
+    const { response: _response } = req.body;
 
     if (!userId) {
       return res.status(401).json({ error: 'Usuário não autenticado' });
