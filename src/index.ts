@@ -7,6 +7,7 @@ import { initializeSocket } from "./config/socket";
 import { config } from "./config/environment";
 import fs from "fs";
 import logger from "./config/logger";
+import crypto from "crypto";
 import { initializeQueues, closeQueues } from "./config/jobQueue";
 import { startSocialScheduler } from "./cron/socialScheduler";
 import { startReminderScheduler } from "./cron/sendReminders";
@@ -148,7 +149,6 @@ function validateSSLFiles(...filePaths: string[]): void {
 function generateSelfSignedCertRobust(): { cert: string; key: string } | null {
   try {
     // Usar crypto nativo do Node.js para gerar certificados
-    const crypto = require('crypto');
 
     // Gerar chave privada RSA de 2048 bits
     const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
@@ -184,7 +184,6 @@ function generateSelfSignedCertRobust(): { cert: string; key: string } | null {
  * @returns {string} Certificado PEM
  */
 function createSelfSignedCertificate(_publicKey: string): string {
-  const crypto = require('crypto');
 
   // Nota: Esta é uma implementação simplificada para desenvolvimento.
   // Para produção, use certificados válidos de uma CA confiável.

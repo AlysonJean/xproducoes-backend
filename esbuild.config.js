@@ -24,7 +24,10 @@ esbuild.build({
   outdir: 'dist',
   platform: 'node',
   target: 'node18',
-  format: 'cjs',
+  format: 'esm',
+  banner: {
+    js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
+  },
   sourcemap: false,
   minify: false,
   keepNames: true,
