@@ -1,6 +1,6 @@
-const esbuild = require('esbuild');
-const { readdirSync, statSync } = require('fs');
-const { join } = require('path');
+import esbuild from 'esbuild';
+import { readdirSync, statSync } from 'fs';
+import { join } from 'path';
 
 // Função para encontrar todos os arquivos .ts recursivamente
 function getAllTsFiles(dir, files = []) {
