@@ -3,6 +3,10 @@ import cloudinary from "../config/cloudinary";
 import logger from "../config/logger";
 import type { UploadApiErrorResponse, UploadApiResponse } from "cloudinary";
 import type { Request } from "express";
+import { JSDOM } from 'jsdom';
+import createDOMPurify from 'dompurify';
+
+const dompurify = createDOMPurify(new JSDOM('').window as any);
 
 
 export class UploadService {
@@ -126,15 +130,9 @@ export class UploadService {
       if (isSvg) {
         logger.info('[UploadService] Processing SVG file');
         try {
-          const jsdomMod = require('jsdom');
-          const dompurifyMod = require('dompurify');
-          const JSDOM = jsdomMod.JSDOM;
-          const createDOMPurify = dompurifyMod.default || dompurifyMod;
-          const window = new JSDOM('').window;
-          const DOMPurify = createDOMPurify(window);
           const svgText = file.buffer.toString('utf8');
           logger.info({obj:svgText.length}, '[UploadService] Original SVG length:');
-          const clean = DOMPurify.sanitize(svgText, { USE_PROFILES: { svg: true } });
+          const clean = dompurify.sanitize(svgText, { USE_PROFILES: { svg: true } });
           logger.info({obj:clean.length}, '[UploadService] Sanitized SVG length:');
           bufferToSend = Buffer.from(clean, 'utf8');
         } catch (sanErr) {

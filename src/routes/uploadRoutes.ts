@@ -1,6 +1,6 @@
 import { createSafeRouter } from "../middlewares/safeRouter";
 import { UploadController } from "../controllers/uploadController";
-import { uploadSingle } from "../middlewares/upload";
+import { uploadSingle, processUpload } from "../middlewares/upload";
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
 import { authenticate } from "../middlewares/unifiedAuth";
 
@@ -13,7 +13,7 @@ uploadRoutes.post(
   "/avatar",
   authenticate,
   uploadRateLimit, uploadSingle("avatar"),
-  require("../middlewares/upload").processUpload,
+  processUpload,
   uploadController.uploadAvatar,
 );
 
@@ -22,7 +22,7 @@ uploadRoutes.post(
   "/image",
   authenticate,
   uploadRateLimit, uploadSingle("image"),
-  require("../middlewares/upload").processUpload,
+  processUpload,
   uploadController.uploadImage,
 );
 

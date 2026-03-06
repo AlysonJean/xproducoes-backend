@@ -1,4 +1,6 @@
 import express from "express";
+import path from "node:path";
+import { fileURLToPath } from 'node:url';
 import helmet from "helmet";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
@@ -16,6 +18,9 @@ import { performanceMonitoringMiddleware } from "./middlewares/performanceMonito
 import { setupSwagger } from "./config/swagger";
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -74,7 +79,6 @@ app.get("/", (req, res) => {
 
 // Servir arquivos estáticos para manifest e service worker (produção)
 if (process.env.NODE_ENV === "production") {
-  const path = require("path");
   app.use(express.static(path.join(__dirname, "../public")));
   app.get("/manifest.webmanifest", (req, res) => {
     res.sendFile(path.join(__dirname, "../public/manifest.webmanifest"));

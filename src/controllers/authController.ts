@@ -3,8 +3,10 @@ import { AuthService } from "../services/authService";
 import logger from "../config/logger";
 import { setAuthCookies, clearAuthCookies } from "../config/cookies";
 import { BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError } from "../utils/errors";
-import crypto from "crypto";
+import crypto from "node:crypto";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { config } from "../config/environment";
 
 // Função para validar access token do Google
 async function validateGoogleToken(accessToken: string): Promise<{
@@ -572,9 +574,6 @@ export class AuthController {
     if (!refreshToken) {
       return next(new BadRequestError('Refresh token é obrigatório'));
     }
-
-    const jwt = require('jsonwebtoken');
-    const config = require('../config/environment').config;
 
     try {
       const decoded = jwt.verify(refreshToken, config.jwtSecret) as any;

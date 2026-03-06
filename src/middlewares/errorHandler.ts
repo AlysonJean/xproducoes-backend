@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import logger from "../config/logger";
 import { ZodError } from "zod";
 import { AppError } from "../utils/errors";
+import { securityMonitor } from "../config/securityMonitor";
 
 export function errorHandler(
   err: unknown,
@@ -42,10 +43,8 @@ export function errorHandler(
     const userAgent = req.headers['user-agent'] || 'unknown';
 
     if (err.statusCode === 401) {
-      const { securityMonitor } = require('../config/securityMonitor');
       securityMonitor.recordInvalidToken(ip, userAgent, req.path, { message: err.message });
     } else if (err.statusCode === 403) {
-      const { securityMonitor } = require('../config/securityMonitor');
       securityMonitor.recordSuspiciousActivity(ip, userAgent, req.path, { message: err.message, type: 'forbidden_access' });
     }
 

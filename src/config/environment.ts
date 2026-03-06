@@ -1,5 +1,7 @@
 // Configuração centralizada para variáveis de ambiente seguras
 import logger from './logger';
+import crypto from 'node:crypto';
+import { execSync } from 'node:child_process';
 
 function required(name: string, value: string | undefined) {
   if (!value) {
@@ -10,7 +12,7 @@ function required(name: string, value: string | undefined) {
     }
 
     // In non-production environments, generate a ephemeral secret for developer convenience
-    const ephemeral = require('crypto').randomBytes(64).toString('hex');
+    const ephemeral = crypto.randomBytes(64).toString('hex');
     logger.warn({ envVar: name }, 'Variável não definida. Gerando valor efêmero para ambiente de desenvolvimento');
     return ephemeral;
   }
@@ -84,8 +86,6 @@ validateCritical();
 
 // Função para gerar certificados auto-assinados para desenvolvimento
 export function generateSelfSignedCert() {
-  const crypto = require('crypto');
-  const { execSync } = require('child_process');
 
   try {
     // Gerar chave privada

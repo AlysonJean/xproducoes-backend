@@ -1,7 +1,7 @@
+import crypto from 'node:crypto';
 import { safeFetch } from '../utils/safeFetch';
 import { prisma } from '../config/prisma';
 import logger from '../config/logger';
-// use runtime UUID generation to avoid requiring new deps at build time
 
 class WebhookService {
   private prisma = prisma;
@@ -11,7 +11,7 @@ class WebhookService {
     if (!this.webhookUrl) return;
 
     const payload = { event: 'booking_confirmed', booking };
-  const id = (typeof crypto !== 'undefined' && (crypto as any).randomUUID) ? (crypto as any).randomUUID() : require('uuid').v4();
+    const id = crypto.randomUUID();
 
     try {
       await (this.prisma as any).webhookLog.create({

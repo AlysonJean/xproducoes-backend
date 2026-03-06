@@ -1,7 +1,7 @@
 import { createSafeRouter } from "../middlewares/safeRouter";
 import { KitController } from "../controllers/kitController";
 import { authenticate, adminOnly, optionalAuth } from "../middlewares/unifiedAuth";
-import { uploadSingle } from "../middlewares/upload";
+import { uploadSingle, processUpload } from "../middlewares/upload";
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
 
 const kitRoutes = createSafeRouter();
@@ -19,7 +19,7 @@ kitRoutes.post(
   authenticate,
   adminOnly,
   uploadRateLimit, uploadSingle("image"),
-  require("../middlewares/upload").processUpload,
+  processUpload,
   kitController.create,
 );
 kitRoutes.put(
@@ -27,7 +27,7 @@ kitRoutes.put(
   authenticate,
   adminOnly,
   uploadRateLimit, uploadSingle("image"),
-  require("../middlewares/upload").processUpload,
+  processUpload,
   kitController.update,
 );
 kitRoutes.delete("/:id", authenticate, adminOnly, kitController.delete);

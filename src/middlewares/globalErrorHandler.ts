@@ -12,6 +12,7 @@
 import { Request, Response, NextFunction } from 'express';
 import logger from '../config/logger';
 import { AppError } from '../utils/errors';
+import { allowedOrigins } from '../config/cors';
 
 // Prisma error codes reference:
 // P2002: Unique constraint
@@ -108,15 +109,6 @@ export function globalErrorHandler(err: any, req: Request, res: Response, _next:
   };
 
   // CORS headers for error responses (prevent browser from blocking)
-  const allowedOrigins: string[] = [];
-  try {
-    const corsConfig = require('../config/cors');
-    if (corsConfig.allowedOrigins) {
-      allowedOrigins.push(...corsConfig.allowedOrigins);
-    }
-  } catch {
-    // cors config not available, skip
-  }
 
   const origin = req.headers.origin;
   if (origin && allowedOrigins.includes(origin)) {

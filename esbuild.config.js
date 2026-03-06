@@ -16,15 +16,15 @@ function getAllTsFiles(dir, files = []) {
   return files;
 }
 
-const entryPoints = getAllTsFiles('./src');
-
 esbuild.build({
-  entryPoints,
-  bundle: false,
-  outdir: 'dist',
+  entryPoints: ['src/index.ts'],
+  bundle: true,
+  outfile: 'dist/index.js',
   platform: 'node',
-  target: 'node18',
+  target: 'node22',
   format: 'esm',
+  // Mark Prisma as external because it has binary engines and generated files
+  external: ['@prisma/client', 'fsevents'],
   banner: {
     js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
   },
@@ -32,7 +32,7 @@ esbuild.build({
   minify: false,
   keepNames: true,
 }).then(() => {
-  console.log('✅ Build completed successfully with esbuild!');
+  console.log('✅ Build completed successfully with esbuild as a single bundle!');
 }).catch((err) => {
   console.error('❌ Build failed:', err);
   process.exit(1);
