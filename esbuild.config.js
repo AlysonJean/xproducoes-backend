@@ -26,7 +26,7 @@ esbuild.build({
   // Mark Prisma and native/complex libs as external
   external: ['@prisma/client', 'fsevents', 'jsdom', 'dompurify'],
   banner: {
-    js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
+    js: "import { createRequire as topLevelCreateRequire } from 'module'; import { fileURLToPath as topLevelFileURLToPath } from 'url'; import { dirname as topLevelDirname } from 'path'; const require = topLevelCreateRequire(import.meta.url); const __filename = topLevelFileURLToPath(import.meta.url); const __dirname = topLevelDirname(__filename);",
   },
   sourcemap: false,
   minify: false,
