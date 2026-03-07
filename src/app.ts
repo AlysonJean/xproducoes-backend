@@ -37,7 +37,9 @@ app.use(performanceMonitoringMiddleware);
 app.use(dynamicCors);
 
 // Segurança
-app.use(helmet());
+app.use(helmet({
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" }
+}));
 // Cabeçalhos de segurança adicionais (CSP gerido aqui para maior controle)
 app.use((req, res, next) => {
   // CSP mais restritivo - removido 'unsafe-inline' onde possível
