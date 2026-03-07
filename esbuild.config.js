@@ -23,8 +23,8 @@ esbuild.build({
   platform: 'node',
   target: 'node22',
   format: 'esm',
-  // Mark Prisma as external because it has binary engines and generated files
-  external: ['@prisma/client', 'fsevents'],
+  // Mark Prisma and native/complex libs as external
+  external: ['@prisma/client', 'fsevents', 'jsdom', 'dompurify'],
   banner: {
     js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
   },
