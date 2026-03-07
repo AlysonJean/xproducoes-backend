@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from "express";
-import logger from "../config/logger";
+import logger from "../config/logger.js";
 import { ZodError } from "zod";
-import { AppError } from "../utils/errors";
-import { securityMonitor } from "../config/securityMonitor";
+import { AppError } from "../utils/errors.js";
+import { securityMonitor } from "../config/securityMonitor.js";
 
 export function errorHandler(
   err: unknown,
@@ -42,10 +42,10 @@ export function errorHandler(
     const ip = req.ip || (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
     const userAgent = req.headers['user-agent'] || 'unknown';
 
-    if (err.statusCode === 401) {
-      securityMonitor.recordInvalidToken(ip, userAgent, req.path, { message: err.message });
-    } else if (err.statusCode === 403) {
-      securityMonitor.recordSuspiciousActivity(ip, userAgent, req.path, { message: err.message, type: 'forbidden_access' });
+    if ((err as any).statusCode === 401) {
+      securityMonitor.recordInvalidToken(ip, userAgent, req.path, { message: (err as any).message });
+    } else if ((err as any).statusCode === 403) {
+      securityMonitor.recordSuspiciousActivity(ip, userAgent, req.path, { message: (err as any).message, type: 'forbidden_access' });
     }
 
     return res.status(err.statusCode).json({

@@ -1,8 +1,8 @@
-import { createSafeRouter } from "../middlewares/safeRouter";
-import { UploadController } from "../controllers/uploadController";
-import { uploadSingle, processUpload } from "../middlewares/upload";
-import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
-import { authenticate } from "../middlewares/unifiedAuth";
+import { createSafeRouter } from "../middlewares/safeRouter.js";
+import { UploadController } from "../controllers/uploadController.js";
+import { uploadSingle, processUpload } from "../middlewares/upload.js";
+import { uploadRateLimit } from '../middlewares/rateLimitMiddleware.js';
+import { authenticate } from "../middlewares/unifiedAuth.js";
 
 const uploadRoutes = createSafeRouter();
 const uploadController = new UploadController();

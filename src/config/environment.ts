@@ -1,5 +1,5 @@
 // Configuração centralizada para variáveis de ambiente seguras
-import logger from './logger';
+import logger from './logger.js';
 import crypto from 'node:crypto';
 import { execSync } from 'node:child_process';
 

@@ -10,9 +10,9 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import logger from '../config/logger';
-import { AppError } from '../utils/errors';
-import { allowedOrigins } from '../config/cors';
+import logger from '../config/logger.js';
+import { AppError } from '../utils/errors.js';
+import { allowedOrigins } from '../config/cors.js';
 
 // Prisma error codes reference:
 // P2002: Unique constraint

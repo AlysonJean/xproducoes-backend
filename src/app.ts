@@ -6,16 +6,17 @@ import morgan from "morgan";
 import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
 import * as dotenv from "dotenv";
-import { dynamicCors } from "./config/cors";
-import apiV1 from "./api/v1";
-import cepRoutes from './routes/cepRoutes';
-import { securityMonitoringMiddleware } from "./config/securityMonitor";
-import { sitemapController } from "./controllers/sitemapController";
-import { initSentry, sentryErrorHandler } from "./config/sentry";
-import { requestIdMiddleware } from "./middlewares/requestIdMiddleware";
-import { healthCheck, readinessCheck, metricsEndpoint } from "./controllers/healthController";
-import { performanceMonitoringMiddleware } from "./middlewares/performanceMonitoring";
-import { setupSwagger } from "./config/swagger";
+import { dynamicCors } from "./config/cors.js";
+import apiV1 from "./api/v1.js";
+ Josephson
+import cepRoutes from './routes/cepRoutes.js';
+import { securityMonitoringMiddleware } from "./config/securityMonitor.js";
+import { sitemapController } from "./controllers/sitemapController.js";
+import { initSentry, sentryErrorHandler } from "./config/sentry.js";
+import { requestIdMiddleware } from "./middlewares/requestIdMiddleware.js";
+import { healthCheck, readinessCheck, metricsEndpoint } from "./controllers/healthController.js";
+import { performanceMonitoringMiddleware } from "./middlewares/performanceMonitoring.js";
+import { setupSwagger } from "./config/swagger.js";
 
 dotenv.config();
 
@@ -98,7 +99,7 @@ app.use(express.urlencoded({ extended: true }));
 // Input sanitization (após body parser, antes das rotas)
 
 
-import { inputSanitizationMiddleware } from "./middlewares/inputSanitization";
+import { inputSanitizationMiddleware } from "./middlewares/inputSanitization.js";
 app.use(inputSanitizationMiddleware);
 
 // Swagger API Documentation
@@ -118,11 +119,11 @@ app.get("/ready", readinessCheck);
 app.get("/metrics", metricsEndpoint);
 
 // Prometheus/Grafana Cloud compatible endpoint (com autenticação)
-import { prometheusMetricsEndpoint, metricsAuthMiddleware } from "./controllers/prometheusController";
+import { prometheusMetricsEndpoint, metricsAuthMiddleware } from "./controllers/prometheusController.js";
 app.get("/metrics/prometheus", metricsAuthMiddleware, prometheusMetricsEndpoint);
 
 // 404 handler
-import { allowedOrigins } from "./config/cors";
+import { allowedOrigins } from "./config/cors.js";
 app.use((req, res) => {
   const origin = req.headers.origin;
   if (origin && allowedOrigins.includes(origin)) {
@@ -146,7 +147,7 @@ app.use((req, res) => {
 app.use(sentryErrorHandler());
 
 // Error handler global enterprise-grade
-import { globalErrorHandler } from "./middlewares/globalErrorHandler";
+import { globalErrorHandler } from "./middlewares/globalErrorHandler.js";
 app.use(globalErrorHandler);
 
 export default app;

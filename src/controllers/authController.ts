@@ -1,12 +1,12 @@
 import { Request, Response, NextFunction } from "express";
-import { AuthService } from "../services/authService";
-import logger from "../config/logger";
-import { setAuthCookies, clearAuthCookies } from "../config/cookies";
-import { BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError } from "../utils/errors";
+import { AuthService } from "../services/authService.js";
+import logger from "../config/logger.js";
+import { setAuthCookies, clearAuthCookies } from "../config/cookies.js";
+import { BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError } from "../utils/errors.js";
 import crypto from "node:crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { config } from "../config/environment";
+import { config } from "../config/environment.js";
 
 // Função para validar access token do Google
 async function validateGoogleToken(accessToken: string): Promise<{
@@ -199,7 +199,7 @@ export class AuthController {
     if (!token) return next(new BadRequestError('Token é obrigatório'));
     
     try {
-      await (await import('../services/userService')).verifyEmailByToken(token);
+      await (await import('../services/userService.js')).verifyEmailByToken(token);
       res.status(200).json({ success: true });
     } catch (e: any) {
       next(new BadRequestError(e.message || 'Token inválido'));
@@ -219,7 +219,7 @@ export class AuthController {
       const user = await this.authService.findUserByEmail(email);
       if (!user) return next(new NotFoundError('Usuário não encontrado'));
       
-      await (await import('../services/userService')).resendEmailVerification(user.id);
+      await (await import('../services/userService.js')).resendEmailVerification(user.id);
       res.json({ success: true });
     } catch (error) {
       next(error);
@@ -334,7 +334,7 @@ export class AuthController {
         const avatarUrl = validation.picture || null;
         
         // Vincular ou criar usuário local
-        const { prisma } = await import('../config/prisma');
+        const { prisma } = await import('../config/prisma.js');
         let user = await prisma.user.findUnique({ where: { email } });
         let isNewUser = false;
 
@@ -369,7 +369,7 @@ export class AuthController {
         const result = await this.authService.loginById(user.id);
         
         // Definir cookies httpOnly para segurança adicional
-        const { setAuthCookies } = await import('../config/cookies');
+        const { setAuthCookies } = await import('../config/cookies.js');
         setAuthCookies(res, result.token, result.refreshToken);
 
         // Calcular rota de redirecionamento baseada no role
@@ -458,7 +458,7 @@ export class AuthController {
   ): Promise<void> => {
     try {
       const redirectUri = (process.env.GOOGLE_REDIRECT_URI || this.getBackendRedirect(req, 'google')).toString();
-      const svc = await import('../services/oauthService');
+      const svc = await import('../services/oauthService.js');
       const { url } = await svc.getGoogleAuthorizationUrl({ redirectUri });
       res.json({ url });
     } catch (error) {
@@ -475,7 +475,7 @@ export class AuthController {
     try {
   const { code, state } = req.query as any;
   const redirectUri = (process.env.GOOGLE_REDIRECT_URI || this.getBackendRedirect(req, 'google')).toString();
-      const svc = await import('../services/oauthService');
+      const svc = await import('../services/oauthService.js');
       const result = await svc.handleGoogleCallback({ code, state, redirectUri });
       // If browser requested (HTML), redirect to frontend with token in fragment
       const accept = (req.headers['accept'] as string) || '';
@@ -499,7 +499,7 @@ export class AuthController {
   ): Promise<void> => {
     try {
       const redirectUri = (process.env.FACEBOOK_REDIRECT_URI || this.getBackendRedirect(req, 'facebook')).toString();
-      const svc = await import('../services/oauthService');
+      const svc = await import('../services/oauthService.js');
       const { url } = await svc.getFacebookAuthorizationUrl({ redirectUri });
       res.json({ url });
     } catch (error) {
@@ -516,7 +516,7 @@ export class AuthController {
     try {
   const { code, state } = req.query as any;
   const redirectUri = (process.env.FACEBOOK_REDIRECT_URI || this.getBackendRedirect(req, 'facebook')).toString();
-      const svc = await import('../services/oauthService');
+      const svc = await import('../services/oauthService.js');
       const result = await svc.handleFacebookCallback({ code, state, redirectUri });
       const accept = (req.headers['accept'] as string) || '';
       const frontend = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');

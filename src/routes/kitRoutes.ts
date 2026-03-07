@@ -1,8 +1,8 @@
-import { createSafeRouter } from "../middlewares/safeRouter";
-import { KitController } from "../controllers/kitController";
-import { authenticate, adminOnly, optionalAuth } from "../middlewares/unifiedAuth";
-import { uploadSingle, processUpload } from "../middlewares/upload";
-import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
+import { createSafeRouter } from "../middlewares/safeRouter.js";
+import { KitController } from "../controllers/kitController.js";
+import { authenticate, adminOnly, optionalAuth } from "../middlewares/unifiedAuth.js";
+import { uploadSingle, processUpload } from "../middlewares/upload.js";
+import { uploadRateLimit } from '../middlewares/rateLimitMiddleware.js';
 
 const kitRoutes = createSafeRouter();
 const kitController = new KitController();
