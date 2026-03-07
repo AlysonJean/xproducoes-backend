@@ -1,10 +1,11 @@
-
-import { Client, LocalAuth } from 'whatsapp-web.js';
+import pkg from 'whatsapp-web.js';
+import type { Client as ClientType } from 'whatsapp-web.js';
+const { Client, LocalAuth } = pkg;
 import qrcode from 'qrcode-terminal';
-import logger from '../config/logger';
+import logger from '../config/logger.js';
 
 class WhatsappService {
-  private client: Client;
+  private client: ClientType;
   private isReady = false;
 
   private currentQr: string | null = null;
@@ -100,7 +101,7 @@ class WhatsappService {
           this.currentQr = null;
           // Após logout, pode ser necessário reinicializar para gerar novo QR
           setTimeout(() => {
-             this.client.initialize().catch(e => logger.error('Erro ao reinicializar pós-logout', e));
+             this.client.initialize().catch((e: any) => logger.error('Erro ao reinicializar pós-logout', e));
           }, 1000);
           return true;
       } catch (error) {
