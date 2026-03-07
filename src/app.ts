@@ -8,7 +8,6 @@ import cookieParser from "cookie-parser";
 import * as dotenv from "dotenv";
 import { dynamicCors } from "./config/cors.js";
 import apiV1 from "./api/v1.js";
- Josephson
 import cepRoutes from './routes/cepRoutes.js';
 import { securityMonitoringMiddleware } from "./config/securityMonitor.js";
 import { sitemapController } from "./controllers/sitemapController.js";
