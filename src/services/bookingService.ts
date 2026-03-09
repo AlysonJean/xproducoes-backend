@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Prisma, BookingStatus, DeliveryStatus } from "@prisma/client";
 import { BookingCreateInput, BookingUpdateInput, BookingFilters } from "../validators/bookingSchema";
 import { 
@@ -182,6 +183,16 @@ export class BookingService {
         type: true,
         updatedAt: true
       }
+    },
+    tasks: {
+      orderBy: { createdAt: 'asc' as const }
+    },
+    expenses: {
+      include: {
+        collaborator: {
+          select: { id: true, name: true, avatarUrl: true }
+        }
+      }
     }
   };
 
@@ -298,10 +309,7 @@ export class BookingService {
       // Gerar ID semântico (Ex: XP-JOAO-20260210-1430-8K2)
       const bookingId = generateSemanticBookingId(data.clientName || "CLIENTE");
 
-      // Criar a reserva com suporte a idempotência usando coluna dedicada.
-      // Tentamos criar com idempotencyKey quando fornecida. Em caso de
-      // violação de unicidade (P2002), buscamos o registro existente e o retornamos.
-  const createData: any = {
+      const createData: any = {
         id: bookingId,
         eventDate: eventDate,
         eventEndDate: eventEndDate,
@@ -333,6 +341,8 @@ export class BookingService {
         technicalRider: data.technicalRider,
         technicalRiderUrl: data.technicalRiderUrl,
         locationUrl: data.locationUrl,
+        venueContactName: data.venueContactName,
+        venueContactPhone: data.venueContactPhone,
         // Campos admin-only e logísticos
         serviceValue: data.serviceValue,
         paymentProofUrl: data.paymentProofUrl,
@@ -406,9 +416,6 @@ export class BookingService {
    */
   async getBookingById(id: string): Promise<any> {
     try {
-      // Para a página de detalhes, incluímos os colaboradores do evento e os pagamentos
-      // relacionados ao booking (filtrados por eventId). Construímos um include dinamicamente
-      // para poder usar o id do booking ao filtrar collaborator.payments.
       const includeWithPayments = {
         ...this.bookingInclude,
         eventCollaborators: {
@@ -613,6 +620,8 @@ export class BookingService {
       if (data.technicalRider !== undefined) (updateData as any).technicalRider = data.technicalRider;
       if (data.technicalRiderUrl !== undefined) (updateData as any).technicalRiderUrl = data.technicalRiderUrl;
       if (data.locationUrl !== undefined) (updateData as any).locationUrl = data.locationUrl;
+      if ((data as any).venueContactName !== undefined) (updateData as any).venueContactName = (data as any).venueContactName;
+      if ((data as any).venueContactPhone !== undefined) (updateData as any).venueContactPhone = (data as any).venueContactPhone;
 
       // Atualizar itens (substituição total para simplicidade no orçamento)
       if (data.items) {
@@ -703,6 +712,9 @@ export class BookingService {
         void this.syncAdminCalendars(updatedBooking).catch(e => {
             logger.warn({ error: e }, 'Erro ao sincronizar agendas dos admins');
         });
+
+        // Sync Chat Operacional
+        void this.syncEventChat(updatedBooking.id);
       }
 
       return updatedBooking;
@@ -712,6 +724,58 @@ export class BookingService {
         throw error;
       }
       throw new Error(`Erro ao atualizar status da reserva: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+    }
+  }
+
+  /**
+   * Sincroniza chat operacional do evento
+   */
+  private async syncEventChat(bookingId: string) {
+    try {
+      const booking = await this.prisma.booking.findUnique({
+        where: { id: bookingId },
+        include: {
+          eventCollaborators: { include: { collaborator: true } },
+          creator: true
+        }
+      });
+
+      if (!booking) return;
+
+      let chat = await this.prisma.chat.findFirst({
+        where: { bookingId, type: 'EVENT' }
+      });
+
+      const participantIds = new Set<string>();
+      if (booking.creator.role === 'ADMIN' || booking.creator.role === 'MANAGER') {
+        participantIds.add(booking.creatorId);
+      }
+      booking.eventCollaborators.forEach(ec => participantIds.add(ec.collaborator.userId));
+
+      if (!chat) {
+        chat = await this.prisma.chat.create({
+          data: {
+            name: `Evento: ${booking.eventTitle || booking.id}`,
+            type: 'EVENT',
+            bookingId,
+            participants: {
+              create: Array.from(participantIds).map(userId => ({ userId }))
+            }
+          }
+        });
+        logger.info(`Chat de evento criado: ${chat.id}`);
+      } else {
+        // Atualizar participantes se necessário
+        for (const userId of participantIds) {
+          await this.prisma.chatParticipant.upsert({
+            where: { chatId_userId: { chatId: chat.id, userId } },
+            create: { chatId: chat.id, userId },
+            update: {}
+          });
+        }
+      }
+    } catch (error) {
+      logger.error('Erro ao sincronizar chat do evento', error);
     }
   }
 
@@ -798,150 +862,42 @@ export class BookingService {
   }
 
   /**
-   * Confirma reserva com detalhes: define totalPrice e atribui colaboradores (event_collaborators)
+   * Confirma uma reserva com detalhes (atribuição de equipe e ajuste de valor)
    */
-  async confirmWithDetails(id: string, details: { totalPrice?: number; collaborators?: Array<any> }): Promise<any> {
+  async confirmWithDetails(id: string, data: { totalPrice?: number; collaborators?: any[] }): Promise<any> {
     try {
-      // Valida se a reserva existe
-      await this.getBookingById(id);
+      // Atualizar a reserva com novo valor e status
+      const updateData: any = { status: BookingStatus.CONFIRMED };
+      if (data.totalPrice) updateData.totalPrice = data.totalPrice;
 
-      const data: any = { status: BookingStatus.CONFIRMED };
-      if (details.totalPrice !== undefined) data.totalPrice = details.totalPrice;
-
-      // Se colaboradores forem passados, criar eventCollaborator entries primeiro
-      if (details.collaborators && Array.isArray(details.collaborators) && details.collaborators.length > 0) {
-        for (const c of details.collaborators) {
-          try {
-            await this.prisma.eventCollaborator.create({
-              data: {
-                bookingId: id,
-                collaboratorId: c.collaboratorId,
-                role: c.role,
-                startTime: c.startTime || '',
-                endTime: c.endTime || '',
-                hourlyRate: c.hourlyRate || undefined,
-                fixedRate: c.fixedRate || undefined,
-                totalHours: c.totalHours || undefined,
-                totalPayment: c.totalPayment || undefined,
-                notes: c.notes || undefined,
-                status: 'ASSIGNED'
-              }
-            });
-          } catch (e) {
-            // Não bloquear toda operação se uma atribuição falhar
-            logger.warn({ error: e }, 'Falha ao atribuir colaborador');
-          }
-        }
+      if (data.collaborators && data.collaborators.length > 0) {
+        updateData.eventCollaborators = {
+           deleteMany: {}, // Limpa anteriores para novo set
+           create: data.collaborators.map((c: any) => ({
+              collaboratorId: c.collaboratorId,
+              role: c.role || 'OTHER',
+              functionId: c.functionId,
+              startTime: c.startTime || '08:00',
+              endTime: c.endTime || '18:00',
+              totalPayment: c.fixedRate || 0,
+              fixedRate: c.fixedRate || 0,
+              status: 'CONFIRMED'
+           }))
+        };
       }
 
-      // Atualiza reserva com preço e status por último
-      const updatedBooking = await this.prisma.booking.update({ where: { id }, data, include: this.bookingInclude });
-
-      // Disparar notificações: email para o cliente e webhook externo (se configurado)
-      try {
-        const EmailService = (await import('./emailService')).default;
-        const clientEmail = updatedBooking.client?.user?.email || updatedBooking.clientEmail || (updatedBooking as any).clientContact;
-        const clientName = updatedBooking.client?.user?.name || updatedBooking.clientName || '';
-        if (clientEmail) {
-          await EmailService.sendBookingApproved({ email: clientEmail, name: clientName }, updatedBooking);
-        }
-      } catch (e) {
-        logger.warn({ error: e }, 'Erro ao enviar email de confirmação');
-      }
-
-      // Sync Google Calendar (Automático)
-      void this.syncGoogleCalendar(updatedBooking);
-
-      // WhatsApp Notification
-      void whatsappService.sendBookingConfirmation(updatedBooking).catch(e => {
-        logger.warn({ error: e }, 'Erro ao enviar notificação WhatsApp (confirmWithDetails)');
+      const booking = await this.prisma.booking.update({
+        where: { id },
+        data: updateData,
+        include: this.bookingInclude
       });
 
-      // Webhook: delegate to WebhookService for dispatching & persistence
-      try {
-        const WebhookService = (await import('./webhookService')).default;
-        void WebhookService.dispatchBookingConfirmed(updatedBooking);
-      } catch (e) {
-        logger.warn({ error: e }, 'Erro ao disparar webhook de confirmação (delegado)');
-      }
+      // Triggers de confirmação (Emails, Zap, Calendar)
+      void this.updateBookingStatus(id, BookingStatus.CONFIRMED);
 
-      // Invalida cache do dashboard
-      void cacheService.invalidateBookingCaches(id);
-
-      // Sincronizar Chat do Evento
-      void this.syncEventChat(updatedBooking);
-
-      return updatedBooking;
+      return booking;
     } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Sincroniza o chat do grupo do evento (Crew Experience)
-   */
-  private async syncEventChat(booking: any) {
-    try {
-      // Buscar colaboradores escalados
-      const collaborators = await this.prisma.eventCollaborator.findMany({
-        where: { bookingId: booking.id },
-        include: { collaborator: { select: { userId: true } } }
-      });
-
-      if (collaborators.length === 0) return;
-
-      const participantUserIds = [...new Set(collaborators.map(c => c.collaborator.userId))];
-      
-      // Adicionar o criador da reserva ou admins se necessário? 
-      // Por enquanto, apenas os colaboradores e o criador (se for admin/manager)
-      const creator = await this.prisma.user.findUnique({ where: { id: booking.creatorId } });
-      if (creator && (creator.role === 'ADMIN' || creator.role === 'MANAGER')) {
-        participantUserIds.push(creator.id);
-      }
-
-      const uniqueParticipantUserIds = [...new Set(participantUserIds)];
-
-      // Verificar se já existe um chat para este evento
-      let chat = await this.prisma.chat.findFirst({
-        where: { bookingId: booking.id, type: 'EVENT' }
-      });
-
-      if (!chat) {
-        chat = await this.prisma.chat.create({
-          data: {
-            name: `Evento: ${booking.eventTitle || booking.id}`,
-            type: 'EVENT',
-            bookingId: booking.id,
-            participants: {
-              create: uniqueParticipantUserIds.map(userId => ({
-                userId,
-                role: 'MEMBER'
-              }))
-            }
-          }
-        });
-        logger.info(`Chat de evento criado: ${chat.id} para reserva ${booking.id}`);
-      } else {
-        // Atualizar participantes (adicionar novos)
-        for (const userId of uniqueParticipantUserIds) {
-          await this.prisma.chatParticipant.upsert({
-            where: {
-              chatId_userId: {
-                chatId: chat.id,
-                userId
-              }
-            },
-            update: {},
-            create: {
-              chatId: chat.id,
-              userId,
-              role: 'MEMBER'
-            }
-          });
-        }
-      }
-    } catch (error) {
-      logger.error({ error, bookingId: booking.id }, "Erro ao sincronizar chat do evento");
+       throw new Error(`Erro ao confirmar com detalhes: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
   }
 
@@ -950,13 +906,13 @@ export class BookingService {
    */
   async cancel(id: string, reason?: string): Promise<any> {
     try {
-      const booking = await this.getBookingById(id);
+      await this.getBookingById(id);
 
-      const updatedBooking = await this.prisma.booking.update({
+      const booking = await this.prisma.booking.update({
         where: { id },
-        data: { 
+        data: {
           status: BookingStatus.CANCELLED,
-          notes: reason ? `${booking.notes || ""}\n\nMotivo do cancelamento: ${reason}` : booking.notes
+          notes: reason ? `Cancelado: ${reason}` : "Reserva cancelada."
         },
         include: this.bookingInclude
       });
@@ -964,139 +920,48 @@ export class BookingService {
       logger.info(`Booking cancelled: ${id}`);
       // Invalida cache do dashboard
       void cacheService.invalidateBookingCaches(id);
-      return updatedBooking;
-
+      return booking;
     } catch (error) {
-      if (error instanceof BookingNotFoundError) {
-        throw error;
-      }
-      throw new Error(`Erro ao cancelar reserva: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+       throw new Error(`Erro ao cancelar reserva: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
   }
 
   /**
-   * Sincroniza automaticamente com o Google Calendar se o cliente tiver conectado
+   * Sincroniza reserva com Google Calendar (Admin principal)
    */
-  private async syncGoogleCalendar(booking: any) {
+  async syncGoogleCalendar(booking: any) {
     try {
-      if (!booking.clientId) return;
-
-      // Precisamos buscar o status da conexão do usuário
-      // O bookingInclude já traz client.user.googleRefreshToken ?
-      // bookingInclude traz client -> user -> email, name, id. NÃO traz googleRefreshToken.
-      // Então precisamos buscar explicitamente ou assumir que falha.
-      // Melhor buscar para garantir.
-
-      const client = await this.prisma.client.findUnique({
-        where: { id: booking.clientId },
-        select: { user: { select: { id: true, googleRefreshToken: true } } }
-      });
-
-      if (!client?.user?.googleRefreshToken) return;
-
-      // Format event data (similar ao controller)
-      const addressParts = [
-          booking.street, 
-          booking.addressNumber,
-          booking.neighborhood, 
-          booking.city
-        ].filter(Boolean);
-        
-      const venueString = booking.location 
-          ? `${booking.location}${addressParts.length > 0 ? ` (${addressParts.join(', ')})` : ''}`
-          : (addressParts.join(', ') || 'Local a definir');
+      if (!booking.creator.googleRefreshToken) return;
 
       const eventData = {
-          title: booking.eventTitle || 'Reserva Confirmada',
-          description: `Reserva #${booking.id.substring(0,8)}\nStatus: ${booking.status}\n\nDetalhes:\n${(booking.equipments || []).map((e:any) => `- ${(e as any).equipment?.name || (e as any).name || 'Item'}`).join('\n')}`,
-          location: venueString,
-          startDate: booking.eventDate,
-          endDate: booking.eventEndDate || new Date(new Date(booking.eventDate).getTime() + 4 * 3600 * 1000)
+        title: `Evento: ${booking.eventTitle || 'X Produções'}`,
+        description: `Cliente: ${booking.clientName}\nLocal: ${booking.location}\nValor: R$ ${booking.totalPrice}`,
+        location: booking.location || '',
+        startDate: booking.eventDate,
+        endDate: booking.eventEndDate
       };
 
-      await googleCalendarService.createEvent(client.user.id, eventData);
-      logger.info(`Reserva ${booking.id} sincronizada automaticamente com Google Calendar`);
-    } catch (e) {
-      logger.warn({ error: e instanceof Error ? e.message : 'Unknown error' }, 'Falha na sincronização automática com Google Calendar');
+      await googleCalendarService.createEvent(booking.creatorId, eventData);
+      logger.info(`Google Calendar sync completed for booking ${booking.id}`);
+    } catch (error) {
+      logger.error('Google Calendar Sync Error:', error);
     }
   }
 
   /**
-   * Notifica colaboradores escalados sobre confirmação/alteração
+   * Notifica colaboradores escalados
    */
   private async notifyCollaborators(booking: any) {
     try {
-      // Buscar colaboradores designados
-      const collaborators = await this.prisma.eventCollaborator.findMany({
-        where: { 
-            bookingId: booking.id,
-            status: 'ASSIGNED'
-        },
-        include: {
-            collaborator: {
-                include: { user: true }
-            },
-            function: true
-        }
+      const collabs = await this.prisma.eventCollaborator.findMany({
+        where: { bookingId: booking.id },
+        include: { collaborator: { include: { user: true } } }
       });
-      
-      if (collaborators.length === 0) return;
 
-      logger.info(`Notificando ${collaborators.length} colaboradores da reserva ${booking.id}`);
-
-      // Data do evento
-      const eventDateStr = new Date(booking.eventDate).toLocaleDateString('pt-BR');
-
-      for (const ec of collaborators) {
-        const user = ec.collaborator.user;
-        const roleName = ec.function?.name || (ec.role !== 'OTHER' ? ec.role : 'Colaborador');
-        
-        // 1. Google Calendar Sync (se conectado)
-        if (user.googleRefreshToken) {
-             try {
-                 // Garantir fuso horário BRT
-                 const startDateTime = createDateFromBRT(booking.eventDate, ec.startTime);
-                 let endDateTime;
-
-                 if (ec.endTime) {
-                     endDateTime = createDateFromBRT(booking.eventDate, ec.endTime);
-                     // Se o horário de fim for menor que o de início, assume dia seguinte
-                     if (endDateTime < startDateTime) {
-                         endDateTime.setDate(endDateTime.getDate() + 1);
-                     }
-                 } else {
-                     // Duração padrão de 4h se não especificado
-                     endDateTime = new Date(startDateTime.getTime() + 4 * 3600 * 1000);
-                 }
-
-                 const eventData = {
-                    title: `TRABALHO: ${booking.eventTitle || 'Evento X-Produções'}`,
-                    description: `Você foi escalado como: ${roleName}\nLocal: ${booking.location || 'A definir'}\nNotas: ${ec.notes || ''}\nReserva #${booking.id.substring(0,8)}`,
-                    location: booking.location,
-                    startDate: startDateTime,
-                    endDate: endDateTime
-                };
-
-                await googleCalendarService.createEvent(user.id, eventData);
-                logger.info(`Agenda colaborador ${user.email} sincronizada`);
-             } catch (err) {
-                 logger.warn(`Erro ao sync agenda colaborador ${user.email}: ${err instanceof Error ? err.message : 'Unknown error'}`);
-             }
-        }
-
-        // 2. WhatsApp Notification
-        const phone = ec.collaborator.phone;
+      for (const ec of collabs) {
+        const phone = ec.collaborator.phone || (ec.collaborator.user as any).phone;
         if (phone) {
-             const message = 
-`👷 *Nova Escala de Trabalho*
-
-Olá *${user.name.split(' ')[0]}*,
-Você foi escalado para o evento *${booking.eventTitle || 'Evento'}*.
-
-📅 *Data:* ${eventDateStr}
-⏰ *Horário:* ${ec.startTime} - ${ec.endTime}
-📍 *Local:* ${booking.location || 'A definir'}
-🔧 *Função:* ${roleName}
+             const message = `Olá ${ec.collaborator.user.name}, você foi escalado para o evento "${booking.eventTitle}" em ${new Date(booking.eventDate).toLocaleDateString('pt-BR')}.
 
 Confirme sua presença no painel.`;
 
@@ -1197,8 +1062,6 @@ Confirme sua presença no painel.`;
    */
   async getCalendar(month?: number, year?: number): Promise<any[]> {
     try {
-      // Se mês e ano forem fornecidos, filtra por período
-      // Caso contrário, busca todas as reservas
       let dateFilter = {};
       if (month && year) {
         const startDate = new Date(year, month - 1, 1);
@@ -1216,7 +1079,6 @@ Confirme sua presença no painel.`;
           ...dateFilter,
           status: { not: BookingStatus.CANCELLED }
         },
-        // Para o calendário, precisamos de dados mais ricos (client name/phone, equipamentos, kit e colaboradores)
         include: {
           ...this.bookingInclude,
           eventCollaborators: {
@@ -1234,7 +1096,6 @@ Confirme sua presença no painel.`;
         orderBy: { eventDate: "asc" }
       });
 
-      // Normalizamos a resposta para o formato esperado no frontend (CalendarBooking)
       return bookings.map((booking: any) => {
         const eventDate = booking.eventDate;
         const eventEndDate = booking.eventEndDate;
@@ -1242,7 +1103,6 @@ Confirme sua presença no painel.`;
           ? Math.max(1, Math.round((new Date(eventEndDate).getTime() - new Date(eventDate).getTime()) / 3600000))
           : (booking.eventDuration || 4);
 
-        // Client simplificado
         const client = booking.client
           ? {
               name: booking.client.user?.name || booking.clientName || undefined,
@@ -1252,7 +1112,6 @@ Confirme sua presença no painel.`;
               ? { name: booking.clientName, phone: booking.clientContact }
               : undefined);
 
-        // Venue normalizado
         const venue = (booking.street || booking.city || booking.zipCode)
           ? {
               street: booking.street || undefined,
@@ -1261,13 +1120,8 @@ Confirme sua presença no painel.`;
             }
           : undefined;
 
-        // Equipamentos já vêm como array simples pelo include
         const equipments = Array.isArray(booking.equipments) ? booking.equipments : [];
-
-        // Mapear kit singular para array kits
         const kits = booking.kit ? [booking.kit] : [];
-
-        // Colaboradores do evento (se existirem)
         const collaborators = Array.isArray(booking.eventCollaborators)
           ? booking.eventCollaborators.map((ec: any) => ({
               collaboratorId: ec.collaboratorId,
@@ -1285,7 +1139,6 @@ Confirme sua presença no painel.`;
 
         return {
           id: booking.id,
-          // Campos esperados pelo frontend
           eventDate: booking.eventDate,
           eventEndDate: booking.eventEndDate,
           duration: durationHours,
@@ -1297,7 +1150,6 @@ Confirme sua presença no painel.`;
           kits,
           collaborators,
           internalNotes: booking.notes,
-          // Campos adicionais úteis ao tooltip
           serviceValue: booking.serviceValue,
           totalPrice: booking.totalPrice,
         };
@@ -1363,7 +1215,6 @@ Confirme sua presença no painel.`;
    */
   async linkBookingsToUser(userId: string, email: string, bookingId?: string): Promise<void> {
     try {
-      // 1. Encontrar ou criar o perfil de cliente para este usuário
       let client = await this.prisma.client.findUnique({ where: { userId } });
       if (!client) {
         client = await this.prisma.client.create({
@@ -1371,7 +1222,6 @@ Confirme sua presença no painel.`;
         });
       }
 
-      // 2. Vincular por e-mail (orçamentos órfãos)
       await this.prisma.booking.updateMany({
         where: {
           OR: [
@@ -1388,6 +1238,54 @@ Confirme sua presença no painel.`;
     } catch (error) {
       logger.error({ error, userId, email }, "Erro ao vincular orçamentos ao usuário");
     }
+  }
+
+  /**
+   * Crie uma nova tarefa para a reserva
+   */
+  async createBookingTask(bookingId: string, data: { title: string; description?: string }) {
+    return await this.prisma.bookingTask.create({
+      data: {
+        bookingId,
+        title: data.title,
+        description: data.description,
+      }
+    });
+  }
+
+  /**
+   * Alterna o status de conclusão de uma tarefa
+   */
+  async toggleTaskStatus(taskId: string, isCompleted: boolean) {
+    return await this.prisma.bookingTask.update({
+      where: { id: taskId },
+      data: { 
+        isCompleted,
+        completedAt: isCompleted ? new Date() : null
+      }
+    });
+  }
+
+  /**
+   * Registra uma nova despesa para a reserva
+   */
+  async createBookingExpense(data: { 
+    bookingId: string; 
+    collaboratorId: string; 
+    amount: number; 
+    description: string; 
+    receiptUrl?: string 
+  }) {
+    return await this.prisma.bookingExpense.create({
+      data: {
+        bookingId: data.bookingId,
+        collaboratorId: data.collaboratorId,
+        amount: data.amount,
+        description: data.description,
+        receiptUrl: data.receiptUrl,
+        status: 'PENDING'
+      }
+    });
   }
 
   /**
@@ -1415,19 +1313,13 @@ Confirme sua presença no painel.`;
             function: true
           }
         },
-        chats: {
-          where: { type: 'EVENT' },
+        tasks: {
+          orderBy: { createdAt: 'asc' as const }
+        },
+        expenses: {
           include: {
-            participants: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    name: true,
-                    avatarUrl: true
-                  }
-                }
-              }
+            collaborator: {
+              select: { id: true, name: true, avatarUrl: true }
             }
           }
         }

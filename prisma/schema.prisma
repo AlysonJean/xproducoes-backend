@@ -376,7 +376,11 @@ model Booking {
   technicalRider     String?
   technicalRiderUrl  String?
   locationUrl        String?
+  venueContactName   String?
+  venueContactPhone  String?
   chats              Chat[]              @relation("BookingChats")
+  tasks              BookingTask[]
+  expenses           BookingExpense[]
 
   @@index([clientId])
   @@index([creatorId])
@@ -795,9 +799,44 @@ model KitExperienceLevel {
   price       Decimal         @db.Decimal(10, 2)
   description String?
   includes    String[]
-  isPopular   Boolean         @default(false)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  updatedAt     DateTime @updatedAt
+}
+
+model BookingTask {
+  id          String    @id @default(cuid())
+  bookingId   String
+  title       String
+  description String?
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("booking_tasks")
+}
+
+model BookingExpense {
+  id             String        @id @default(cuid())
+  bookingId      String
+  collaboratorId String
+  amount         Decimal       @db.Decimal(10, 2)
+  description    String
+  receiptUrl     String?
+  status         ExpenseStatus @default(PENDING)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  booking        Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  collaborator   User          @relation(fields: [collaboratorId], references: [id], onDelete: Cascade)
+
+  @@map("booking_expenses")
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
   kitId       String
   kit         Kit             @relation(fields: [kitId], references: [id], onDelete: Cascade)
 

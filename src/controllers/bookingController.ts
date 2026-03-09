@@ -709,4 +709,32 @@ export class BookingController {
       next(error);
     }
   };
+
+  toggleTask = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { taskId } = req.params;
+      const { isCompleted } = req.body;
+      const updated = await bookingService.toggleTaskStatus(taskId, isCompleted);
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  addExpense = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { amount, description, receiptUrl } = req.body;
+      const expense = await bookingService.createBookingExpense({
+        bookingId: id,
+        collaboratorId: req.userId!,
+        amount,
+        description,
+        receiptUrl
+      });
+      res.status(201).json({ success: true, data: expense });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

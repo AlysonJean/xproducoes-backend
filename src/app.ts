@@ -24,6 +24,10 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// ✅ TRUST PROXY FOR RENDER/LOAD BALANCERS
+// Necessário para que o express-rate-limit funcione corretamente
+app.set("trust proxy", 1);
+
 // Inicializar Sentry (deve ser o primeiro)
 initSentry(app);
 

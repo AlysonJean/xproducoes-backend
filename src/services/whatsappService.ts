@@ -12,7 +12,17 @@ class WhatsappService {
 
   constructor() {
     const puppeteerOptions: any = {
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+      args: [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox', 
+        '--disable-dev-shm-usage', 
+        '--disable-gpu',
+        '--no-zygote',
+        '--disable-extensions',
+        '--disable-component-update',
+        '--disable-web-security',
+        '--disable-features=IsolateOrigins,site-per-process',
+      ],
       headless: true
     };
 
@@ -167,7 +177,8 @@ Obrigado pela preferência! 🚀`;
 
 export const whatsappService = new WhatsappService();
 
-// Inicializa automaticamente exceto em ambiente de teste para economizar recursos
-if (process.env.NODE_ENV !== 'test') {
+// Inicializa automaticamente APENAS em desenvolvimento para economizar recursos no Render/Produção
+// Em produção, o serviço deve ser iniciado via Admin ou quando houver mensagens pendentes
+if (process.env.NODE_ENV === 'development') {
   whatsappService.initialize();
 }

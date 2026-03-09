@@ -44,8 +44,8 @@ router.get("/dashboard/stats", adminOnly, bookingController.getDashboardStats);
 router.post('/:id/attachments', validateId(), bookingController.addAttachment);
 router.delete('/:id/attachments/:attachmentId', validateId(), bookingController.removeAttachment);
 
-// Rotas específicas de colaboradores (futuro)
-router.get("/roadmap/:id", adminOrCollaborator, validateId(), bookingController.getRoadmap);
-router.get("/collaborator/:collaboratorId/events", adminOrCollaborator, bookingController.getCollaboratorEvents);
+// Checklist e Despesas (Crew Experience)
+router.put("/tasks/:taskId/toggle", adminOrCollaborator, bookingController.toggleTask);
+router.post("/:id/expenses", adminOrCollaborator, bookingController.addExpense);
 
 export default router;
