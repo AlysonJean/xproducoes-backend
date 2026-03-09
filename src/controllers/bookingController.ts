@@ -674,4 +674,39 @@ export class BookingController {
       next(error);
     }
   };
+
+  getRoadmap = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params as { id: string };
+      if (!id) throw new BadRequestError("ID da reserva é obrigatório.");
+
+      // Auth check
+      if (req.userRole !== "ADMIN") {
+        const collaborator = await prisma.collaborator.findFirst({
+          where: { userId: req.userId }
+        });
+
+        if (!collaborator) {
+          throw new ForbiddenError("Acesso negado. Perfil de colaborador não encontrado.");
+        }
+
+        const isAssigned = await prisma.eventCollaborator.findFirst({
+          where: {
+            bookingId: id,
+            collaboratorId: collaborator.id
+          }
+        });
+
+        if (!isAssigned) {
+          throw new ForbiddenError("Acesso negado. Você não está escalado para este evento.");
+        }
+      }
+
+      const roadmap = await bookingService.getEventRoadmap(id);
+      res.json({ success: true, data: roadmap });
+    } catch (error) {
+      logger.error({ err: error, bookingId: req.params.id }, "Erro no controller getRoadmap");
+      next(error);
+    }
+  };
 }

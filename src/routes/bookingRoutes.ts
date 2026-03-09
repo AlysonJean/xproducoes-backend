@@ -45,6 +45,7 @@ router.post('/:id/attachments', validateId(), bookingController.addAttachment);
 router.delete('/:id/attachments/:attachmentId', validateId(), bookingController.removeAttachment);
 
 // Rotas específicas de colaboradores (futuro)
+router.get("/roadmap/:id", adminOrCollaborator, validateId(), bookingController.getRoadmap);
 router.get("/collaborator/:collaboratorId/events", adminOrCollaborator, bookingController.getCollaboratorEvents);
 
 export default router;

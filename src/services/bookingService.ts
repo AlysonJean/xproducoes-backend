@@ -174,6 +174,14 @@ export class BookingService {
         serviceId: true,
         kitId: true
       }
+    },
+    chats: {
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        updatedAt: true
+      }
     }
   };
 
@@ -322,6 +330,9 @@ export class BookingService {
         totalPrice: totalPrice,
         idempotencyKey: idempotencyKey || undefined,
         kitId: data.kitId,
+        technicalRider: data.technicalRider,
+        technicalRiderUrl: data.technicalRiderUrl,
+        locationUrl: data.locationUrl,
         // Campos admin-only e logísticos
         serviceValue: data.serviceValue,
         paymentProofUrl: data.paymentProofUrl,
@@ -597,6 +608,11 @@ export class BookingService {
       // Atualizar campos admin-only
       if (data.serviceValue !== undefined) (updateData as any).serviceValue = data.serviceValue;
       if (data.paymentProofUrl !== undefined) (updateData as any).paymentProofUrl = data.paymentProofUrl;
+      
+      // Crew Experience fields
+      if (data.technicalRider !== undefined) (updateData as any).technicalRider = data.technicalRider;
+      if (data.technicalRiderUrl !== undefined) (updateData as any).technicalRiderUrl = data.technicalRiderUrl;
+      if (data.locationUrl !== undefined) (updateData as any).locationUrl = data.locationUrl;
 
       // Atualizar itens (substituição total para simplicidade no orçamento)
       if (data.items) {
@@ -852,9 +868,80 @@ export class BookingService {
       // Invalida cache do dashboard
       void cacheService.invalidateBookingCaches(id);
 
+      // Sincronizar Chat do Evento
+      void this.syncEventChat(updatedBooking);
+
       return updatedBooking;
     } catch (error) {
       throw error;
+    }
+  }
+
+  /**
+   * Sincroniza o chat do grupo do evento (Crew Experience)
+   */
+  private async syncEventChat(booking: any) {
+    try {
+      // Buscar colaboradores escalados
+      const collaborators = await this.prisma.eventCollaborator.findMany({
+        where: { bookingId: booking.id },
+        include: { collaborator: { select: { userId: true } } }
+      });
+
+      if (collaborators.length === 0) return;
+
+      const participantUserIds = [...new Set(collaborators.map(c => c.collaborator.userId))];
+      
+      // Adicionar o criador da reserva ou admins se necessário? 
+      // Por enquanto, apenas os colaboradores e o criador (se for admin/manager)
+      const creator = await this.prisma.user.findUnique({ where: { id: booking.creatorId } });
+      if (creator && (creator.role === 'ADMIN' || creator.role === 'MANAGER')) {
+        participantUserIds.push(creator.id);
+      }
+
+      const uniqueParticipantUserIds = [...new Set(participantUserIds)];
+
+      // Verificar se já existe um chat para este evento
+      let chat = await this.prisma.chat.findFirst({
+        where: { bookingId: booking.id, type: 'EVENT' }
+      });
+
+      if (!chat) {
+        chat = await this.prisma.chat.create({
+          data: {
+            name: `Evento: ${booking.eventTitle || booking.id}`,
+            type: 'EVENT',
+            bookingId: booking.id,
+            participants: {
+              create: uniqueParticipantUserIds.map(userId => ({
+                userId,
+                role: 'MEMBER'
+              }))
+            }
+          }
+        });
+        logger.info(`Chat de evento criado: ${chat.id} para reserva ${booking.id}`);
+      } else {
+        // Atualizar participantes (adicionar novos)
+        for (const userId of uniqueParticipantUserIds) {
+          await this.prisma.chatParticipant.upsert({
+            where: {
+              chatId_userId: {
+                chatId: chat.id,
+                userId
+              }
+            },
+            update: {},
+            create: {
+              chatId: chat.id,
+              userId,
+              role: 'MEMBER'
+            }
+          });
+        }
+      }
+    } catch (error) {
+      logger.error({ error, bookingId: booking.id }, "Erro ao sincronizar chat do evento");
     }
   }
 
@@ -1301,5 +1388,53 @@ Confirme sua presença no painel.`;
     } catch (error) {
       logger.error({ error, userId, email }, "Erro ao vincular orçamentos ao usuário");
     }
+  }
+
+  /**
+   * Retorna os dados completos para o Roadmap do Evento (Crew Experience)
+   */
+  async getEventRoadmap(id: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      include: {
+        ...this.bookingInclude,
+        eventCollaborators: {
+          include: {
+            collaborator: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    avatarUrl: true
+                  }
+                }
+              }
+            },
+            function: true
+          }
+        },
+        chats: {
+          where: { type: 'EVENT' },
+          include: {
+            participants: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    avatarUrl: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!booking) throw new BookingNotFoundError();
+    return booking;
   }
 }

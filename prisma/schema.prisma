@@ -373,6 +373,10 @@ model Booking {
   equipments         Equipment[]         @relation("BookingEquipments")
   services           Service[]           @relation("BookingServices")
   validUntil         DateTime?
+  technicalRider     String?
+  technicalRiderUrl  String?
+  locationUrl        String?
+  chats              Chat[]              @relation("BookingChats")
 
   @@index([clientId])
   @@index([creatorId])
@@ -633,6 +637,8 @@ model Chat {
   lastMessageAt DateTime?
   messages      ChatMessage[]
   participants  ChatParticipant[]
+  bookingId     String?
+  booking       Booking?          @relation("BookingChats", fields: [bookingId], references: [id])
 
   @@map("chats")
 }
