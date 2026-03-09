@@ -142,8 +142,7 @@ export class BookingService {
           }
         }
       }
-    }
-    ,
+    },
     attachments: {
       select: {
         id: true,
@@ -160,6 +159,20 @@ export class BookingService {
         price: true,
         imageUrl: true,
         duration: true
+      }
+    },
+    items: {
+      select: {
+        id: true,
+        description: true,
+        quantity: true,
+        unitPrice: true,
+        discount: true,
+        totalPrice: true,
+        itemType: true,
+        equipmentId: true,
+        serviceId: true,
+        kitId: true
       }
     }
   };
@@ -314,6 +327,19 @@ export class BookingService {
         paymentProofUrl: data.paymentProofUrl,
         setupTime: (data as any).setupTime ? new Date((data as any).setupTime) : undefined,
         pickupTime: (data as any).pickupTime ? new Date((data as any).pickupTime) : undefined,
+        items: data.items ? {
+          create: data.items.map(item => ({
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            discount: item.discount,
+            totalPrice: item.totalPrice,
+            itemType: item.itemType as any,
+            equipmentId: item.equipmentId,
+            serviceId: item.serviceId,
+            kitId: item.kitId
+          }))
+        } : undefined,
         equipments: data.equipmentIds ? {
           connect: data.equipmentIds.map(id => ({ id }))
         } : undefined,
@@ -571,6 +597,26 @@ export class BookingService {
       // Atualizar campos admin-only
       if (data.serviceValue !== undefined) (updateData as any).serviceValue = data.serviceValue;
       if (data.paymentProofUrl !== undefined) (updateData as any).paymentProofUrl = data.paymentProofUrl;
+
+      // Atualizar itens (substituição total para simplicidade no orçamento)
+      if (data.items) {
+        // Primeiro remove os antigos
+        await this.prisma.bookingItem.deleteMany({ where: { bookingId: id } });
+        // Cria os novos
+        (updateData as any).items = {
+          create: data.items.map(item => ({
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            discount: item.discount,
+            totalPrice: item.totalPrice,
+            itemType: item.itemType as any,
+            equipmentId: item.equipmentId,
+            serviceId: item.serviceId,
+            kitId: item.kitId
+          }))
+        };
+      }
 
       const updatedBooking = await this.prisma.booking.update({
         where: { id },
@@ -1222,6 +1268,38 @@ Confirme sua presença no painel.`;
       };
     } catch (error) {
       throw new Error(`Erro ao buscar estatísticas: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+    }
+  }
+
+  /**
+   * Vincula orçamentos manuais a um usuário recém-registrado
+   */
+  async linkBookingsToUser(userId: string, email: string, bookingId?: string): Promise<void> {
+    try {
+      // 1. Encontrar ou criar o perfil de cliente para este usuário
+      let client = await this.prisma.client.findUnique({ where: { userId } });
+      if (!client) {
+        client = await this.prisma.client.create({
+          data: { userId }
+        });
+      }
+
+      // 2. Vincular por e-mail (orçamentos órfãos)
+      await this.prisma.booking.updateMany({
+        where: {
+          OR: [
+            { clientEmail: email, clientId: null },
+            { id: bookingId, clientId: null }
+          ]
+        },
+        data: {
+          clientId: client.id
+        }
+      });
+      
+      logger.info({ userId, email, bookingId }, "Orçamentos vinculados ao usuário com sucesso");
+    } catch (error) {
+      logger.error({ error, userId, email }, "Erro ao vincular orçamentos ao usuário");
     }
   }
 }

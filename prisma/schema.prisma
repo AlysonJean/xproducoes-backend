@@ -369,8 +369,10 @@ model Booking {
   messages           Message[]
   review             Review?
   tvDevices          TVDevice[]
+  items              BookingItem[]
   equipments         Equipment[]         @relation("BookingEquipments")
   services           Service[]           @relation("BookingServices")
+  validUntil         DateTime?
 
   @@index([clientId])
   @@index([creatorId])
@@ -1098,4 +1100,32 @@ enum AnnouncementType {
   TEXT
   IMAGE
   ALERT
+}
+
+model BookingItem {
+  id            String    @id @default(cuid())
+  bookingId     String
+  description   String
+  quantity      Int       @default(1)
+  unitPrice     Decimal   @db.Decimal(10, 2)
+  discount      Decimal?  @db.Decimal(10, 2)
+  totalPrice    Decimal   @db.Decimal(10, 2)
+  
+  // Link to original catalog items if they exist
+  equipmentId   String?
+  serviceId     String?
+  kitId         String?
+  
+  itemType      BookingItemType @default(EQUIPMENT)
+  
+  booking       Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  
+  @@map("booking_items")
+}
+
+enum BookingItemType {
+  EQUIPMENT
+  SERVICE
+  KIT
+  CUSTOM
 }

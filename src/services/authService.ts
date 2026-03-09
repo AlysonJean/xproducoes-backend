@@ -10,6 +10,7 @@ interface RegisterData {
   role?: string;
   phone?: string;
   companyName?: string;
+  bookingId?: string;
 }
 
 interface LoginData {
@@ -29,12 +30,24 @@ interface InviteData {
 
 export class AuthService {
   async register(data: RegisterData) {
-    return userService.register({
+    const user = await userService.register({
       name: data.name,
       email: data.email,
       password: data.password,
-      role: data.role
+      role: data.role || 'CLIENT'
     });
+
+    if (user && user.role === 'CLIENT') {
+      try {
+        const { BookingService } = await import('./bookingService.js');
+        const bookingService = new BookingService();
+        await bookingService.linkBookingsToUser(user.id, user.email, data.bookingId);
+      } catch (e) {
+        console.error('Erro ao vincular orçamentos no registro:', e);
+      }
+    }
+
+    return user;
   }
 
   async login(data: LoginData) {

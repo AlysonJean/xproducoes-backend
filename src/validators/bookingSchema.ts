@@ -1,72 +1,86 @@
-import { z } from "zod";
-import { BookingStatus, DeliveryStatus } from "@prisma/client";
-import { idSchema, idArraySchema } from "../utils/sharedSchema";
+import { z } from 'zod';
+import { BookingStatus, DeliveryStatus } from '@prisma/client';
+import { idSchema, idArraySchema } from '../utils/sharedSchema';
+
+const bookingItemSchema = z.object({
+  description: z.string().min(1),
+  quantity: z.number().int().positive().default(1),
+  unitPrice: z.number().nonnegative(),
+  discount: z.number().nonnegative().optional().default(0),
+  totalPrice: z.number().nonnegative(),
+  equipmentId: idSchema.optional(),
+  serviceId: idSchema.optional(),
+  kitId: idSchema.optional(),
+  itemType: z.enum(['EQUIPMENT', 'SERVICE', 'KIT', 'CUSTOM']).default('EQUIPMENT'),
+});
 
 // Schema base (sem refinements)
 const bookingBaseSchema = z.object({
-    // Cliente (ou user registrado ou dados manuais)
+  // Cliente (ou user registrado ou dados manuais)
   // aceitar UUIDs ou CUIDs (seed usa cuid())
   userId: idSchema.optional(),
   clientId: idSchema.optional(),
-    clientName: z.string().min(1).optional(),
-    clientContact: z.string().min(1).optional(),
-    clientEmail: z.string().email().optional(),
+  clientName: z.string().min(1).optional(),
+  clientContact: z.string().min(1).optional(),
+  clientEmail: z.string().email().optional(),
 
-    // Equipamentos/Kits/Serviços
-    kitId: idSchema.optional(),
-    equipmentIds: idArraySchema.optional(),
-    serviceIds: idArraySchema.optional(),
+  kitId: idSchema.optional(),
+  equipmentIds: idArraySchema.optional(),
+  serviceIds: idArraySchema.optional(),
+  items: z.array(bookingItemSchema).optional(),
 
-    // Datas do evento (aceita ISO datetime e datetime-local como 'YYYY-MM-DDTHH:mm')
-    eventDate: z
-      .string()
-      .refine((s) => {
-        const parsed = Date.parse(s);
-        return !isNaN(parsed);
-      }, { message: "A data do evento é inválida." }),
-    eventEndDate: z
-      .string()
-      .refine((s) => {
-        const parsed = Date.parse(s);
-        return !isNaN(parsed);
-      }, { message: "A data final do evento é inválida." }),
+  // Datas do evento (aceita ISO datetime e datetime-local como 'YYYY-MM-DDTHH:mm')
+  eventDate: z.string().refine(
+    (s) => {
+      const parsed = Date.parse(s);
+      return !isNaN(parsed);
+    },
+    { message: 'A data do evento é inválida.' },
+  ),
+  eventEndDate: z.string().refine(
+    (s) => {
+      const parsed = Date.parse(s);
+      return !isNaN(parsed);
+    },
+    { message: 'A data final do evento é inválida.' },
+  ),
 
-    // Detalhes do evento
-    eventTitle: z.string().min(1).optional(),
-    eventDuration: z.number().positive().optional(),
+  // Detalhes do evento
+  eventTitle: z.string().min(1).optional(),
+  eventDuration: z.number().positive().optional(),
 
-    // Endereço
-    location: z.string().min(1, "Local é obrigatório"),
-    street: z.string().min(1, "Rua é obrigatória"),
-    neighborhood: z.string().min(1, "Bairro é obrigatório"),
-    city: z.string().min(1, "Cidade é obrigatória"),
-    state: z.string().min(1, "Estado é obrigatório"),
-    zipCode: z.string().min(1, "CEP é obrigatório"),
-    addressNumber: z.string().min(1, "Número é obrigatório"),
-    addressComplement: z.string().optional(),
+  // Endereço
+  location: z.string().min(1, 'Local é obrigatório'),
+  street: z.string().min(1, 'Rua é obrigatória'),
+  neighborhood: z.string().min(1, 'Bairro é obrigatório'),
+  city: z.string().min(1, 'Cidade é obrigatória'),
+  state: z.string().min(1, 'Estado é obrigatório'),
+  zipCode: z.string().min(1, 'CEP é obrigatório'),
+  addressNumber: z.string().min(1, 'Número é obrigatório'),
+  addressComplement: z.string().optional(),
 
-    // Características do local
-    requiresStairs: z.boolean().optional().default(false),
-    isCovered: z.boolean().optional().default(true),
-    hasParking: z.boolean().optional().default(true),
+  // Características do local
+  requiresStairs: z.boolean().optional().default(false),
+  isCovered: z.boolean().optional().default(true),
+  hasParking: z.boolean().optional().default(true),
 
-    // Observações e solicitações
-    notes: z.string().optional(),
-    specialRequests: z.string().optional(),
+  // Observações e solicitações
+  notes: z.string().optional(),
+  specialRequests: z.string().optional(),
 
-    // Status (opcionais para criação)
-    status: z.nativeEnum(BookingStatus).optional().default(BookingStatus.DRAFT),
-    deliveryStatus: z.nativeEnum(DeliveryStatus).optional().default(DeliveryStatus.PENDING),
+  // Status (opcionais para criação)
+  status: z.nativeEnum(BookingStatus).optional().default(BookingStatus.DRAFT),
+  deliveryStatus: z.nativeEnum(DeliveryStatus).optional().default(DeliveryStatus.PENDING),
 
-    // Preço total (calculado automaticamente)
-    totalPrice: z.number().positive().optional(),
+  // Preço total (calculado automaticamente)
+  totalPrice: z.number().positive().optional(),
 
-    // Campos admin-only e logísticos
-    serviceValue: z.number().positive().optional(),
-    paymentProofUrl: z.string().url().optional(),
-    setupTime: z.string().optional(),
-    pickupTime: z.string().optional(),
-  });
+  // Campos admin-only e logísticos
+  serviceValue: z.number().positive().optional(),
+  paymentProofUrl: z.string().url().optional(),
+  setupTime: z.string().optional(),
+  pickupTime: z.string().optional(),
+});
 
 // Schema para criação de booking (com validações cruzadas)
 export const bookingCreateSchema = bookingBaseSchema
@@ -76,21 +90,26 @@ export const bookingCreateSchema = bookingBaseSchema
       return data.userId || data.clientId || (data.clientName && data.clientContact);
     },
     {
-      message: "É necessário associar a reserva a um cliente registrado ou fornecer dados de contato.",
-      path: ["clientName"],
-    }
+      message:
+        'É necessário associar a reserva a um cliente registrado ou fornecer dados de contato.',
+      path: ['clientName'],
+    },
   )
   .refine(
     (data) => {
-      // Garante que pelo menos um kit, equipamentos ou serviços sejam fornecidos
-      return data.kitId || 
-             (data.equipmentIds && data.equipmentIds.length > 0) ||
-             (data.serviceIds && data.serviceIds.length > 0);
+      // Garante que pelo menos um kit, equipamentos, serviços ou itens manuais sejam fornecidos
+      return (
+        data.kitId ||
+        (data.equipmentIds && data.equipmentIds.length > 0) ||
+        (data.serviceIds && data.serviceIds.length > 0) ||
+        (data.items && data.items.length > 0)
+      );
     },
     {
-      message: "É necessário fornecer um kit, equipamentos ou serviços para o orçamento.",
-      path: ["kitId"],
-    }
+      message:
+        'É necessário fornecer um kit, equipamentos, serviços ou itens detalhados para o orçamento.',
+      path: ['kitId'],
+    },
   )
   .refine(
     (data) => {
@@ -100,9 +119,9 @@ export const bookingCreateSchema = bookingBaseSchema
       return endDate > startDate;
     },
     {
-      message: "A data final deve ser posterior à data inicial do evento.",
-      path: ["eventEndDate"],
-    }
+      message: 'A data final deve ser posterior à data inicial do evento.',
+      path: ['eventEndDate'],
+    },
   );
 
 // Schema para filtros de busca
@@ -133,7 +152,7 @@ export const deliveryStatusUpdateSchema = z.object({
 
 // Schema para cancelamento
 export const bookingCancelSchema = z.object({
-  reason: z.string().min(1, "Motivo do cancelamento é obrigatório"),
+  reason: z.string().min(1, 'Motivo do cancelamento é obrigatório'),
 });
 
 // Tipos derivados dos schemas
