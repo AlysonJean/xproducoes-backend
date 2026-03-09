@@ -18,10 +18,12 @@ class WhatsappService {
         '--disable-dev-shm-usage', 
         '--disable-gpu',
         '--no-zygote',
+        '--single-process', // Reduz overhead de múltiplos processos
         '--disable-extensions',
         '--disable-component-update',
         '--disable-web-security',
         '--disable-features=IsolateOrigins,site-per-process',
+        '--js-flags="--max-old-space-size=256"', // Limita heap do JS no Chromium
       ],
       headless: true
     };

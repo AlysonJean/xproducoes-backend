@@ -112,6 +112,7 @@ model User {
   socialCredentials            SocialCredential[]
   moderatedPosts               SocialPost[]
   sponsorLogos                 SponsorLogo[]
+  bookingExpenses              BookingExpense[]
 
   @@index([email])
   @@index([role])
@@ -799,7 +800,14 @@ model KitExperienceLevel {
   price       Decimal         @db.Decimal(10, 2)
   description String?
   includes    String[]
-  updatedAt     DateTime @updatedAt
+  kitId       String
+  kit         Kit             @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([kitId, level])
+  @@index([kitId])
+  @@index([level])
+  @@map("kit_experience_levels")
 }
 
 model BookingTask {
@@ -836,14 +844,6 @@ enum ExpenseStatus {
   PENDING
   APPROVED
   REJECTED
-}
-  kitId       String
-  kit         Kit             @relation(fields: [kitId], references: [id], onDelete: Cascade)
-
-  @@unique([kitId, level])
-  @@index([kitId])
-  @@index([level])
-  @@map("kit_experience_levels")
 }
 
 model SocialCredential {
@@ -1148,23 +1148,23 @@ enum AnnouncementType {
 }
 
 model BookingItem {
-  id            String    @id @default(cuid())
-  bookingId     String
-  description   String
-  quantity      Int       @default(1)
-  unitPrice     Decimal   @db.Decimal(10, 2)
-  discount      Decimal?  @db.Decimal(10, 2)
-  totalPrice    Decimal   @db.Decimal(10, 2)
-  
+  id          String   @id @default(cuid())
+  bookingId   String
+  description String
+  quantity    Int      @default(1)
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  discount    Decimal? @db.Decimal(10, 2)
+  totalPrice  Decimal  @db.Decimal(10, 2)
+
   // Link to original catalog items if they exist
-  equipmentId   String?
-  serviceId     String?
-  kitId         String?
-  
-  itemType      BookingItemType @default(EQUIPMENT)
-  
-  booking       Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  
+  equipmentId String?
+  serviceId   String?
+  kitId       String?
+
+  itemType BookingItemType @default(EQUIPMENT)
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
   @@map("booking_items")
 }
 
