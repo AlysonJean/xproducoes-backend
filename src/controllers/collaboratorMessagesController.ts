@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../config/prisma';
 import logger from "../config/logger";
+import { getSocketIO } from '../config/socket';
 
 
 export class CollaboratorMessagesController {
@@ -252,6 +253,31 @@ export class CollaboratorMessagesController {
         where: { id: chatId },
         data: { updatedAt: new Date() }
       });
+
+      // Emitir via Socket.IO para tempo real
+      try {
+        const io = getSocketIO();
+        io.to(`chat_${chatId}`).emit('new_message', message);
+
+        // Notificar outros participantes (fora do chat atual)
+        const chat = await prisma.chat.findUnique({
+          where: { id: chatId },
+          include: { participants: true }
+        });
+
+        if (chat) {
+          const others = chat.participants.filter(p => p.userId !== userId);
+          others.forEach(participant => {
+            io.to(`user_${participant.userId}`).emit('chat_notification', {
+              chatId,
+              message,
+              sender: message.sender.name
+            });
+          });
+        }
+      } catch (_e) {
+        logger.warn('Falha ao emitir socket events no chat');
+      }
 
       return res.json({ success: true, data: message });
     } catch (error) {

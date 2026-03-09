@@ -4,6 +4,7 @@ import { prisma } from "../config/prisma";
 import { BookingStatus, DeliveryStatus } from "@prisma/client";
 import logger from "../config/logger";
 import { BadRequestError, ForbiddenError, NotFoundError } from "../utils/errors";
+import { getSocketIO } from "../config/socket";
 
 const bookingService = new BookingService();
 
@@ -715,6 +716,15 @@ export class BookingController {
       const { taskId } = req.params;
       const { isCompleted } = req.body;
       const updated = await bookingService.toggleTaskStatus(taskId, isCompleted);
+      
+      // Emitir via Socket.IO para tempo real
+      try {
+        const io = getSocketIO();
+        io.to(`event:${updated.bookingId}`).emit('task_updated', updated);
+      } catch (_e) {
+        logger.warn('Falha ao emitir socket event task_updated');
+      }
+
       res.json({ success: true, data: updated });
     } catch (error) {
       next(error);
