@@ -11,12 +11,20 @@ class WhatsappService {
   private currentQr: string | null = null;
 
   constructor() {
+    const puppeteerOptions: any = {
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+      headless: true
+    };
+
+    // No Render/Linux, o cache pode estar em um local fixo se configurado via .puppeteerrc
+    logger.info('Inicializando cliente WhatsApp com Puppeteer...', {
+      args: puppeteerOptions.args,
+      node_env: process.env.NODE_ENV
+    });
+
     this.client = new Client({
       authStrategy: new LocalAuth(),
-      puppeteer: {
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        headless: true
-      }
+      puppeteer: puppeteerOptions
     });
   }
 
