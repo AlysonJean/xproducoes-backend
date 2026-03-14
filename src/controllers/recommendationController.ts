@@ -80,7 +80,7 @@ export const getPersonalizedRecommendations = async (req: Request, res: Response
 
     res.json(recommendations);
   } catch (error) {
-    console.error('Error getting personalized recommendations:', error);
+    logger.error({ err: error }, 'Error getting personalized recommendations');
     res.status(500).json({ error: 'Failed to get personalized recommendations' });
   }
 };
@@ -142,7 +142,7 @@ export const getSimilarRecommendations = async (req: Request, res: Response) => 
 
     res.status(400).json({ error: 'Invalid type. Must be equipment or kit' });
   } catch (error) {
-    console.error('Error getting similar recommendations:', error);
+    logger.error({ err: error }, 'Error getting similar recommendations');
     res.status(500).json({ error: 'Failed to get similar recommendations' });
   }
 };
@@ -218,7 +218,7 @@ export const getFrequentlyBoughtTogether = async (req: Request, res: Response) =
 
     res.json(sorted);
   } catch (error) {
-    console.error('Error getting frequently bought together:', error);
+    logger.error({ err: error }, 'Error getting frequently bought together');
     res.status(500).json({ error: 'Failed to get frequently bought together' });
   }
 };
@@ -280,7 +280,7 @@ export const getTrendingRecommendations = async (req: Request, res: Response) =>
 
     res.json(recommendations);
   } catch (error) {
-    console.error('Error getting trending recommendations:', error);
+    logger.error({ err: error }, 'Error getting trending recommendations');
     res.status(500).json({ error: 'Failed to get trending recommendations' });
   }
 };
@@ -307,7 +307,7 @@ export const getNewRecommendations = async (req: Request, res: Response) => {
 
     res.json(recommendations);
   } catch (error) {
-    console.error('Error getting new recommendations:', error);
+    logger.error({ err: error }, 'Error getting new recommendations');
     res.status(500).json({ error: 'Failed to get new recommendations' });
   }
 };
@@ -349,7 +349,7 @@ export const getSeasonalRecommendations = async (req: Request, res: Response) =>
 
     res.json(recommendations);
   } catch (error) {
-    console.error('Error getting seasonal recommendations:', error);
+    logger.error({ err: error }, 'Error getting seasonal recommendations');
     res.status(500).json({ error: 'Failed to get seasonal recommendations' });
   }
 };
@@ -402,7 +402,7 @@ export const getRecommendationsBasedOnFavorites = async (req: Request, res: Resp
 
     res.json(recommendations);
   } catch (error) {
-    console.error('Error getting recommendations based on favorites:', error);
+    logger.error({ err: error }, 'Error getting recommendations based on favorites');
     res.status(500).json({ error: 'Failed to get recommendations based on favorites' });
   }
 };
@@ -429,7 +429,7 @@ export const getRecommendationsByCategory = async (req: Request, res: Response) 
 
     res.json(recommendations);
   } catch (error) {
-    console.error('Error getting recommendations by category:', error);
+    logger.error({ err: error }, 'Error getting recommendations by category');
     res.status(500).json({ error: 'Failed to get recommendations by category' });
   }
 };
@@ -457,7 +457,7 @@ export const getRecommendationsByBudget = async (req: Request, res: Response) =>
 
     res.json(recommendations);
   } catch (error) {
-    console.error('Error getting recommendations by budget:', error);
+    logger.error({ err: error }, 'Error getting recommendations by budget');
     res.status(500).json({ error: 'Failed to get recommendations by budget' });
   }
 };

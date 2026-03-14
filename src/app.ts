@@ -28,6 +28,16 @@ const app = express();
 // Necessário para que o express-rate-limit funcione corretamente
 app.set("trust proxy", 1);
 
+// ✅ HTTPS Redirect in production (enforce HTTPS)
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    if (req.header('x-forwarded-proto') !== 'https') {
+      return res.redirect(`https://${req.header('host')}${req.url}`);
+    }
+    next();
+  });
+}
+
 // Inicializar Sentry (deve ser o primeiro)
 initSentry(app);
 

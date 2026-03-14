@@ -43,7 +43,7 @@ export class AuthService {
         const bookingService = new BookingService();
         await bookingService.linkBookingsToUser(user.id, user.email, data.bookingId);
       } catch (e) {
-        console.error('Erro ao vincular orçamentos no registro:', e);
+        logger.error({ err: e }, 'Erro ao vincular orçamentos no registro');
       }
     }
 
