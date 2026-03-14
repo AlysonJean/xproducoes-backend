@@ -9,9 +9,6 @@ import { cacheService, CacheService } from "../services/cacheService";
 export class CategoryController {
   create = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      console.log('DEBUG Category Create:', {
-        body: req.body
-      });
       categoryCreateSchema.parse(req.body);
       const { name, imageUrl, imageAlt } = req.body;
       const category = await categoryService.create({ name, imageUrl, imageAlt });
