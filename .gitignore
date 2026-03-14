@@ -45,3 +45,7 @@ test-results/
 debug_login.js
 smoke_test_routes.js
 test_validation.js
+
+# Backups
+backup_db.bat
+backups/
