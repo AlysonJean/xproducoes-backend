@@ -263,6 +263,21 @@ export const dashboardRateLimit = rateLimit({
   },
 });
 
+// Rate limiting para formulário de contato público - Anti-spam
+export const contactRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hora
+  max: 5, // 5 mensagens por hora por IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req: Request, res: Response) => {
+    res.status(429).json({
+      success: false,
+      error: 'CONTACT_RATE_LIMIT',
+      message: 'Muitas mensagens enviadas. Aguarde 1 hora antes de tentar novamente.',
+    });
+  },
+});
+
 export const rateLimiters = {
   auth: authRateLimit,
   api: apiRateLimit,
