@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import * as kitService from "../services/kitService";
+import { logger } from "../config/logger";
 
 export class KitController {
   create = async (req: Request, res: Response, next: NextFunction) => {
@@ -13,7 +14,7 @@ export class KitController {
         try {
           data.items = JSON.parse(data.items);
         } catch (e) {
-          console.error("Failed to parse items JSON", e);
+          logger.warn({ error: e }, "Falha ao fazer parse de items JSON em create");
         }
       }
 
@@ -35,7 +36,7 @@ export class KitController {
         try {
           data.items = JSON.parse(data.items);
         } catch (e) {
-          console.error("Failed to parse items JSON", e);
+          logger.warn({ error: e }, "Falha ao fazer parse de items JSON em update");
         }
       }
 

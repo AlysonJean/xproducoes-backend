@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { ServiceService } from '../services/serviceService';
+import { logger } from '../config/logger';
 
 const service = new ServiceService();
 
@@ -10,7 +11,7 @@ export class ServiceController {
       const services = await service.findAll(undefined, publicView);
       return res.json(services);
     } catch (error) {
-      console.error(error);
+      logger.error({ error }, 'Erro ao buscar serviços');
       return res.status(500).json({ message: 'Erro ao buscar serviços' });
     }
   }
@@ -36,7 +37,7 @@ export class ServiceController {
       const serviceData = await service.create(data);
       return res.status(201).json(serviceData);
     } catch (error) {
-      console.error(error);
+      logger.error({ error }, 'Erro ao criar serviço');
       return res.status(400).json({ message: 'Erro ao criar serviço' });
     }
   }

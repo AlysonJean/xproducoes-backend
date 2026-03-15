@@ -5,12 +5,17 @@ import {
   categoryUpdateSchema,
 } from "../validators/categorySchema";
 import { cacheService, CacheService } from "../services/cacheService";
+import { logger } from "../config/logger";
 
 export class CategoryController {
   create = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      categoryCreateSchema.parse(req.body);
-      const { name, imageUrl, imageAlt } = req.body;
+      const validation = categoryCreateSchema.safeParse(req.body);
+      if (!validation.success) {
+        return next(new Error(`Validação falhou: ${validation.error.issues[0]?.message || 'Dados inválidos'}`));
+      }
+
+      const { name, imageUrl, imageAlt } = validation.data;
       const category = await categoryService.create({ name, imageUrl, imageAlt });
 
       // Invalidar cache após criar categoria
@@ -41,9 +46,14 @@ export class CategoryController {
       if (req.userRole !== "ADMIN") {
         return res.status(403).json({ message: "Acesso negado" });
       }
-      categoryUpdateSchema.parse(req.body);
+
+      const validation = categoryUpdateSchema.safeParse(req.body);
+      if (!validation.success) {
+        return next(new Error(`Validação falhou: ${validation.error.issues[0]?.message || 'Dados inválidos'}`));
+      }
+
       const { id } = req.params as { id: string };
-      const { name, imageUrl, imageAlt } = req.body;
+      const { name, imageUrl, imageAlt } = validation.data;
 
       if (!id) {
         return res
@@ -58,6 +68,9 @@ export class CategoryController {
 
       return res.json(category);
     } catch (error) {
+      return next(error);
+    }
+  };
       return next(error);
     }
   };

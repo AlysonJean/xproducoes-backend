@@ -3,6 +3,7 @@
 import { Request, Response, NextFunction } from "express";
 import { ContactService } from "../services/contactService";
 import { z } from "zod";
+import { ValidationError } from "../errors/AppError";
 
 const contactService = new ContactService();
 
@@ -16,7 +17,13 @@ export class ContactController {
   // Rota Pública
   submitForm = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const validatedData = contactSchema.parse(req.body);
+      const validation = contactSchema.safeParse(req.body);
+      if (!validation.success) {
+        const firstError = validation.error.issues[0]?.message || 'Dados inválidos';
+        return next(new ValidationError(firstError));
+      }
+
+      const validatedData = validation.data;
       const submission = await contactService.createSubmission(validatedData);
       return res.status(201).json(submission);
     } catch (error) {
