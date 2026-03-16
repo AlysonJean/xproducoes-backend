@@ -9,7 +9,7 @@
     "dev:tsx": "tsx watch src/index.ts",
     "dev:ts-node-dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "dev:detached": "start \"backend\" cmd /k \"npm run dev:tsx\"",
-    "build": "shx mkdir -p .cache/puppeteer && cross-env PUPPETEER_CACHE_DIR=.cache/puppeteer npx puppeteer browsers install chrome && npm run prisma:generate && node esbuild.config.js",
+    "build": "node -e \"const fs=require('fs');fs.mkdirSync('.cache/puppeteer',{recursive:true})\" && npx puppeteer browsers install chrome && npm run prisma:generate && node esbuild.config.js",
     "postbuild": "npx prisma db push --accept-data-loss || echo 'Schema already in sync'",
     "start": "node dist/index.js",
     "start:prod": "node dist/index.js",
