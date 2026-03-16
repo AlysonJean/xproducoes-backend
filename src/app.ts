@@ -11,11 +11,14 @@ import apiV1 from "./api/v1.js";
 import cepRoutes from './routes/cepRoutes.js';
 import { securityMonitoringMiddleware } from "./config/securityMonitor.js";
 import { sitemapController } from "./controllers/sitemapController.js";
-import { initSentry, sentryErrorHandler } from "./config/sentry.js";
 import { requestIdMiddleware } from "./middlewares/requestIdMiddleware.js";
 import { healthCheck, readinessCheck, metricsEndpoint } from "./controllers/healthController.js";
 import { performanceMonitoringMiddleware } from "./middlewares/performanceMonitoring.js";
 import { setupSwagger } from "./config/swagger.js";
+import { initSentry, sentryErrorHandler } from "./config/sentryEnhanced.js";
+import { csrfTokenGenerator, csrfTokenValidator, getCsrfToken } from "./middlewares/csrfMiddleware.js";
+import { createApiRateLimiter, createAuthRateLimiter, createUploadRateLimiter, initializeRateLimiters } from "./middlewares/adaptiveRateLimiter.js";
+import { inputSanitizationMiddleware } from "./middlewares/inputSanitization.js";
 
 dotenv.config();
 
@@ -70,13 +73,12 @@ app.use((req, res, next) => {
 });
 // Logs
 app.use(morgan("dev"));
-// Rate limiting
-app.use(
-  rateLimit({
-    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-    max: Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
-  }),
-);
+
+// ✅ INITIALIZE RATE LIMITERS (Redis + Memory fallback)
+await initializeRateLimiters();
+
+// Apply adaptive rate limiting
+app.use(createApiRateLimiter());
 
 // Monitoramento de segurança
 app.use(securityMonitoringMiddleware);
@@ -107,18 +109,33 @@ if (process.env.NODE_ENV === "production") {
 // Removido: não servimos uploads locais (Cloudinary apenas)
 // Cookie parser (deve vir antes das rotas que usam cookies)
 app.use(cookieParser());
+
+// ✅ CSRF TOKEN GENERATION (antes de rotas, depois de cookies)
+app.use(csrfTokenGenerator);
+
 // Body parser
 app.use(express.json({ limit: process.env.MAX_FILE_SIZE || "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // Input sanitization (após body parser, antes das rotas)
-
-
-import { inputSanitizationMiddleware } from "./middlewares/inputSanitization.js";
 app.use(inputSanitizationMiddleware);
+
+// ✅ CSRF TOKEN VALIDATION (após body parser, antes das rotas)
+app.use('/api/v1', csrfTokenValidator);
 
 // Swagger API Documentation
 setupSwagger(app);
+
+// ✅ CSRF TOKEN ENDPOINT (GET - no validation needed)
+app.get("/api/v1/csrf-token", getCsrfToken);
+
+// ✅ AUTH RATE LIMITING (before auth routes)
+const authRateLimiter = createAuthRateLimiter();
+app.use('/api/v1/auth', authRateLimiter);
+
+// ✅ UPLOAD RATE LIMITING (before upload routes)
+const uploadRateLimiter = createUploadRateLimiter();
+app.use('/api/v1/upload', uploadRateLimiter);
 
 // Versionamento de API
 app.use("/api/v1", apiV1);
