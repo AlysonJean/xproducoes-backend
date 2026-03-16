@@ -50,7 +50,7 @@ app.use(requestIdMiddleware);
 app.use(performanceMonitoringMiddleware);
 
 // Advanced metrics monitoring (2026 standard - for Prometheus + Grafana)
-app.use(monitoringMiddleware);
+app.use(monitoringMiddleware());
 
 // CORS middleware
 app.use(dynamicCors);
