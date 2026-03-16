@@ -1,5 +1,7 @@
 import { describe, it, expect, jest } from '@jest/globals';
 
+let whatsappService: typeof import('../services/whatsappService').whatsappService;
+
 // 1. MOCK TOTAL das libs pesadas (Evita abrir Chrome/Puppeteer)
 jest.mock('whatsapp-web.js', () => {
   return {
@@ -31,11 +33,15 @@ jest.mock('pino', () => () => ({
   info: jest.fn(),
   error: jest.fn(),
   warn: jest.fn(),
+  debug: jest.fn(),
+  trace: jest.fn(),
+  fatal: jest.fn(),
   child: jest.fn().mockReturnThis()
 }));
 
-// Importar o serviço APÓS os mocks
-import { whatsappService } from '../services/whatsappService';
+beforeAll(async () => {
+  ({ whatsappService } = await import('../services/whatsappService'));
+});
 
 describe('Smoke Tests (Leves)', () => {
   it('WhatsappService deve carregar sem travar o PC', async () => {

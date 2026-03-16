@@ -1,9 +1,7 @@
 import express from "express";
 import path from "node:path";
-import { fileURLToPath } from 'node:url';
 import helmet from "helmet";
 import morgan from "morgan";
-import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
 import * as dotenv from "dotenv";
 import { dynamicCors } from "./config/cors.js";
@@ -17,13 +15,14 @@ import { performanceMonitoringMiddleware } from "./middlewares/performanceMonito
 import { setupSwagger } from "./config/swagger.js";
 import { initSentry, sentryErrorHandler } from "./config/sentryEnhanced.js";
 import { csrfTokenGenerator, csrfTokenValidator, getCsrfToken } from "./middlewares/csrfMiddleware.js";
-import { createApiRateLimiter, createAuthRateLimiter, createUploadRateLimiter, initializeRateLimiters } from "./middlewares/adaptiveRateLimiter.js";
+import { createApiRateLimiter, createAuthRateLimiter, createUploadRateLimiter } from "./middlewares/adaptiveRateLimiter.js";
 import { inputSanitizationMiddleware } from "./middlewares/inputSanitization.js";
+import { monitoringMiddleware, prometheusMetricsEndpoint, getDashboardSummary } from "./monitoring/advancedMetrics.js";
+import crypto from "node:crypto";
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const appDirPath = path.resolve(process.cwd(), "src");
 
 const app = express();
 
@@ -50,6 +49,9 @@ app.use(requestIdMiddleware);
 // Performance monitoring (coleta métricas de todas as requisições)
 app.use(performanceMonitoringMiddleware);
 
+// Advanced metrics monitoring (2026 standard - for Prometheus + Grafana)
+app.use(monitoringMiddleware);
+
 // CORS middleware
 app.use(dynamicCors);
 
@@ -74,9 +76,6 @@ app.use((req, res, next) => {
 // Logs
 app.use(morgan("dev"));
 
-// ✅ INITIALIZE RATE LIMITERS (Redis + Memory fallback)
-await initializeRateLimiters();
-
 // Apply adaptive rate limiting
 app.use(createApiRateLimiter());
 
@@ -97,12 +96,12 @@ app.get("/", (req, res) => {
 
 // Servir arquivos estáticos para manifest e service worker (produção)
 if (process.env.NODE_ENV === "production") {
-  app.use(express.static(path.join(__dirname, "../public")));
+  app.use(express.static(path.join(appDirPath, "../public")));
   app.get("/manifest.webmanifest", (req, res) => {
-    res.sendFile(path.join(__dirname, "../public/manifest.webmanifest"));
+    res.sendFile(path.join(appDirPath, "../public/manifest.webmanifest"));
   });
   app.get("/service-worker.js", (req, res) => {
-    res.sendFile(path.join(__dirname, "../public/service-worker.js"));
+    res.sendFile(path.join(appDirPath, "../public/service-worker.js"));
   });
 }
 
@@ -150,9 +149,31 @@ app.get("/ready", readinessCheck);
 // Metrics endpoints - SRE Dashboard data
 app.get("/metrics", metricsEndpoint);
 
-// Prometheus/Grafana Cloud compatible endpoint (com autenticação)
-import { prometheusMetricsEndpoint, metricsAuthMiddleware } from "./controllers/prometheusController.js";
-app.get("/metrics/prometheus", metricsAuthMiddleware, prometheusMetricsEndpoint);
+// Advanced Prometheus/Grafana metrics endpoint (with authentication)
+function isValidInternalKey(req: express.Request): boolean {
+  const apiKey = req.get('X-Internal-Key');
+  const expected = process.env.INTERNAL_API_KEY;
+  if (!apiKey || !expected) return false;
+  const a = Buffer.from(apiKey);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+app.get("/internal/metrics", (req, res) => {
+  if (!isValidInternalKey(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  prometheusMetricsEndpoint(req, res);
+});
+
+// Advanced metrics dashboard endpoint (with authentication)
+app.get("/internal/dashboard", (req, res) => {
+  if (!isValidInternalKey(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  getDashboardSummary(req, res);
+});
 
 // 404 handler
 import { allowedOrigins } from "./config/cors.js";

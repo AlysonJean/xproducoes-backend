@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
-import * as kitService from "../services/kitService";
-import { logger } from "../config/logger";
+import * as kitService from "../services/kitService.js";
+import logger from "../config/logger.js";
 
 export class KitController {
   create = async (req: Request, res: Response, next: NextFunction) => {

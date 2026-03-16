@@ -9,9 +9,9 @@ export const equipmentCreateSchema = z.object({
   quantity: z.coerce.number().int().nonnegative("Quantidade deve ser não-negativa"),
   categoryId: z.string().min(1, "Categoria obrigatória"),
   tags: z.any().transform((v) => (typeof v === 'string' ? JSON.parse(v) : v)).pipe(z.array(z.string())).optional(),
-  specifications: z.any().transform((v) => (typeof v === 'string' ? JSON.parse(v) : v)).pipe(z.record(z.any())).optional(), // JSON
+  specifications: z.any().transform((v) => (typeof v === 'string' ? JSON.parse(v) : v)).pipe(z.record(z.string(), z.any())).optional(), // JSON
   weight: z.coerce.number().optional(),
-  dimensions: z.any().transform((v) => (typeof v === 'string' ? JSON.parse(v) : v)).pipe(z.record(z.any())).optional(),
+  dimensions: z.any().transform((v) => (typeof v === 'string' ? JSON.parse(v) : v)).pipe(z.record(z.string(), z.any())).optional(),
   powerRequirements: z.string().optional(),
   maintenanceNotes: z.string().optional(),
   condition: z.string().optional(),

@@ -1,10 +1,11 @@
-import { createSafeRouter } from "../middlewares/safeRouter";
-import * as userController from "../controllers/userController";
-import { authenticate } from "../middlewares/unifiedAuth";
-import { uploadSingle, processUpload } from "../middlewares/upload";
-import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
-import { validateBody } from "../config/validation";
-import { updateUserSchema, changePasswordSchema } from "../schemas/user.schema";
+import type { Request, Response } from 'express';
+import { createSafeRouter } from "../middlewares/safeRouter.js";
+import * as userController from "../controllers/userController.js";
+import { authenticate } from "../middlewares/unifiedAuth.js";
+import { uploadSingle, processUpload } from "../middlewares/upload.js";
+import { uploadRateLimit } from '../middlewares/rateLimitMiddleware.js';
+import { validateBody } from "../config/validation.js";
+import { updateUserSchema, changePasswordSchema } from "../schemas/user.schema.js";
 
 const userRoutes = createSafeRouter();
 
@@ -22,7 +23,7 @@ userRoutes.put(
 );
 
 // Rota temporária para favoritos (evitar 404)
-userRoutes.get("/favorites", authenticate, (req, res) => {
+userRoutes.get("/favorites", authenticate, (req: Request, res: Response) => {
   res.json({
     success: true,
     data: {
@@ -39,7 +40,7 @@ userRoutes.get("/stats", authenticate, userController.getStats);
 userRoutes.post("/promote-vip", authenticate, userController.promoteVip);
 
 // Rota para alterar senha
-userRoutes.post("/change-password", authenticate, validateBody(changePasswordSchema), async (req, res) => {
+userRoutes.post("/change-password", authenticate, validateBody(changePasswordSchema), async (req: Request, res: Response) => {
   try {
     const { currentPassword, newPassword } = req.body;
 

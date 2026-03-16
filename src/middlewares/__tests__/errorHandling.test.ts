@@ -1,42 +1,58 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { Request, Response, NextFunction } from 'express';
 import { errorHandler } from '../../middlewares/errorHandler.js';
-import { AppError } from '../../errors/AppError.js';
+import { AppError } from '../../utils/errors.js';
+
+type MockResponse = Pick<Response, 'status' | 'json' | 'setHeader'>;
+type ErrorResponseBody = {
+  message?: string;
+  stack?: string;
+};
 
 describe('Error Handler Middleware', () => {
   let mockRequest: Partial<Request>;
-  let mockResponse: Partial<Response>;
+  let mockResponse: MockResponse;
   let mockNext: NextFunction;
   let statusCode: number;
-  let responseData: any;
+  let responseData: ErrorResponseBody;
+  const originalNodeEnv = process.env.NODE_ENV;
+
+  afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+  });
 
   beforeEach(() => {
     statusCode = 200;
-    responseData = null;
+    responseData = {};
 
     mockRequest = {
       method: 'GET',
       url: '/api/test',
       headers: {},
+      socket: {
+        remoteAddress: '127.0.0.1',
+      } as Request['socket'],
     };
 
     mockResponse = {
-      status: vi.fn(function (code: number) {
+      status: jest.fn(function status(this: Partial<Response>, code: number) {
         statusCode = code;
-        return this;
+        return this as Response;
       }),
-      json: vi.fn(function (data: any) {
-        responseData = data;
-        return this;
+      json: jest.fn(function json(this: Partial<Response>, data: unknown) {
+        responseData = data as ErrorResponseBody;
+        return this as Response;
       }),
-      setHeader: vi.fn(),
+      setHeader: jest.fn(function setHeader(this: Partial<Response>) {
+        return this as Response;
+      }),
     };
 
-    mockNext = vi.fn();
+    mockNext = jest.fn();
   });
 
   it('should handle AppError correctly', () => {
-    const error = new AppError('Test error', 400);
+    const error = new AppError('Test error', 400, true, 'TEST_ERROR');
     
     errorHandler(
       error as any,
@@ -47,7 +63,7 @@ describe('Error Handler Middleware', () => {
 
     expect(mockResponse.status).toHaveBeenCalledWith(400);
     expect(mockResponse.json).toHaveBeenCalled();
-    expect(responseData.message).toContain('Test error');
+    expect((responseData as { message: string }).message).toContain('Test error');
   });
 
   it('should handle generic Error', () => {
@@ -94,7 +110,7 @@ describe('Error Handler Middleware', () => {
   it('should handle ValidationError', () => {
     const error = new (class extends AppError {
       constructor(msg: string) {
-        super(msg, 422);
+        super(msg, 422, true, 'VALIDATION_ERROR');
       }
     })('Validation failed');
     
@@ -111,7 +127,7 @@ describe('Error Handler Middleware', () => {
   it('should handle NotFoundError', () => {
     const error = new (class extends AppError {
       constructor(msg: string) {
-        super(msg, 404);
+        super(msg, 404, true, 'NOT_FOUND');
       }
     })('Resource not found');
     
@@ -128,7 +144,7 @@ describe('Error Handler Middleware', () => {
   it('should handle UnauthorizedError', () => {
     const error = new (class extends AppError {
       constructor(msg: string) {
-        super(msg, 401);
+        super(msg, 401, true, 'UNAUTHORIZED');
       }
     })('Unauthorized');
     
@@ -145,7 +161,7 @@ describe('Error Handler Middleware', () => {
   it('should handle ConflictError', () => {
     const error = new (class extends AppError {
       constructor(msg: string) {
-        super(msg, 409);
+        super(msg, 409, true, 'CONFLICT');
       }
     })('Resource already exists');
     
@@ -162,7 +178,7 @@ describe('Error Handler Middleware', () => {
 
 describe('Request Logging', () => {
   it('should log request method and URL', () => {
-    const logSpy = vi.spyOn(console, 'log');
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
     
     const mockRequest: Partial<Request> = {
       method: 'POST',
@@ -207,11 +223,19 @@ describe('Status Code Handling', () => {
 });
 
 describe('Security Headers', () => {
-  let mockResponse: Partial<Response>;
+  let mockResponse: MockResponse;
 
   beforeEach(() => {
     mockResponse = {
-      setHeader: vi.fn(),
+      status: jest.fn(function status(this: Partial<Response>) {
+        return this as Response;
+      }),
+      json: jest.fn(function json(this: Partial<Response>) {
+        return this as Response;
+      }),
+      setHeader: jest.fn(function setHeader(this: Partial<Response>) {
+        return this as Response;
+      }),
     };
   });
 

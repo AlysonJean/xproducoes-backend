@@ -6,6 +6,7 @@
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import { Express } from 'express';
+import { openAPISchema } from '../docs/openapi.js';
 
 const options: swaggerJsdoc.Options = {
   definition: {
@@ -274,7 +275,7 @@ const swaggerSpec = swaggerJsdoc(options);
  * Configura Swagger UI no Express
  */
 export function setupSwagger(app: Express): void {
-  // Servir documentação Swagger
+  // Servir documentação Swagger com spec original (backward compatibility)
   app.use(
     '/api/docs',
     swaggerUi.serve,
@@ -285,10 +286,39 @@ export function setupSwagger(app: Express): void {
     })
   );
 
-  // Endpoint JSON da especificação OpenAPI
+  // Endpoint JSON da especificação OpenAPI (original)
   app.get('/api/docs.json', (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(swaggerSpec);
+  });
+
+  // ✅ NEW: Servir documentação com OpenAPI 3.1 schema (2026 standard)
+  app.use(
+    '/api/docs/v2',
+    swaggerUi.serve,
+    swaggerUi.setup(openAPISchema as any, {
+      customCss: '.swagger-ui .topbar { display: none }',
+      customSiteTitle: 'X Produções API Docs (v2)',
+      customfavIcon: '/favicon.ico',
+      swaggerOptions: {
+        urls: [
+          {
+            url: '/api/v1/openapi.json',
+            name: 'OpenAPI v3.1 (Current)',
+          },
+          {
+            url: '/api/docs.json',
+            name: 'Swagger v3.0 (Legacy)',
+          },
+        ],
+      },
+    })
+  );
+
+  // ✅ NEW: Expose OpenAPI schema as JSON endpoint
+  app.get('/api/v1/openapi.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(openAPISchema);
   });
 }
 

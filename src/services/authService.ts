@@ -1,7 +1,8 @@
-import { prisma } from "../config/prisma";
-import * as userService from "./userService";
+import logger from '../config/logger.js';
+import { prisma } from "../config/prisma.js";
+import * as userService from "./userService.js";
 import jwt from "jsonwebtoken";
-import { config as envConfig } from "../config/environment";
+import { config as envConfig } from "../config/environment.js";
 
 interface RegisterData {
   name: string;

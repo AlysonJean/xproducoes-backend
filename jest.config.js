@@ -1,19 +1,40 @@
-const { createDefaultPreset } = require("ts-jest");
-
 /** @type {import("jest").Config} **/
-module.exports = {
+const integrationIgnorePatterns = [
+  "src/utils/__tests__/authTest\\.test\\.ts$",
+  "src/utils/__tests__/cart\\.test\\.ts$",
+  "src/utils/__tests__/category\\.test\\.ts$",
+  "src/utils/__tests__/dashboard\\.test\\.ts$",
+  "src/utils/__tests__/equipment\\.test\\.ts$",
+  "src/utils/__tests__/faq\\.test\\.ts$",
+  "src/utils/__tests__/kit\\.test\\.ts$",
+  "src/utils/__tests__/payment\\.test\\.ts$",
+  "src/utils/__tests__/portfolio\\.test\\.ts$",
+  "src/utils/__tests__/review\\.test\\.ts$",
+  "src/utils/__tests__/users\\.test\\.ts$",
+  "src/utils/__tests__/userController\\.test\\.ts$",
+  "src/utils/__tests__/cache\\.test\\.ts$",
+];
+
+const config = {
   testEnvironment: "node",
+  extensionsToTreatAsEsm: [".ts"],
+  moduleNameMapper: {
+    "^(\\.{1,2}/.*)\\.js$": "$1",
+  },
   transform: {
     "^.+\\.tsx?$": ["ts-jest", {
       tsconfig: 'tsconfig.test.json',
       isolatedModules: true, // Acelera a transpilação
+      useESM: true,
     }],
   },
   setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
   testTimeout: 10000, // Reduzido de 20s para 10s
   maxWorkers: "50%", // Usa metade dos cores para paralelizar
   // Evita rodar testes compilados em dist/ e duplicidades
-  testPathIgnorePatterns: ["/node_modules/", "/dist/"],
+  testPathIgnorePatterns: process.env.RUN_INTEGRATION_TESTS === 'true'
+    ? ["/node_modules/", "/dist/"]
+    : ["/node_modules/", "/dist/", ...integrationIgnorePatterns],
   // Só executa testes em desenvolvimento ou quando explicitamente solicitado
   testMatch: process.env.NODE_ENV === 'production' ? [] : [
     "**/__tests__/**/*.(js|ts)",
@@ -31,3 +52,5 @@ module.exports = {
     watchAll: false,
   })
 };
+
+export default config;

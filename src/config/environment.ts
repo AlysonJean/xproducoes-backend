@@ -61,6 +61,9 @@ function validateCritical() {
   }
 
   // Outras variáveis são recomendadas mas não críticas
+  if (!process.env.FRONTEND_URL) {
+    missing.push('FRONTEND_URL (recomendado para links em emails)');
+  }
   if (!config.cloudinary.cloudName || !config.cloudinary.apiKey || !config.cloudinary.apiSecret) {
     missing.push('CLOUDINARY_* (recomendado para upload de imagens)');
   }

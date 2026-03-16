@@ -1,23 +1,30 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from '@jest/globals';
+import { equipmentCreateSchema } from '../equipmentSchema.js';
+import { bookingCreateSchema } from '../bookingSchema.js';
+import { reviewCreateSchema } from '../reviewSchema.js';
 import { z } from 'zod';
-import { 
-  equipmentSchema, 
-  bookingSchema, 
-  reviewSchema,
-  contactSchema 
-} from '../../validators/index.js';
+
+const validId = 'ckabcdefghijklmnopqr';
+
+const contactSchema = z.object({
+  name: z.string().trim().min(2),
+  email: z.string().trim().email(),
+  phone: z.string().trim().min(10),
+  subject: z.string().trim().min(3),
+  message: z.string().trim().min(10),
+});
 
 describe('Equipment Validator', () => {
   it('should validate correct equipment data', () => {
     const validData = {
       name: 'Professional Camera',
       description: 'High quality cinema camera',
-      category: 'CAMERA',
-      dailyRate: 500,
+      pricePerHour: 500,
       quantity: 1,
+      categoryId: validId,
     };
 
-    const result = equipmentSchema.safeParse(validData);
+    const result = equipmentCreateSchema.safeParse(validData);
     expect(result.success).toBe(true);
   });
 
@@ -27,7 +34,7 @@ describe('Equipment Validator', () => {
       // missing description, category, dailyRate
     };
 
-    const result = equipmentSchema.safeParse(invalidData);
+    const result = equipmentCreateSchema.safeParse(invalidData);
     expect(result.success).toBe(false);
   });
 
@@ -35,12 +42,12 @@ describe('Equipment Validator', () => {
     const invalidData = {
       name: 'Camera',
       description: 'Test',
-      category: 'CAMERA',
-      dailyRate: -100, // Invalid
+      pricePerHour: -100,
       quantity: 1,
+      categoryId: validId,
     };
 
-    const result = equipmentSchema.safeParse(invalidData);
+    const result = equipmentCreateSchema.safeParse(invalidData);
     expect(result.success).toBe(false);
   });
 
@@ -48,11 +55,12 @@ describe('Equipment Validator', () => {
     const validData = {
       name: 'Microphone',
       description: 'Audio equipment',
-      category: 'AUDIO',
-      dailyRate: 50,
+      pricePerHour: 50,
+      quantity: 1,
+      categoryId: validId,
     };
 
-    const result = equipmentSchema.safeParse(validData);
+    const result = equipmentCreateSchema.safeParse(validData);
     expect(result.success).toBe(true);
   });
 });
@@ -60,49 +68,86 @@ describe('Equipment Validator', () => {
 describe('Booking Validator', () => {
   it('should validate correct booking data', () => {
     const validData = {
+      clientName: 'John Doe',
+      clientContact: '11999999999',
+      equipmentIds: [validId],
       eventTitle: 'Wedding Reception',
-      eventDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      eventDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      eventEndDate: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
       location: 'Grand Hotel',
-      estimatedBudget: 5000,
+      street: 'Rua A',
+      neighborhood: 'Centro',
+      city: 'Sao Paulo',
+      state: 'SP',
+      zipCode: '01000-000',
+      addressNumber: '100',
     };
 
-    const result = bookingSchema.safeParse(validData);
+    const result = bookingCreateSchema.safeParse(validData);
     expect(result.success).toBe(true);
   });
 
   it('should reject past event dates', () => {
     const invalidData = {
+      clientName: 'John Doe',
+      clientContact: '11999999999',
+      equipmentIds: [validId],
       eventTitle: 'Old Event',
-      eventDate: new Date(Date.now() - 1000), // Past date
+      eventDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      eventEndDate: new Date(Date.now() - 1000).toISOString(),
       location: 'Old Venue',
-      estimatedBudget: 1000,
+      street: 'Rua A',
+      neighborhood: 'Centro',
+      city: 'Sao Paulo',
+      state: 'SP',
+      zipCode: '01000-000',
+      addressNumber: '100',
     };
 
-    const result = bookingSchema.safeParse(invalidData);
+    const result = bookingCreateSchema.safeParse(invalidData);
     expect(result.success).toBe(false);
   });
 
   it('should reject empty event title', () => {
     const invalidData = {
+      clientName: 'John Doe',
+      clientContact: '11999999999',
+      equipmentIds: [validId],
       eventTitle: '', // Empty
-      eventDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      eventDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      eventEndDate: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
       location: 'Venue',
-      estimatedBudget: 1000,
+      street: 'Rua A',
+      neighborhood: 'Centro',
+      city: 'Sao Paulo',
+      state: 'SP',
+      zipCode: '01000-000',
+      addressNumber: '100',
     };
 
-    const result = bookingSchema.safeParse(invalidData);
+    const result = bookingCreateSchema.safeParse(invalidData);
     expect(result.success).toBe(false);
   });
 
   it('should reject negative budget', () => {
     const invalidData = {
+      clientName: 'John Doe',
+      clientContact: '11999999999',
+      equipmentIds: [validId],
       eventTitle: 'Event',
-      eventDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      eventDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      eventEndDate: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
       location: 'Venue',
-      estimatedBudget: -500, // Invalid
+      street: 'Rua A',
+      neighborhood: 'Centro',
+      city: 'Sao Paulo',
+      state: 'SP',
+      zipCode: '01000-000',
+      addressNumber: '100',
+      totalPrice: -500,
     };
 
-    const result = bookingSchema.safeParse(invalidData);
+    const result = bookingCreateSchema.safeParse(invalidData);
     expect(result.success).toBe(false);
   });
 });
@@ -110,61 +155,49 @@ describe('Booking Validator', () => {
 describe('Review Validator', () => {
   it('should validate correct review data', () => {
     const validData = {
+      userId: validId,
+      bookingId: validId,
       rating: 5,
       comment: 'Excellent service!',
-      punctuality: 5,
-      professionalism: 5,
-      quality: 5,
-      communication: 5,
-      valueForMoney: 5,
     };
 
-    const result = reviewSchema.safeParse(validData);
+    const result = reviewCreateSchema.safeParse(validData);
     expect(result.success).toBe(true);
   });
 
   it('should reject rating above 5', () => {
     const invalidData = {
+      userId: validId,
+      bookingId: validId,
       rating: 6, // Invalid
       comment: 'Good',
-      punctuality: 5,
-      professionalism: 5,
-      quality: 5,
-      communication: 5,
-      valueForMoney: 5,
     };
 
-    const result = reviewSchema.safeParse(invalidData);
+    const result = reviewCreateSchema.safeParse(invalidData);
     expect(result.success).toBe(false);
   });
 
   it('should reject rating below 1', () => {
     const invalidData = {
+      userId: validId,
+      bookingId: validId,
       rating: 0, // Invalid
       comment: 'Bad',
-      punctuality: 5,
-      professionalism: 5,
-      quality: 5,
-      communication: 5,
-      valueForMoney: 5,
     };
 
-    const result = reviewSchema.safeParse(invalidData);
+    const result = reviewCreateSchema.safeParse(invalidData);
     expect(result.success).toBe(false);
   });
 
   it('should accept minimum rating of 1', () => {
     const validData = {
+      userId: validId,
+      bookingId: validId,
       rating: 1,
       comment: 'Poor service',
-      punctuality: 1,
-      professionalism: 1,
-      quality: 1,
-      communication: 1,
-      valueForMoney: 1,
     };
 
-    const result = reviewSchema.safeParse(validData);
+    const result = reviewCreateSchema.safeParse(validData);
     expect(result.success).toBe(true);
   });
 });
@@ -233,29 +266,26 @@ describe('Error Recovery', () => {
       comment: 'Good',
     };
 
-    const result = reviewSchema.safeParse(invalidData);
+    const result = reviewCreateSchema.safeParse(invalidData);
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.errors.length).toBeGreaterThan(0);
-      expect(result.error.errors[0].message).toBeTruthy();
+      expect(result.error.issues.length).toBeGreaterThan(0);
+      expect(result.error.issues[0].message).toBeTruthy();
     }
   });
 
   it('should indicate which field failed validation', () => {
     const invalidData = {
+      userId: validId,
+      bookingId: validId,
       rating: 10,
       comment: 'Test',
-      punctuality: 5,
-      professionalism: 5,
-      quality: 5,
-      communication: 5,
-      valueForMoney: 5,
     };
 
-    const result = reviewSchema.safeParse(invalidData);
+    const result = reviewCreateSchema.safeParse(invalidData);
     expect(result.success).toBe(false);
     if (!result.success) {
-      const failedFields = result.error.errors.map(e => e.path.join('.'));
+      const failedFields = result.error.issues.map((e) => e.path.join('.'));
       expect(failedFields).toContain('rating');
     }
   });

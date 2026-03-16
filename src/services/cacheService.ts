@@ -5,7 +5,7 @@
  */
 
 import Redis from 'ioredis';
-import logger from '../config/logger';
+import logger from '../config/logger.js';
 
 interface CacheItem {
   data: any;
@@ -14,21 +14,13 @@ interface CacheItem {
 
 export class CacheService {
   private static instance: CacheService;
-  private redis: Redis | null = null;
+  private redis: InstanceType<typeof Redis> | null = null;
   private memoryStore = new Map<string, CacheItem>();
   private isRedisConnected = false;
-  private cleanupInterval: NodeJS.Timeout;
   private readonly keyPrefix = 'xproducoes:';
 
   private constructor() {
     this.initializeRedis();
-    // Limpeza automática a cada 5 minutos
-    this.cleanupInterval = setInterval(
-      () => {
-        this.cleanup();
-      },
-      5 * 60 * 1000,
-    );
   }
 
   public static getInstance(): CacheService {
@@ -124,6 +116,8 @@ export class CacheService {
    */
   async get<T>(key: string): Promise<T | null> {
     try {
+      this.cleanup();
+
       // Tenta Redis primeiro
       if (this.isRedisAvailable()) {
         const cached = await this.redis!.get(key);
@@ -160,6 +154,8 @@ export class CacheService {
     ttlSeconds: number = 300,
   ): Promise<boolean> {
     try {
+      this.cleanup();
+
       // Salva no Redis se disponível
       if (this.isRedisAvailable()) {
         const serialized = JSON.stringify(data);
@@ -462,9 +458,6 @@ export class CacheService {
    * ✅ DESTRUCTOR
    */
   destroy(): void {
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-    }
     this.memoryStore.clear();
     this.close();
   }

@@ -213,8 +213,8 @@ describe('Schema Error Handling', () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.errors.length).toBeGreaterThan(0);
-      expect(result.error.errors[0]).toHaveProperty('message');
+      expect(result.error.issues.length).toBeGreaterThan(0);
+      expect(result.error.issues[0]).toHaveProperty('message');
     }
   });
 

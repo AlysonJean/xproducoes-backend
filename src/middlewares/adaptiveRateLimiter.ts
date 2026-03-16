@@ -1,7 +1,6 @@
-import rateLimit, { Options } from 'express-rate-limit';
-import RedisStore from 'rate-limit-redis';
-import { createClient } from 'redis';
-import { logger } from '../config/logger.js';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import type { NextFunction, Request, Response } from 'express';
+import logger from '../config/logger.js';
 
 /**
  * Adaptive Rate Limiting (2026 Standard)
@@ -20,56 +19,82 @@ interface AdaptiveLimitConfig {
   windowMs: number;
   maxRequests: number;
   minRequests?: number; // Floor for adaptive limiting
-  maxRequests?: number; // Ceiling for adaptive limiting
-  keyGenerator?: (req: any) => string;
-  skip?: (req: any) => boolean;
+  maxRequestsCeiling?: number; // Ceiling for adaptive limiting
+  keyGenerator?: (req: RateLimitRequest) => string;
+  skip?: (req: RateLimitRequest) => boolean;
   message?: string;
+  responseTimeProvider?: () => number;
 }
 
-let redisClient: any = null;
+type RateLimitRequest = Request & {
+  userId?: string;
+  rateLimit?: {
+    resetTime?: Date;
+  };
+};
+
+type RateLimitHandler = (req: RateLimitRequest, res: Response, next: NextFunction) => unknown;
 
 /**
  * Initialize Redis client for distributed rate limiting
  */
 async function initializeRedis() {
   if (process.env.REDIS_URL && process.env.NODE_ENV === 'production') {
-    try {
-      redisClient = createClient({
-        url: process.env.REDIS_URL,
-      });
-
-      await redisClient.connect();
-      logger.info('Redis connected for rate limiting');
-      return redisClient;
-    } catch (error) {
-      logger.warn({ error }, 'Failed to connect to Redis, falling back to memory store');
-      return null;
-    }
+    logger.warn('Redis rate limit store disabled: package support not installed, using memory store');
   }
 
   return null;
 }
+
+const buildLimiter = ({
+  windowMs,
+  limit,
+  message,
+  keyGenerator,
+  skip,
+  handler,
+}: {
+  windowMs: number;
+  limit: number | ((req: RateLimitRequest, res: Response) => number | Promise<number>);
+  message: string;
+  keyGenerator: (req: RateLimitRequest) => string;
+  skip?: (req: RateLimitRequest) => boolean;
+  handler?: RateLimitHandler;
+}) => {
+  return rateLimit({
+    windowMs,
+    limit,
+    message,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    keyGenerator,
+    skip: skip ?? (() => false),
+    handler,
+  });
+};
+
+const getClientKey = (req: RateLimitRequest, prefix?: string) => {
+  if (req.userId) {
+    return prefix ? `${prefix}:${req.userId}` : `user:${req.userId}`;
+  }
+
+  return ipKeyGenerator(req.ip ?? 'unknown');
+};
 
 /**
  * Create adaptive rate limiter for general API endpoints
  * Standard: 50 requests per 15 minutes per IP
  */
 export const createApiRateLimiter = () => {
-  const config: Options = {
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 50,
+  return buildLimiter({
+    windowMs: 15 * 60 * 1000,
+    limit: 50,
     message: 'Too many requests from this IP, please try again later.',
-    standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
-    legacyHeaders: false, // Disable `X-RateLimit-*` headers
-    keyGenerator: (req: any) => {
-      // Use user ID if authenticated, otherwise IP
-      return req.userId ? `user:${req.userId}` : req.ip;
-    },
-    skip: (req: any) => {
-      // Skip rate limiting for health checks
+    keyGenerator: (req) => getClientKey(req),
+    skip: (req) => {
       return req.path === '/health' || req.path === '/readiness';
     },
-    handler: (req: any, res: any) => {
+    handler: (req, res) => {
       logger.warn(
         { ip: req.ip, userId: req.userId, path: req.path },
         'Rate limit exceeded'
@@ -80,20 +105,7 @@ export const createApiRateLimiter = () => {
         retryAfter: req.rateLimit?.resetTime,
       });
     },
-  };
-
-  // Use Redis store if available, otherwise memory
-  if (redisClient) {
-    return rateLimit({
-      ...config,
-      store: new RedisStore({
-        client: redisClient,
-        prefix: 'rl:', // Redis key prefix
-      }),
-    });
-  }
-
-  return rateLimit(config);
+  });
 };
 
 /**
@@ -102,17 +114,12 @@ export const createApiRateLimiter = () => {
  * Limit: 5 requests per 15 minutes per IP (strict!)
  */
 export const createAuthRateLimiter = () => {
-  const config: Options = {
+  return buildLimiter({
     windowMs: 15 * 60 * 1000,
-    max: 5, // Only 5 login attempts per 15 min
+    limit: 5,
     message: 'Too many login attempts, please try again later.',
-    standardHeaders: true,
-    legacyHeaders: false,
-    keyGenerator: (req: any) => {
-      // Always use IP for login (not user ID, since user might not exist yet)
-      return req.ip;
-    },
-    handler: (req: any, res: any) => {
+    keyGenerator: (req) => ipKeyGenerator(req.ip ?? 'unknown'),
+    handler: (req, res) => {
       logger.warn(
         { ip: req.ip, path: req.path },
         'Authentication rate limit exceeded - possible brute force'
@@ -123,19 +130,7 @@ export const createAuthRateLimiter = () => {
         retryAfter: req.rateLimit?.resetTime,
       });
     },
-  };
-
-  if (redisClient) {
-    return rateLimit({
-      ...config,
-      store: new RedisStore({
-        client: redisClient,
-        prefix: 'auth:',
-      }),
-    });
-  }
-
-  return rateLimit(config);
+  });
 };
 
 /**
@@ -143,26 +138,12 @@ export const createAuthRateLimiter = () => {
  * Limit: 100 requests per 15 minutes per IP
  */
 export const createPublicRateLimiter = () => {
-  const config: Options = {
+  return buildLimiter({
     windowMs: 15 * 60 * 1000,
-    max: 100, // Lenient for public data
+    limit: 100,
     message: 'Too many requests from this IP.',
-    standardHeaders: true,
-    legacyHeaders: false,
-    keyGenerator: (req: any) => req.ip,
-  };
-
-  if (redisClient) {
-    return rateLimit({
-      ...config,
-      store: new RedisStore({
-        client: redisClient,
-        prefix: 'public:',
-      }),
-    });
-  }
-
-  return rateLimit(config);
+    keyGenerator: (req) => ipKeyGenerator(req.ip ?? 'unknown'),
+  });
 };
 
 /**
@@ -170,17 +151,12 @@ export const createPublicRateLimiter = () => {
  * Limit: 3 uploads per hour per user
  */
 export const createUploadRateLimiter = () => {
-  const config: Options = {
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 3, // Only 3 uploads per hour
+  return buildLimiter({
+    windowMs: 60 * 60 * 1000,
+    limit: 3,
     message: 'Upload limit exceeded.',
-    standardHeaders: true,
-    legacyHeaders: false,
-    keyGenerator: (req: any) => {
-      // Require authentication for uploads
-      return req.userId ? `upload:${req.userId}` : req.ip;
-    },
-    handler: (req: any, res: any) => {
+    keyGenerator: (req) => getClientKey(req, 'upload'),
+    handler: (req, res) => {
       logger.warn(
         { userId: req.userId, path: req.path },
         'Upload rate limit exceeded'
@@ -191,19 +167,7 @@ export const createUploadRateLimiter = () => {
         retryAfter: 3600,
       });
     },
-  };
-
-  if (redisClient) {
-    return rateLimit({
-      ...config,
-      store: new RedisStore({
-        client: redisClient,
-        prefix: 'upload:',
-      }),
-    });
-  }
-
-  return rateLimit(config);
+  });
 };
 
 /**
@@ -212,53 +176,41 @@ export const createUploadRateLimiter = () => {
  * Requires performance monitoring data
  */
 export const createAdaptiveRateLimiter = (config: AdaptiveLimitConfig) => {
-  let serverLoad = 0;
-  let maxRequestsDynamic = config.maxRequests;
   const minRequests = config.minRequests || 10;
-  const maxRequests = config.maxRequests || config.maxRequests;
+  const maxRequestsCeiling = config.maxRequestsCeiling || config.maxRequests;
+  const responseTimeProvider = config.responseTimeProvider ?? getAverageResponseTime;
 
-  // Monitor server load every 10 seconds
-  setInterval(() => {
-    // Get average response time from monitoring
-    // This is a placeholder - integrate with actual metrics
-    const avgResponseTime = getAverageResponseTime();
-
-    // Adjust limits based on response time
-    if (avgResponseTime > 5000) {
-      // High response time - tighten limits
-      maxRequestsDynamic = Math.max(minRequests, maxRequestsDynamic - 5);
-      serverLoad = 'high';
-    } else if (avgResponseTime < 1000) {
-      // Low response time - relax limits
-      maxRequestsDynamic = Math.min(maxRequests, maxRequestsDynamic + 5);
-      serverLoad = 'low';
-    }
-
-    logger.debug(
-      { maxRequests: maxRequestsDynamic, avgResponseTime, serverLoad },
-      'Adaptive rate limiting adjusted'
-    );
-  }, 10_000);
-
-  const limiter: Options = {
+  return buildLimiter({
     windowMs: config.windowMs,
-    max: maxRequestsDynamic,
+    limit: () => {
+      const avgResponseTime = responseTimeProvider();
+
+      if (avgResponseTime > 5000) {
+        logger.debug(
+          { avgResponseTime, load: 'high', limit: minRequests },
+          'Adaptive rate limiting tightened for high load'
+        );
+        return minRequests;
+      }
+
+      if (avgResponseTime < 1000) {
+        logger.debug(
+          { avgResponseTime, load: 'low', limit: maxRequestsCeiling },
+          'Adaptive rate limiting relaxed for low load'
+        );
+        return maxRequestsCeiling;
+      }
+
+      logger.debug(
+        { avgResponseTime, load: 'normal', limit: config.maxRequests },
+        'Adaptive rate limiting kept at baseline'
+      );
+      return config.maxRequests;
+    },
     message: config.message || 'Too many requests.',
-    keyGenerator: config.keyGenerator || ((req: any) => req.ip),
+    keyGenerator: config.keyGenerator || ((req) => ipKeyGenerator(req.ip ?? 'unknown')),
     skip: config.skip,
-  };
-
-  if (redisClient) {
-    return rateLimit({
-      ...limiter,
-      store: new RedisStore({
-        client: redisClient,
-        prefix: 'adaptive:',
-      }),
-    });
-  }
-
-  return rateLimit(limiter);
+  });
 };
 
 /**

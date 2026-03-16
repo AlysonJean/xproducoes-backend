@@ -1,10 +1,10 @@
-import { createSafeRouter } from '../middlewares/safeRouter';
-import { ServiceController } from '../controllers/serviceController';
-import { uploadSingle, processUpload } from '../middlewares/upload';
-import { authenticate, optionalAuth } from '../middlewares/unifiedAuth';
+import { createSafeRouter } from '../middlewares/safeRouter.js';
+import { ServiceController } from '../controllers/serviceController.js';
+import { uploadSingle, processUpload } from '../middlewares/upload.js';
+import { authenticate, optionalAuth } from '../middlewares/unifiedAuth.js';
 
-import { validateBody, validateId } from '../config/validation';
-import { serviceCreateSchema, serviceUpdateSchema } from '../schemas/service.schema';
+import { validateBody, validateId } from '../config/validation.js';
+import { serviceCreateSchema, serviceUpdateSchema } from '../schemas/service.schema.js';
 
 const router = createSafeRouter();
 const controller = new ServiceController();

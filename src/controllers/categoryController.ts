@@ -5,7 +5,6 @@ import {
   categoryUpdateSchema,
 } from "../validators/categorySchema";
 import { cacheService, CacheService } from "../services/cacheService";
-import { logger } from "../config/logger";
 
 export class CategoryController {
   create = async (req: Request, res: Response, next: NextFunction) => {
@@ -68,9 +67,6 @@ export class CategoryController {
 
       return res.json(category);
     } catch (error) {
-      return next(error);
-    }
-  };
       return next(error);
     }
   };

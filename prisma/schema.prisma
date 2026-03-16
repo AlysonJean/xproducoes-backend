@@ -876,14 +876,15 @@ model EventSocialSetting {
   layoutMode         LayoutMode           @default(LANDSCAPE)
   mosaicFrequency    Int                  @default(15)
   qrCodeText         String?
-  booking            Booking?             @relation(fields: [bookingId], references: [id])
-  user               User?                @relation(fields: [userId], references: [id])
+  booking            Booking?             @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user               User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
   announcements      SocialAnnouncement[]
   posts              SocialPost[]
   devices            TVDevice[]
   sponsors           SponsorLogo[]        @relation("EventSocialSettingToSponsorLogo")
 
   @@index([userId])
+  @@index([hashtag])
   @@map("event_social_settings")
 }
 
@@ -905,6 +906,8 @@ model SocialPost {
 
   @@index([settingId])
   @@index([status])
+  @@index([moderatedBy])
+  @@index([status, fetchedAt])
   @@map("social_posts")
 }
 
@@ -918,11 +921,12 @@ model TVDevice {
   lastSeen    DateTime            @default(now())
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
-  booking     Booking?            @relation(fields: [bookingId], references: [id])
-  setting     EventSocialSetting? @relation(fields: [settingId], references: [id])
+  booking     Booking?            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  setting     EventSocialSetting? @relation(fields: [settingId], references: [id], onDelete: Cascade)
 
   @@index([pairingCode])
   @@index([settingId])
+  @@index([bookingId])
   @@map("tv_devices")
 }
 

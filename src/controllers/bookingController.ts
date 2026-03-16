@@ -712,8 +712,13 @@ export class BookingController {
 
   toggleTask = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { taskId } = req.params;
+      const taskId = Array.isArray(req.params.taskId) ? req.params.taskId[0] : req.params.taskId;
       const { isCompleted } = req.body;
+
+      if (!taskId) {
+        throw new BadRequestError("ID da tarefa é obrigatório.");
+      }
+
       const updated = await bookingService.toggleTaskStatus(taskId, isCompleted);
       
       // Emitir via Socket.IO para tempo real
@@ -732,8 +737,13 @@ export class BookingController {
 
   addExpense = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const { amount, description, receiptUrl } = req.body;
+
+      if (!id) {
+        throw new BadRequestError("ID da reserva é obrigatório.");
+      }
+
       const expense = await bookingService.createBookingExpense({
         bookingId: id,
         collaboratorId: req.userId!,

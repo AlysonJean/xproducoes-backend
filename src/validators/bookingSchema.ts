@@ -68,6 +68,13 @@ const bookingBaseSchema = z.object({
   notes: z.string().optional(),
   specialRequests: z.string().optional(),
 
+  // Crew Experience / produção operacional
+  technicalRider: z.string().optional(),
+  technicalRiderUrl: z.string().url().optional(),
+  locationUrl: z.string().url().optional(),
+  venueContactName: z.string().optional(),
+  venueContactPhone: z.string().optional(),
+
   // Status (opcionais para criação)
   status: z.nativeEnum(BookingStatus).optional().default(BookingStatus.DRAFT),
   deliveryStatus: z.nativeEnum(DeliveryStatus).optional().default(DeliveryStatus.PENDING),

@@ -10,6 +10,7 @@ jest.mock('../../middlewares/unifiedAuth', () => ({
     req.userRole = 'ADMIN';
     next();
   },
+  adminOnly: (req: any, res: any, next: any) => next(),
   authenticateToken: (req: any, res: any, next: any) => {
     req.user = { id: '1', role: 'ADMIN' };
     req.userId = '1';

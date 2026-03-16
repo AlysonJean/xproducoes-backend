@@ -4,7 +4,6 @@ import { equipmentCreateSchema } from "../validators/equipmentSchema";
 import { cacheService, CacheService } from "../services/cacheService";
 import { invalidateCache } from "../middlewares/cacheMiddleware";
 import { BadRequestError, ForbiddenError, NotFoundError } from "../utils/errors";
-import { logger } from "../config/logger";
 
 const equipmentService = new EquipmentService();
 
@@ -26,6 +25,7 @@ export class EquipmentController {
       ...req.body,
       pricePerHour: Number(req.body.pricePerHour),
       quantity: Number(req.body.quantity),
+      imageUrl: req.body.imageUrl,
     };
 
     const validation = equipmentCreateSchema.safeParse(data);
@@ -34,7 +34,10 @@ export class EquipmentController {
       throw new BadRequestError(firstError);
     }
 
-    const equipment = await equipmentService.create(validation.data, req.file);
+    const equipment = await equipmentService.create({
+      ...validation.data,
+      imageUrl: req.body.imageUrl,
+    }, req.file);
 
     // Invalidar cache após criar equipamento
     await cacheService.invalidateEquipmentCaches();
@@ -65,7 +68,14 @@ export class EquipmentController {
     const { id } = req.params as { id: string };
     if (!id) throw new BadRequestError("ID do equipamento é obrigatório.");
 
-    const equipment = await equipmentService.update(id, validation.data, req.file);
+    const equipment = await equipmentService.update(
+      id,
+      {
+        ...validation.data,
+        imageUrl: req.body.imageUrl,
+      },
+      req.file
+    );
 
     // Invalidar cache após atualizar equipamento
     if (equipment) {

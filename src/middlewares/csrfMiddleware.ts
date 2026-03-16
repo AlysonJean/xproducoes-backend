@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
-import { logger } from '../config/logger.js';
+import logger from '../config/logger.js';
 
 /**
  * CSRF Protection Middleware - Double-Submit Cookie Pattern (2026 standard)
@@ -19,6 +19,8 @@ import { logger } from '../config/logger.js';
 interface CsrfRequest extends Request {
   csrfToken?: string;
   csrfValid?: boolean;
+  id?: string;
+  userId?: string;
 }
 
 const CSRF_COOKIE_NAME = 'X-CSRF-Token';
@@ -117,7 +119,7 @@ export const csrfTokenValidator = (req: CsrfRequest, res: Response, next: NextFu
     const isValid = secureCompare(cookieToken, headerToken);
     if (!isValid) {
       logger.warn(
-        { method: req.method, path: req.path, requestId: req.id, userId: (req as any).userId },
+        { method: req.method, path: req.path, requestId: req.id, userId: req.userId },
         'CSRF token mismatch - possible attack detected'
       );
       return res.status(403).json({

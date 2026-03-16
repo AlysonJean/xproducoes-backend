@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { ServiceService } from '../services/serviceService';
-import { logger } from '../config/logger';
+import { ServiceService } from '../services/serviceService.js';
+import logger from '../config/logger.js';
 
 const service = new ServiceService();
 

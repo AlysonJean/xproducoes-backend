@@ -202,8 +202,7 @@ export class KitRepository {
             level: level.level,
             price: level.price,
             description: level.description,
-            includes: level.includes,
-            isPopular: level.isPopular
+            includes: level.includes
           }))
         }
       },

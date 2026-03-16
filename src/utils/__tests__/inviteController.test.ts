@@ -1,10 +1,10 @@
 import { sendInvite, registerFromInvite } from '../../controllers/inviteController';
 import { prisma } from '../../config/database';
-import * as mailer from '../../services/mailerService';
+import emailService from '../../services/emailService';
 
 // override prisma exported object at runtime
 const p: any = prisma as any;
-jest.spyOn(mailer as any, 'sendMail').mockImplementation(async () => ({ messageId: 'm1' }));
+jest.spyOn(emailService as any, 'sendMail').mockImplementation(async () => ({ messageId: 'm1' }));
 
 describe('inviteController', () => {
   beforeEach(() => {
@@ -20,7 +20,7 @@ describe('inviteController', () => {
     await sendInvite(req, res);
 
     expect((prisma as any).inviteToken.create).toHaveBeenCalled();
-    expect((mailer as any).sendMail).toHaveBeenCalled();
+    expect((emailService as any).sendMail).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(201);
   });
 

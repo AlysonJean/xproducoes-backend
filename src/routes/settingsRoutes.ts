@@ -1,5 +1,5 @@
-import { createSafeRouter } from '../middlewares/safeRouter';
-import { getAppSettings, updateAppSettings } from '../controllers/settingsController';
+import { createSafeRouter } from '../middlewares/safeRouter.js';
+import { getAppSettings, updateAppSettings } from '../controllers/settingsController.js';
 
 const router = createSafeRouter();
 

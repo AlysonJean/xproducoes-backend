@@ -10,6 +10,7 @@ dotenv.config();
 const connectionString = process.env.DATABASE_URL;
 
 let prisma: PrismaClient;
+let hasConnected = false;
 
 declare global {
   var __prisma: PrismaClient | undefined;
@@ -25,8 +26,8 @@ if (process.env.NODE_ENV === "production") {
   const pool = new Pool({ 
     connectionString, 
     max: POOL_MAX_CONNECTIONS,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000 
+    idleTimeoutMillis: 5000,
+    connectionTimeoutMillis: 15000 
   });
   const adapter = new PrismaPg(pool);
   prisma = new PrismaClient({
@@ -38,8 +39,8 @@ if (process.env.NODE_ENV === "production") {
     const pool = new Pool({ 
       connectionString,
       max: POOL_MAX_CONNECTIONS,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000 
+      idleTimeoutMillis: 5000,
+      connectionTimeoutMillis: 15000 
     });
     const adapter = new PrismaPg(pool);
     global.__prisma = new PrismaClient({
@@ -51,12 +52,17 @@ if (process.env.NODE_ENV === "production") {
 }
 
 // Conectar ao banco com retry (resiliência para Docker/Kubernetes)
-async function connectWithRetry(attempts = 1) {
+async function connectWithRetry(attempts = 1): Promise<void> {
   const MAX_ATTEMPTS = 5;
   const DELAY = attempts * 2000; // exponential backoff
 
   try {
+    if (!connectionString) {
+      throw new Error('DATABASE_URL não está configurada');
+    }
+
     await prisma.$connect();
+    hasConnected = true;
     logger.info('✅ Banco de dados conectado com sucesso');
   } catch (error) {
     if (attempts >= MAX_ATTEMPTS) {
@@ -64,18 +70,31 @@ async function connectWithRetry(attempts = 1) {
       if (process.env.NODE_ENV !== 'test') {
         process.exit(1);
       }
+      throw error instanceof Error ? error : new Error(String(error));
     } else {
       logger.warn(`⚠️ Falha na conexão (tentativa ${attempts}/${MAX_ATTEMPTS}). Retentando em ${DELAY}ms...`);
-      setTimeout(() => connectWithRetry(attempts + 1), DELAY);
+      await new Promise((resolve) => setTimeout(resolve, DELAY));
+      return connectWithRetry(attempts + 1);
     }
   }
 }
 
-connectWithRetry();
-// Graceful shutdown managed by application entry point
-process.on('beforeExit', async () => {
+export async function connectDatabase(): Promise<void> {
+  if (hasConnected) {
+    return;
+  }
+
+  await connectWithRetry();
+}
+
+export async function disconnectDatabase(): Promise<void> {
+  if (!hasConnected) {
+    return;
+  }
+
   await prisma.$disconnect();
-});
+  hasConnected = false;
+}
 
 export { prisma };
 export default prisma;

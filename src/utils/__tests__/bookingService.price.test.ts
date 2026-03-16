@@ -19,35 +19,34 @@ describe("BookingService - cálculo de preço total", () => {
   });
 
   it("usa totalPrice explícito se fornecido", async () => {
-    const data: any = { eventDate: Date.now()+100000, eventEndDate: Date.now()+200000, totalPrice: 123, userId: "u1", clientName: "c", clientContact: "x" };
+    const data: any = { eventDate: new Date(Date.now()+100000).toISOString(), eventEndDate: new Date(Date.now()+200000).toISOString(), totalPrice: 123, userId: "u1", clientName: "c", clientContact: "x" };
     mockPrisma.user.findUnique.mockResolvedValue({ id: "u1" });
     mockPrisma.client.findFirst.mockResolvedValue({ id: "cli1" });
-    const result = await service.createBooking(data, "u1");
+    await service.createBooking(data, "u1");
     expect(mockPrisma.booking.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ totalPrice: 123 }) }));
   });
 
   it("calcula preço pelo kit se kitId fornecido", async () => {
-    const data: any = { eventDate: Date.now()+100000, eventEndDate: Date.now()+200000, kitId: "kit1", userId: "u1", clientName: "c", clientContact: "x" };
+    const data: any = { eventDate: new Date(Date.now()+100000).toISOString(), eventEndDate: new Date(Date.now()+200000).toISOString(), eventDuration: 1, kitId: "kit1", userId: "u1", clientName: "c", clientContact: "x" };
     mockPrisma.user.findUnique.mockResolvedValue({ id: "u1" });
     mockPrisma.kit.findUnique.mockResolvedValue({ id: "kit1", price: 555 });
     mockPrisma.client.findFirst.mockResolvedValue({ id: "cli1" });
-    const result = await service.createBooking(data, "u1");
+    await service.createBooking(data, "u1");
     expect(mockPrisma.booking.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ totalPrice: 555 }) }));
   });
 
   it("calcula preço por equipamentos se equipmentIds fornecido", async () => {
-    const data: any = { eventDate: Date.now()+100000, eventEndDate: Date.now()+200000, equipmentIds: ["e1","e2"], userId: "u1", clientName: "c", clientContact: "x" };
+    const data: any = { eventDate: new Date(Date.now()+100000).toISOString(), eventEndDate: new Date(Date.now()+200000).toISOString(), eventDuration: 1, equipmentIds: ["e1","e2"], userId: "u1", clientName: "c", clientContact: "x" };
     mockPrisma.user.findUnique.mockResolvedValue({ id: "u1" });
     mockPrisma.equipment.findMany.mockResolvedValue([{ pricePerHour: 10 }, { pricePerHour: 20 }]);
     mockPrisma.client.findFirst.mockResolvedValue({ id: "cli1" });
-    const result = await service.createBooking(data, "u1");
+    await service.createBooking(data, "u1");
     expect(mockPrisma.booking.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ totalPrice: 30 }) }));
   });
 
   it("lança erro se não houver cliente identificado", async () => {
-    const data: any = { eventDate: Date.now()+100000, eventEndDate: Date.now()+200000, userId: "u1" };
+    const data: any = { eventDate: new Date(Date.now()+100000).toISOString(), eventEndDate: new Date(Date.now()+200000).toISOString() };
     mockPrisma.user.findUnique.mockResolvedValue({ id: "u1" });
-    mockPrisma.client.findFirst.mockResolvedValue(null);
     await expect(service.createBooking(data, "u1")).rejects.toThrow(BookingValidationError);
   });
 });

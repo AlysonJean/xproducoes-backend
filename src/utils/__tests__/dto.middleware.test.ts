@@ -1,5 +1,5 @@
 import { dtoTransformerMiddleware } from '../../middlewares/dto.middleware';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Prisma } from '@prisma/client';
 
 describe('dtoTransformerMiddleware', () => {
   let req: any, res: any, next: any;
@@ -14,7 +14,7 @@ describe('dtoTransformerMiddleware', () => {
     const originalJson = res.json;
     dtoTransformerMiddleware(req, res, next);
     
-    const decimal = new Decimal('123.45');
+    const decimal = new Prisma.Decimal('123.45');
     const data = { price: decimal };
     res.json(data);
     
@@ -25,7 +25,7 @@ describe('dtoTransformerMiddleware', () => {
     const originalJson = res.json;
     dtoTransformerMiddleware(req, res, next);
     
-    const decimalArr = [new Decimal('1.1'), new Decimal('2.2')];
+    const decimalArr = [new Prisma.Decimal('1.1'), new Prisma.Decimal('2.2')];
     res.json({ arr: decimalArr });
     
     expect(originalJson).toHaveBeenCalledWith({ arr: [1.1, 2.2] });
@@ -35,7 +35,7 @@ describe('dtoTransformerMiddleware', () => {
     const originalJson = res.json;
     dtoTransformerMiddleware(req, res, next);
     
-    const data = { nested: { value: new Decimal('9.99') } };
+    const data = { nested: { value: new Prisma.Decimal('9.99') } };
     res.json(data);
     
     expect(originalJson).toHaveBeenCalledWith({ nested: { value: 9.99 } });

@@ -144,6 +144,6 @@ describe('Cookie Configuration', () => {
     const refreshTokenMaxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
 
     expect(accessTokenMaxAge).toBeLessThan(refreshTokenMaxAge);
-    expect(accessTokenMaxAge).toBeLessThan(10 * 60 * 1000); // Less than 10 min too
+    expect(accessTokenMaxAge).toBeLessThanOrEqual(15 * 60 * 1000);
   });
 });

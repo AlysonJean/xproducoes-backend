@@ -1,17 +1,23 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Prisma, BookingStatus, DeliveryStatus } from "@prisma/client";
-import { BookingCreateInput, BookingUpdateInput, BookingFilters } from "../validators/bookingSchema";
+import { BookingCreateInput, BookingUpdateInput, BookingFilters } from "../validators/bookingSchema.js";
 import { 
   BookingValidationError, 
   BookingNotFoundError
-} from "../utils/bookingErrors";
-import logger from "../config/logger";
-import { prisma } from "../config/prisma";
-import { generateSemanticBookingId } from "../utils/bookingIdGenerator";
-import { cacheService } from "./cacheService";
-import { googleCalendarService } from "./googleCalendarService";
-import { whatsappService } from "./whatsappService";
-import { createDateFromBRT } from '../utils/timeZone';
+} from "../utils/bookingErrors.js";
+import logger from "../config/logger.js";
+import { prisma } from "../config/prisma.js";
+import { generateSemanticBookingId } from "../utils/bookingIdGenerator.js";
+import { cacheService } from "./cacheService.js";
+import { googleCalendarService } from "./googleCalendarService.js";
+import { whatsappService } from "./whatsappService.js";
+
+type BookingUpdateExtras = {
+  technicalRider?: string | null;
+  technicalRiderUrl?: string | null;
+  locationUrl?: string | null;
+  venueContactName?: string | null;
+  venueContactPhone?: string | null;
+};
 
 export class BookingService {
   /**
@@ -201,6 +207,15 @@ export class BookingService {
    */
   async createBooking(data: BookingCreateInput, creatorId: string, idempotencyKey?: string): Promise<any> {
     try {
+      // BACK-003: Check idempotency key first to avoid duplicate work
+      if (idempotencyKey) {
+        const existing = await this.prisma.booking.findFirst({
+          where: ({ idempotencyKey } as any),
+          include: this.bookingInclude
+        });
+        if (existing) return existing;
+      }
+
       // Validações básicas
       if (!data.eventDate || !data.eventEndDate) {
         throw new BookingValidationError("Datas do evento são obrigatórias");
@@ -217,10 +232,13 @@ export class BookingService {
         throw new BookingValidationError("A data final deve ser posterior à data inicial");
       }
 
-      // Buscar o usuário criador
-      const creator = await this.prisma.user.findUnique({
-        where: { id: creatorId }
-      });
+      // BACK-001: Parallel independent queries to fix N+1
+      const [creator, kit, equipments, services] = await Promise.all([
+        this.prisma.user.findUnique({ where: { id: creatorId } }),
+        data.kitId ? this.prisma.kit.findUnique({ where: { id: data.kitId } }) : null,
+        data.equipmentIds?.length ? this.prisma.equipment.findMany({ where: { id: { in: data.equipmentIds } } }) : [],
+        (data as any).serviceIds?.length ? this.prisma.service.findMany({ where: { id: { in: (data as any).serviceIds } } }) : [],
+      ]);
 
       if (!creator) {
         throw new BookingValidationError("Usuário criador não encontrado");
@@ -232,66 +250,40 @@ export class BookingService {
       const duration = data.eventDuration || 0;
 
       if (!totalPrice) {
-        let kitsPrice = 0;
-        let equipmentsPrice = 0;
-        let servicesPrice = 0;
-
-        if (data.kitId) {
-          const kit = await this.prisma.kit.findUnique({
-            where: { id: data.kitId }
-          });
-          kitsPrice = kit?.price ? Number(kit.price) * duration : 0;
-        }
-
-        if (data.equipmentIds && data.equipmentIds.length > 0) {
-          const equipments = await this.prisma.equipment.findMany({
-            where: { id: { in: data.equipmentIds } }
-          });
-          equipmentsPrice = equipments.reduce((sum, eq) => sum + Number(eq.pricePerHour), 0) * duration;
-        }
-
-        if ((data as any).serviceIds && (data as any).serviceIds.length > 0) {
-          const services = await this.prisma.service.findMany({
-            where: { id: { in: (data as any).serviceIds } }
-          });
-          servicesPrice = services.reduce((sum, s) => sum + Number(s.price), 0);
-        }
-
+        const kitsPrice = kit?.price ? Number(kit.price) * duration : 0;
+        const equipmentsPrice = (equipments as any[]).reduce((sum: number, eq: any) => sum + Number(eq.pricePerHour), 0) * duration;
+        const servicesPrice = (services as any[]).reduce((sum: number, s: any) => sum + Number(s.price), 0);
         totalPrice = kitsPrice + equipmentsPrice + servicesPrice;
       }
 
-      // Lidar com cliente
+      // BACK-002: Lidar com cliente usando upsert para evitar race condition
       let clientId = data.clientId;
       if (!clientId && data.userId) {
-        let client = await this.prisma.client.findFirst({
-          where: { userId: data.userId }
+        const client = await this.prisma.client.upsert({
+          where: { userId: data.userId },
+          create: {
+            userId: data.userId,
+            phone: data.clientContact || "",
+            companyName: data.clientName
+          },
+          update: {}
         });
-
-        if (!client) {
-          client = await this.prisma.client.create({
-            data: {
-              userId: data.userId,
-              phone: data.clientContact || "",
-              companyName: data.clientName
-            }
-          });
-        }
         clientId = client.id;
       } else if (!clientId && data.clientName && data.clientContact) {
-        // Para clientes temporários, devemos conectar a um usuário existente se userId for fornecido
         if (data.userId) {
-          // Verificar se o usuário existe
           const user = await this.prisma.user.findUnique({
             where: { id: data.userId }
           });
           
           if (user) {
-            const client = await this.prisma.client.create({
-              data: {
+            const client = await this.prisma.client.upsert({
+              where: { userId: data.userId },
+              create: {
                 userId: data.userId,
                 phone: data.clientContact,
                 companyName: data.clientName
-              }
+              },
+              update: {}
             });
             clientId = client.id;
           } else {
@@ -349,7 +341,7 @@ export class BookingService {
         setupTime: (data as any).setupTime ? new Date((data as any).setupTime) : undefined,
         pickupTime: (data as any).pickupTime ? new Date((data as any).pickupTime) : undefined,
         items: data.items ? {
-          create: data.items.map(item => ({
+          create: data.items.map((item: any) => ({
             description: item.description,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
@@ -362,18 +354,21 @@ export class BookingService {
           }))
         } : undefined,
         equipments: data.equipmentIds ? {
-          connect: data.equipmentIds.map(id => ({ id }))
+          connect: data.equipmentIds.map((id: string) => ({ id }))
         } : undefined,
         services: (data as any).serviceIds ? {
           connect: (data as any).serviceIds.map((id: string) => ({ id }))
         } : undefined
       };
 
+      // BACK-001: Wrap booking creation in a transaction
       let booking: any;
       try {
-        booking = await this.prisma.booking.create({
-          data: createData,
-          include: this.bookingInclude
+        booking = await this.prisma.$transaction(async (tx: any) => {
+          return tx.booking.create({
+            data: createData,
+            include: this.bookingInclude
+          });
         });
       } catch (err: any) {
         // Prisma: código P2002 -> violação de unicidade
@@ -396,10 +391,8 @@ export class BookingService {
     } catch (error) {
       logger.error("Error creating booking: " + String(error));
       if (error instanceof BookingValidationError) {
-        // Garante que só o erro customizado é lançado
         throw error;
       }
-      // Se o erro for "Cannot read properties of undefined (reading 'id')" e a mensagem original for de cliente não encontrado, relança BookingValidationError
       if (
         error instanceof Error &&
         error.message &&
@@ -581,7 +574,7 @@ export class BookingService {
   /**
    * Atualiza uma reserva
    */
-  async updateBooking(id: string, data: BookingUpdateInput): Promise<any> {
+  async updateBooking(id: string, data: BookingUpdateInput & BookingUpdateExtras): Promise<any> {
     try {
       // Valida se booking existe (throws se não existir)
       await this.getBookingById(id);
@@ -629,7 +622,7 @@ export class BookingService {
         await this.prisma.bookingItem.deleteMany({ where: { bookingId: id } });
         // Cria os novos
         (updateData as any).items = {
-          create: data.items.map(item => ({
+          create: data.items.map((item: any) => ({
             description: item.description,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
@@ -686,7 +679,7 @@ export class BookingService {
 
         // Enviar email de confirmação
         try {
-          const EmailService = (await import('./emailService')).default;
+          const EmailService = (await import('./emailService.js')).default;
           const clientUser = updatedBooking.client?.user;
           const clientEmail = clientUser?.email || updatedBooking.clientEmail || (updatedBooking as any).clientContact;
           const clientName = clientUser?.name || updatedBooking.clientName || '';
@@ -694,22 +687,22 @@ export class BookingService {
           if (clientEmail) {
             void EmailService.sendBookingApproved({ name: clientName, email: clientEmail }, updatedBooking);
           }
-        } catch (e) {
+        } catch (e: any) {
           logger.warn({ error: e }, 'Erro ao enviar email de aprovação via updateBookingStatus');
         }
 
         // WhatsApp Notification
-        void whatsappService.sendBookingConfirmation(updatedBooking).catch(e => {
+        void whatsappService.sendBookingConfirmation(updatedBooking).catch((e: any) => {
             logger.warn({ error: e }, 'Erro ao enviar notificação WhatsApp');
         });
 
         // Notify Collaborators (WhatsApp + Google Calendar)
-        void this.notifyCollaborators(updatedBooking).catch(e => {
+        void this.notifyCollaborators(updatedBooking).catch((e: any) => {
             logger.warn({ error: e }, 'Erro ao notificar colaboradores');
         });
 
         // Sync Admin Calendars (Master Agenda)
-        void this.syncAdminCalendars(updatedBooking).catch(e => {
+        void this.syncAdminCalendars(updatedBooking).catch((e: any) => {
             logger.warn({ error: e }, 'Erro ao sincronizar agendas dos admins');
         });
 
@@ -750,7 +743,7 @@ export class BookingService {
       if (booking.creator.role === 'ADMIN' || booking.creator.role === 'MANAGER') {
         participantIds.add(booking.creatorId);
       }
-      booking.eventCollaborators.forEach(ec => participantIds.add(ec.collaborator.userId));
+      booking.eventCollaborators.forEach((ec: any) => participantIds.add(ec.collaborator.userId));
 
       if (!chat) {
         chat = await this.prisma.chat.create({

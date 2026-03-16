@@ -1,6 +1,5 @@
 import { EmailService } from "../../services/emailService";
-import { BookingStatus, DeliveryStatus, UserRole } from '@prisma/client';
-import { Decimal } from "@prisma/client/runtime/library";
+import { BookingStatus, DeliveryStatus, Prisma, UserRole } from '@prisma/client';
 
 jest.mock("nodemailer");
 
@@ -29,7 +28,7 @@ describe("EmailService", () => {
       kitId: null,
       eventDate: new Date(),
       eventEndDate: new Date(),
-      totalPrice: new Decimal(100),
+      totalPrice: new Prisma.Decimal(100),
       status: BookingStatus.PENDING,
       requiresStairs: false,
       isCovered: false,
@@ -56,7 +55,7 @@ describe("EmailService", () => {
           updatedAt: new Date(),
           description: "Descrição teste",
           imageUrl: "http://imagem.com/img.png",
-          pricePerHour: new Decimal(10),
+          pricePerHour: new Prisma.Decimal(10),
           quantity: 1,
           categoryId: "cat1",
         },

@@ -6,9 +6,12 @@ jest.mock('../../repositories/cartRepository', () => {
     CartRepository: jest.fn().mockImplementation(() => ({
       findOrCreateCart: jest.fn(async (userId) => ({ id: 'cart1', userId, equipments: [], kit: null })),
       addItems: jest.fn(async (cartId, equipmentIds) => ({ id: cartId, equipments: equipmentIds })),
+      addService: jest.fn(async (cartId, serviceId) => ({ id: cartId, services: [serviceId] })),
       removeItem: jest.fn(async (cartId, equipmentId) => ({ id: cartId, equipments: [] })),
+      removeService: jest.fn(async (cartId, serviceId) => ({ id: cartId, services: [] })),
       updateKit: jest.fn(async (cartId, kitId) => ({ id: cartId, kit: kitId })),
       clearEquipments: jest.fn(async (cartId) => true),
+      clearServices: jest.fn(async (cartId) => true),
       clearKit: jest.fn(async (cartId) => true),
     }))
   };

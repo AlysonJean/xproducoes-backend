@@ -1,6 +1,17 @@
 import * as Sentry from '@sentry/node';
-import { ProfilingIntegration } from '@sentry/profiling-node';
-import { logger } from './logger.js';
+import logger from './logger.js';
+import type { Express, NextFunction, Request, Response } from 'express';
+
+type RequestWithContext = Request & {
+  id?: string;
+  userId?: string;
+  userRole?: string;
+};
+
+type ErrorWithStatus = Error & {
+  status?: number | string;
+  statusCode?: number | string;
+};
 
 /**
  * Enhanced Sentry Configuration (2026 Standard)
@@ -20,7 +31,7 @@ import { logger } from './logger.js';
  * - Integrate with monitoring endpoints
  */
 
-export function initSentry(app: any) {
+export function initSentry(app: Express) {
   const isDev = process.env.NODE_ENV === 'development';
   const dsn = process.env.SENTRY_DSN;
 
@@ -44,15 +55,11 @@ export function initSentry(app: any) {
       process.env.API_URL || 'http://localhost:4000',
     ],
 
-    // Profiling (continuous profiling)
-    profilesSampleRate: isDev ? 1.0 : 0.1, // Sample 10% of transactions for profiling in prod
+    // Profiling
+    profilesSampleRate: isDev ? 1.0 : 0.1,
     integrations: [
-      new ProfilingIntegration(),
-      new Sentry.Integrations.Http({ tracing: true }),
-      new Sentry.Integrations.Express({
-        request: true,
-        serverName: true,
-      }),
+      Sentry.httpIntegration(),
+      Sentry.expressIntegration(),
     ],
 
     // Error filtering & sampling
@@ -94,11 +101,6 @@ export function initSentry(app: any) {
       'Failed to fetch',
     ],
 
-    // Data sanitization
-    sanitizer: {
-      allowUrls: [],
-    },
-
     // Max breadcrumbs
     maxBreadcrumbs: 50,
 
@@ -109,17 +111,17 @@ export function initSentry(app: any) {
     serverName: process.env.HOSTNAME || 'x-producoes-api',
   });
 
-  // Attach request handler middleware
-  app.use(Sentry.Handlers.requestHandler());
-
-  // Attach performance monitoring middleware
-  app.use(Sentry.Handlers.tracingHandler());
-
   // Custom middleware to add request context
-  app.use((req, res, next) => {
-    Sentry.getCurrentScope().setTag('request_id', req.id);
-    Sentry.getCurrentScope().setTag('user_id', (req as any).userId);
-    Sentry.getCurrentScope().setTag('user_role', (req as any).userRole);
+  app.use((req: RequestWithContext, _res: Response, next: NextFunction) => {
+    if (req.id) {
+      Sentry.setTag('request_id', req.id);
+    }
+    if (req.userId) {
+      Sentry.setTag('user_id', req.userId);
+    }
+    if (req.userRole) {
+      Sentry.setTag('user_role', req.userRole);
+    }
 
     next();
   });
@@ -134,10 +136,11 @@ export function initSentry(app: any) {
  * Must be placed after all other error handlers
  */
 export function sentryErrorHandler() {
-  return Sentry.Handlers.errorHandler({
-    shouldHandleError: (error) => {
+  return Sentry.expressErrorHandler({
+    shouldHandleError: (error: ErrorWithStatus) => {
       // Only send errors that are not 4xx status codes
-      if (error?.status && error.status >= 400 && error.status < 500) {
+      const status = Number(error.status ?? error.statusCode ?? 500);
+      if (status >= 400 && status < 500) {
         return false;
       }
       return true;
@@ -146,11 +149,11 @@ export function sentryErrorHandler() {
 }
 
 /**
- * Start a Sentry transaction for monitoring
+ * Start a Sentry span for monitoring
  * Useful for tracking critical operations
  */
 export function startTransaction(name: string, op: string) {
-  return Sentry.startTransaction({
+  return Sentry.startInactiveSpan({
     name,
     op,
   });
@@ -225,7 +228,7 @@ export function addBreadcrumb(
   message: string,
   category: string,
   level: 'fatal' | 'error' | 'warning' | 'info' | 'debug' = 'info',
-  data?: Record<string, any>
+  data?: Record<string, unknown>
 ) {
   Sentry.addBreadcrumb({
     message,
@@ -242,7 +245,7 @@ export function addBreadcrumb(
 export function captureUserAction(
   userId: string,
   action: string,
-  details?: Record<string, any>
+  details?: Record<string, unknown>
 ) {
   addBreadcrumb(`User: ${action}`, 'user-action', 'info', details);
 

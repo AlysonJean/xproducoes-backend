@@ -1,8 +1,14 @@
 
 import { Request, Response } from 'express';
+import type { Prisma } from '@prisma/client';
 import { googleCalendarService } from '../services/googleCalendarService';
 import { prisma } from '../config/prisma';
 import logger from '../config/logger';
+
+const syncBookingInclude = {
+  equipments: true,
+  client: true,
+} satisfies Prisma.BookingInclude;
 
 // Inicia o fluxo OAuth
 // Retorna JSON com a URL para o frontend redirecionar
@@ -62,16 +68,14 @@ export async function disconnect(req: Request, res: Response) {
 export async function syncBooking(req: Request, res: Response) {
     try {
         const userId = (req as any).user?.id || (req as any).userId;
-        const { id } = req.params; // bookingId
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
         if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!id) return res.status(400).json({ error: 'ID da reserva é obrigatório' });
 
         const booking = await prisma.booking.findUnique({
             where: { id },
-            include: { 
-              equipments: true,
-              client: true
-            }
+      include: syncBookingInclude
         });
 
         if (!booking) return res.status(404).json({ error: 'Reserva não encontrada' });
@@ -104,7 +108,7 @@ export async function syncBooking(req: Request, res: Response) {
         // Montar objeto de evento
         const eventData = {
             title: booking.eventTitle || 'Reserva X-Produções',
-            description: `Reserva #${booking.id.substring(0,8)}\nStatus: ${booking.status}\n\nDetalhes:\n${(booking.equipments || []).map(e => `- ${(e as any).equipment?.name || (e as any).name || 'Item'}`).join('\n')}`,
+          description: `Reserva #${booking.id.substring(0,8)}\nStatus: ${booking.status}\n\nDetalhes:\n${booking.equipments.map((equipment) => `- ${equipment.name || 'Item'}`).join('\n')}`,
             location: venueString,
             startDate: booking.eventDate,
             endDate: booking.eventEndDate || new Date(booking.eventDate.getTime() + 4 * 3600 * 1000)

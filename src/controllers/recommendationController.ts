@@ -2,6 +2,7 @@
 
 import type { Request, Response } from 'express';
 import { prisma } from '../config/prisma';
+import logger from '../config/logger';
 
 /**
  * Controller para gerenciar recomendações de equipamentos e kits

@@ -1,6 +1,6 @@
-import { createSafeRouter } from '../middlewares/safeRouter';
-import socialController from '../controllers/socialController';
-import { authenticate } from '../middlewares/unifiedAuth';
+import { createSafeRouter } from '../middlewares/safeRouter.js';
+import socialController from '../controllers/socialController.js';
+import { authenticate } from '../middlewares/unifiedAuth.js';
 import multer from 'multer';
 
 const upload = multer({ storage: multer.memoryStorage() });

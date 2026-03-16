@@ -41,11 +41,18 @@ test-results/
 .wwebjs_auth/
 .wwebjs_cache/
 
-# Temporary Test Files
+# Caches
+.cache/
+
+# Backups (store externally)
+backups/
+*.sql
+
+# Temporary/debug files
 debug_login.js
 smoke_test_routes.js
 test_validation.js
-
-# Backups
-backup_db.bat
+*.log
+lint_*.txt
+output.log
 backups/

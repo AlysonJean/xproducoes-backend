@@ -39,8 +39,9 @@ export function errorHandler(
   // 3. Erros Operacionais da Aplicação (Customizados)
   if (err instanceof AppError) {
     // Reporting security events
-    const ip = req.ip || (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
-    const userAgent = req.headers['user-agent'] || 'unknown';
+    const forwardedFor = req.headers?.['x-forwarded-for'];
+    const ip = req.ip || (typeof forwardedFor === 'string' ? forwardedFor : undefined) || req.socket?.remoteAddress || 'unknown';
+    const userAgent = req.headers?.['user-agent'] || 'unknown';
 
     if ((err as any).statusCode === 401) {
       securityMonitor.recordInvalidToken(ip, userAgent, req.path, { message: (err as any).message });

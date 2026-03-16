@@ -1,6 +1,7 @@
 import app from "./app";
 import { securityMonitor } from "./config/securityMonitor";
 import { prisma } from "./config/prisma";
+import { connectDatabase } from "./config/database";
 import http from "http";
 import https from "https";
 import { initializeSocket } from "./config/socket";
@@ -11,6 +12,7 @@ import crypto from "crypto";
 import { initializeQueues, closeQueues } from "./config/jobQueue";
 import { startSocialScheduler } from "./cron/socialScheduler";
 import { startReminderScheduler } from "./cron/sendReminders";
+import { initializeRateLimiters } from "./middlewares/adaptiveRateLimiter";
 
 
 
@@ -255,8 +257,12 @@ async function startServerWithRetries(initialPort: number, maxRetries = 10) {
   }
 }
 
-// Iniciar servidor com tentativas
-startServerWithRetries(Number(process.env.PORT) || PORT)
+// Iniciar infraestrutura crítica antes de expor o servidor
+Promise.all([
+  connectDatabase(),
+  initializeRateLimiters(),
+])
+  .then(() => startServerWithRetries(Number(process.env.PORT) || PORT))
   .then(async () => {
     // Inicializar filas de jobs após servidor iniciar
     await initializeQueues();

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ChecklistType, ChecklistStatus, ChecklistPriority, ChecklistAssignmentStatus, ChecklistItemStatus } from "@prisma/client";
-import { idArraySchema } from "../utils/sharedSchema";
+import { idArraySchema } from "../utils/sharedSchema.js";
 
 // --- Checklist Item Schema ---
 export const checklistItemCreateSchema = z.object({

@@ -3,6 +3,17 @@ import type { Equipment, Prisma } from "@prisma/client";
 import { generateSlug } from "../utils/slug";
 import { randomBytes } from "crypto";
 
+type EquipmentCreateData = {
+  name: string;
+  description: string;
+  pricePerHour: number;
+  quantity: number;
+  categoryId: string;
+  imageUrl?: string;
+};
+
+type EquipmentUpdateData = Partial<EquipmentCreateData>;
+
 interface EquipmentSearchQuery {
   name?: string;
   categoryId?: string;
@@ -10,19 +21,11 @@ interface EquipmentSearchQuery {
 }
 
 export class EquipmentService {
-  async create(data: Prisma.EquipmentCreateInput, _file?: Express.Multer.File): Promise<Equipment> {
-    // imageUrl deve vir do middleware do Cloudinary
+  async create(data: EquipmentCreateData, _file?: Express.Multer.File): Promise<Equipment> {
     const imageUrl = data.imageUrl || "";
-    const equipmentData = { ...data } as any;
-    
-    // Limpeza de campos internos/metadata de upload
-    delete equipmentData.fileName;
-    delete equipmentData.folder;
-    delete equipmentData.uploadedFile;
-    delete equipmentData.imageUrl;
-    
+
     // Gerar slug a partir do nome
-    let slug = generateSlug(equipmentData.name);
+    let slug = generateSlug(data.name);
     
     // Verificar se slug existe e adicionar sufixo se necessário
     const slugExists = await prisma.equipment.findUnique({ where: { slug } });
@@ -32,36 +35,41 @@ export class EquipmentService {
 
     return prisma.equipment.create({
       data: {
-        ...equipmentData,
+        name: data.name,
+        description: data.description,
         pricePerHour: Number(data.pricePerHour),
         quantity: Number(data.quantity),
         imageUrl,
         slug,
+        category: {
+          connect: { id: data.categoryId },
+        },
       },
     });
   }
 
   async update(
     id: string,
-    data: Prisma.EquipmentUpdateInput,
+    data: EquipmentUpdateData,
     _file?: Express.Multer.File,
   ): Promise<Equipment | null> {
-    // imageUrl deve vir do middleware do Cloudinary (se fornecido)
     const imageUrl = data.imageUrl;
-    const equipmentData = { ...data } as any;
-    
-    // Limpeza de campos internos/metadata de upload
-    delete equipmentData.fileName;
-    delete equipmentData.folder;
-    delete equipmentData.uploadedFile;
-    delete equipmentData.imageUrl;
+    const updateData: Prisma.EquipmentUpdateInput = {};
+
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.pricePerHour !== undefined) updateData.pricePerHour = Number(data.pricePerHour);
+    if (data.quantity !== undefined) updateData.quantity = Number(data.quantity);
+    if (data.categoryId !== undefined) {
+      updateData.category = {
+        connect: { id: data.categoryId },
+      };
+    }
+    if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
     
     return prisma.equipment.update({
       where: { id },
-      data: {
-        ...equipmentData,
-        ...(imageUrl && { imageUrl }),
-      },
+      data: updateData,
       include: { category: true }
     });
   }

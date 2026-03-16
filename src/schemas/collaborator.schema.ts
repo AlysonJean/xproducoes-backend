@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { CollaboratorRole, CollaboratorStatus, AvailabilityStatus, PaymentType, CollaboratorPaymentStatus } from "@prisma/client";
-import { idSchema } from "../utils/sharedSchema";
+import { idSchema } from "../utils/sharedSchema.js";
 
 // --- Collaborator Schemas ---
 export const collaboratorCreateSchema = z.object({

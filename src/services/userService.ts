@@ -87,7 +87,8 @@ export async function requestPasswordReset(email: string, ipAddress?: string, us
     } catch {
       // noop
     }
-    throw new Error('Usuário não encontrado');
+    // Return success to prevent user enumeration
+    return { success: true };
   }
 
   // Gerar token de reset (mais seguro - 64 caracteres)
@@ -228,9 +229,9 @@ export async function register(data: RegisterInput) {
 
 export async function login(data: LoginInput) {
   const user = await prisma.user.findUnique({ where: { email: data.email } });
-  if (!user) throw new Error("Usuário não encontrado");
+  if (!user) throw new Error("Credenciais inválidas");
   const valid = await bcrypt.compare(data.password, user.passwordHash);
-  if (!valid) throw new Error("Senha inválida");
+  if (!valid) throw new Error("Credenciais inválidas");
   // Exigir verificação de e-mail se habilitado por ambiente; ADMINs são dispensados
   if (process.env.REQUIRE_EMAIL_VERIFICATION === 'true' && !user.verified && user.role !== 'ADMIN') {
     const err = new Error('E-mail não verificado') as Error & { code?: string };
@@ -247,7 +248,7 @@ export async function login(data: LoginInput) {
   const refreshToken = jwt.sign(
     { userId: user.id, role: user.role },
     config.jwtSecret,
-    { expiresIn: "7d" }, // Refresh token com 7 dias
+    { expiresIn: "3d" }, // Refresh token com 3 dias
   );
   
   // Adicionar rota de redirecionamento baseada no role
@@ -375,7 +376,7 @@ export async function listUsers() {
 
 export async function forgotPassword(email: string) {
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) throw new Error("Usuário não encontrado");
+  if (!user) throw new Error("Credenciais inválidas");
   const token = crypto.randomBytes(32).toString("hex");
   const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
   await prisma.user.update({
