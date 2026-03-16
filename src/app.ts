@@ -4,7 +4,8 @@ import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import * as dotenv from "dotenv";
-import { dynamicCors } from "./config/cors.js";
+import { dynamicCors, allowedOrigins } from "./config/cors.js";
+import { globalErrorHandler } from "./middlewares/globalErrorHandler.js";
 import apiV1 from "./api/v1.js";
 import cepRoutes from './routes/cepRoutes.js';
 import { securityMonitoringMiddleware } from "./config/securityMonitor.js";
@@ -139,7 +140,6 @@ app.use('/api/v1/upload', uploadRateLimiter);
 // Versionamento de API
 app.use("/api/v1", apiV1);
 app.use('/api/v1/cep', cepRoutes);
-app.use("/sitemap.xml", sitemapController.getSitemap);
 app.use("/api", apiV1); // Compatibilidade para testes e frontend
 
 // Health checks - Kubernetes/Docker probes
@@ -176,7 +176,6 @@ app.get("/internal/dashboard", (req, res) => {
 });
 
 // 404 handler
-import { allowedOrigins } from "./config/cors.js";
 app.use((req, res) => {
   const origin = req.headers.origin;
   if (origin && allowedOrigins.includes(origin)) {
@@ -200,7 +199,6 @@ app.use((req, res) => {
 app.use(sentryErrorHandler());
 
 // Error handler global enterprise-grade
-import { globalErrorHandler } from "./middlewares/globalErrorHandler.js";
 app.use(globalErrorHandler);
 
 export default app;

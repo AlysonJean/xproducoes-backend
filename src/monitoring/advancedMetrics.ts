@@ -65,7 +65,7 @@ function collectSystemHealth(): SystemHealth {
     uptime: process.uptime(),
     memoryUsage: process.memoryUsage(),
     dbPoolHealth: 'healthy', // Get from Prisma pool
-    cacheHitRate: Math.random() * 100, // Get from Redis stats
+    cacheHitRate: 0, // Populated via Redis stats when available
   };
 }
 

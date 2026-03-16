@@ -22,7 +22,6 @@ import collaboratorPaymentRoutes from "./collaboratorPaymentRoutes";
 import collaboratorMessagesRoutes from "./collaboratorMessagesRoutes";
 import enterpriseMonitoringRoutes from "./enterpriseMonitoringRoutes";
 import { cacheService } from "../services/cacheService";
-import { performanceMonitoringMiddleware } from "../middlewares/performanceMonitoring";
 
 import checklistRoutes from "./checklistRoutes";
 import settingsRoutes from "./settingsRoutes";
@@ -35,11 +34,9 @@ import googleRoutes from "./googleRoutes";
 import whatsappRoutes from "./whatsappRoutes";
 import sponsorRoutes from "./sponsorRoutes";
 import collaboratorFunctionRoutes from "./collaboratorFunctionRoutes";
+import recommendationRoutes from "./recommendationRoutes";
 
 const router: RouterType = Router();
-
-// Performance monitoring middleware
-router.use(performanceMonitoringMiddleware);
 
 // Core routes
 router.use("/calendar", calendarRoutes);
@@ -96,7 +93,6 @@ router.use('/banners', bannerRoutes);
 router.use(socialRoutes);
 
 // Recommendation routes (optional auth - better results when authenticated)
-import recommendationRoutes from './recommendationRoutes';
 router.use('/recommendations', recommendationRoutes);
 router.use('/google', googleRoutes);
 router.use('/whatsapp', whatsappRoutes);

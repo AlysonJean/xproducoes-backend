@@ -24,7 +24,7 @@ interface CsrfRequest extends Request {
 }
 
 const CSRF_COOKIE_NAME = 'X-CSRF-Token';
-const CSRF_HEADER_NAMES = ['x-csrf-token', 'x-csrf-token', 'csrf-token'];
+const CSRF_HEADER_NAMES = ['x-csrf-token', 'csrf-token'];
 const CSRF_TOKEN_LENGTH = 32;
 
 /**
