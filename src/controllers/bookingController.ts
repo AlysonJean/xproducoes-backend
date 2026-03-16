@@ -664,7 +664,6 @@ export class BookingController {
         return;
       }
 
-      // TODO: Implementar getCollaboratorEvents quando sistema de colaboradores estiver completo
       res.json({ 
         success: true,
         message: "Funcionalidade em desenvolvimento", 

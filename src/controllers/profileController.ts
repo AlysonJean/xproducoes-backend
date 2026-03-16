@@ -270,8 +270,6 @@ export class ProfileController {
       }
 
       // Os campos do req.body não são usados pois a funcionalidade não está implementada
-
-      // TODO: Implementar quando PortfolioItem for adicionado ao schema
       throw new Error(
         "Portfolio functionality not implemented - PortfolioItem model missing from schema",
       );

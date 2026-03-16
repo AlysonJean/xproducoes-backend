@@ -76,7 +76,7 @@ export class ServiceController {
       const duplicate = await service.duplicate(String(id));
       return res.status(201).json({ service: duplicate, message: 'Serviço duplicado com sucesso' });
     } catch (error) {
-      console.error(error);
+      logger.error({ error }, 'Erro ao duplicar serviço');
       return res.status(500).json({ message: 'Erro ao duplicar serviço' });
     }
   }

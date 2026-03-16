@@ -62,7 +62,6 @@ export class NewsletterController {
   }
 
   async unsubscribe(req: Request, res: Response): Promise<void> {
-     // TODO: Implement unsubscribe link logic if needed
      res.status(501).json({ error: 'Not implemented' });
   }
 }
