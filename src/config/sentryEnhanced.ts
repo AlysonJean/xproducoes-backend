@@ -36,7 +36,7 @@ export function initSentry(app: Express) {
   const dsn = process.env.SENTRY_DSN;
 
   if (!dsn && !isDev) {
-    logger.warn('SENTRY_DSN not configured, error tracking disabled');
+    logger.info('SENTRY_DSN not configured, error tracking disabled');
     return;
   }
 

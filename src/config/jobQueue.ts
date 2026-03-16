@@ -10,11 +10,21 @@ import logger from './logger';
 // Conexão Redis
 const getRedisConnection = () => {
   const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-  
-  return new IORedis(redisUrl, {
+
+  const conn = new IORedis(redisUrl, {
     maxRetriesPerRequest: null, // BullMQ requer isso
     enableReadyCheck: false,
   });
+
+  // BullMQ requires noeviction policy. Attempt to set it on connect;
+  // managed Redis providers (e.g. Upstash) may reject CONFIG SET — silently ignore.
+  conn.once('ready', () => {
+    conn.config('SET', 'maxmemory-policy', 'noeviction').catch(() => {
+      // CONFIG SET not permitted on this provider — policy must be set via dashboard
+    });
+  });
+
+  return conn;
 };
 
 // Configuração padrão para filas
