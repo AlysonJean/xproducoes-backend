@@ -1,0 +1,198 @@
+import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
+import { logger } from '../config/logger.js';
+
+/**
+ * CSRF Protection Middleware - Double-Submit Cookie Pattern (2026 standard)
+ * 
+ * Implements dual mechanisms:
+ * 1. Double-Submit Cookie: Random token in cookie + header validation
+ * 2. Token Validation: Ensures token consistency across requests
+ * 
+ * Benefits:
+ * - Stateless (no server-side session needed)
+ * - XSS-resilient when using httpOnly cookies
+ * - CSRF-token in custom header prevents form hijacking
+ * - Compatible with SPA architectures
+ */
+
+interface CsrfRequest extends Request {
+  csrfToken?: string;
+  csrfValid?: boolean;
+}
+
+const CSRF_COOKIE_NAME = 'X-CSRF-Token';
+const CSRF_HEADER_NAMES = ['x-csrf-token', 'x-csrf-token', 'csrf-token'];
+const CSRF_TOKEN_LENGTH = 32;
+
+/**
+ * Generate a new CSRF token (cryptographically secure random)
+ */
+function generateCsrfToken(): string {
+  return crypto.randomBytes(CSRF_TOKEN_LENGTH).toString('hex');
+}
+
+/**
+ * CSRF Token Generation Middleware
+ * Generates and sets CSRF token on every request
+ * Token is stored in httpOnly cookie for validation
+ */
+export const csrfTokenGenerator = (req: CsrfRequest, res: Response, next: NextFunction) => {
+  try {
+    // Generate new token (regenerate on each request for maximum security)
+    const token = generateCsrfToken();
+    
+    // Store token in httpOnly cookie
+    // httpOnly prevents JS access (XSS protection)
+    // secure flag ensures HTTPS-only in production
+    // sameSite=strict prevents CSRF
+    res.cookie(CSRF_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 60 * 60 * 1000, // 1 hour
+      path: '/',
+    });
+
+    // Store token in request for verification
+    req.csrfToken = token;
+
+    next();
+  } catch (error) {
+    logger.error({ error }, 'CSRF token generation failed');
+    return res.status(500).json({ success: false, message: 'Security initialization failed' });
+  }
+};
+
+/**
+ * CSRF Token Validation Middleware
+ * Validates CSRF token on state-changing requests (POST, PUT, DELETE, PATCH)
+ * 
+ * Implementation details:
+ * - Skips GET/HEAD/OPTIONS requests (idempotent)
+ * - Requires token in X-CSRF-Token header
+ * - Validates against cookie token
+ * - Returns 403 on mismatch (CSRF attack detected)
+ */
+export const csrfTokenValidator = (req: CsrfRequest, res: Response, next: NextFunction) => {
+  // Skip validation for safe methods
+  const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
+  if (safeMethods.includes(req.method)) {
+    return next();
+  }
+
+  try {
+    // Get token from cookie
+    const cookieToken = req.cookies?.[CSRF_COOKIE_NAME];
+    if (!cookieToken) {
+      logger.warn(
+        { method: req.method, path: req.path, requestId: req.id },
+        'CSRF cookie missing'
+      );
+      return res.status(403).json({
+        success: false,
+        message: 'CSRF cookie not found. Please refresh and try again.',
+      });
+    }
+
+    // Get token from headers (try multiple header names for compatibility)
+    let headerToken: string | undefined;
+    for (const headerName of CSRF_HEADER_NAMES) {
+      headerToken = req.headers[headerName] as string;
+      if (headerToken) break;
+    }
+
+    if (!headerToken) {
+      logger.warn(
+        { method: req.method, path: req.path, requestId: req.id },
+        'CSRF header missing'
+      );
+      return res.status(403).json({
+        success: false,
+        message: 'CSRF token missing from request header.',
+      });
+    }
+
+    // Validate tokens match (constant-time comparison to prevent timing attacks)
+    const isValid = secureCompare(cookieToken, headerToken);
+    if (!isValid) {
+      logger.warn(
+        { method: req.method, path: req.path, requestId: req.id, userId: (req as any).userId },
+        'CSRF token mismatch - possible attack detected'
+      );
+      return res.status(403).json({
+        success: false,
+        message: 'CSRF token validation failed. Possible security breach.',
+      });
+    }
+
+    // Valid CSRF token
+    req.csrfValid = true;
+    next();
+  } catch (error) {
+    logger.error({ error, path: req.path }, 'CSRF validation error');
+    return res.status(500).json({
+      success: false,
+      message: 'Security validation failed',
+    });
+  }
+};
+
+/**
+ * Constant-time comparison to prevent timing attacks
+ * Compares two strings without early exit
+ */
+function secureCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+
+  return result === 0;
+}
+
+/**
+ * Get CSRF token for frontend to use in headers
+ * Endpoint for SPA to retrieve token on page load
+ */
+export const getCsrfToken = (req: CsrfRequest, res: Response) => {
+  try {
+    const token = req.csrfToken || generateCsrfToken();
+    
+    // Ensure cookie is set
+    if (!req.cookies[CSRF_COOKIE_NAME]) {
+      res.cookie(CSRF_COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 60 * 60 * 1000,
+        path: '/',
+      });
+    }
+
+    // Return token (frontend will send it in headers)
+    // Token is redundant since it's in cookie, but frontend still needs it for headers
+    return res.json({
+      success: true,
+      data: {
+        csrfToken: token,
+      },
+    });
+  } catch (error) {
+    logger.error({ error }, 'Failed to retrieve CSRF token');
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve CSRF token',
+    });
+  }
+};
+
+export default {
+  csrfTokenGenerator,
+  csrfTokenValidator,
+  getCsrfToken,
+};
