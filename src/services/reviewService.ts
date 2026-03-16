@@ -13,7 +13,7 @@ interface ReviewUpdateData {
   reported?: boolean;
 }
 
-export async function findPublicReviews() {
+export async function findPublicReviews(limit = 20, skip = 0) {
   return prisma.review.findMany({
     where: { reported: false },
     orderBy: { createdAt: "desc" },
@@ -23,6 +23,8 @@ export async function findPublicReviews() {
         select: { id: true, user: { select: { name: true, avatarUrl: true } } },
       },
     },
+    take: Math.min(limit, 100),
+    skip,
   });
 }
 
@@ -92,7 +94,7 @@ export async function create(data: {
   });
 }
 
-export async function findAll(filters?: ReviewFilters) {
+export async function findAll(filters?: ReviewFilters, limit = 20, skip = 0) {
   const where: Prisma.ReviewWhereInput = {};
   
   if (filters?.rating) {
@@ -128,10 +130,12 @@ export async function findAll(filters?: ReviewFilters) {
         },
       },
     },
+    take: Math.min(limit, 100),
+    skip,
   });
 }
 
-export async function findByEquipment(equipmentId: string) {
+export async function findByEquipment(equipmentId: string, limit = 10, skip = 0) {
   return prisma.review.findMany({
     where: {
       booking: {
@@ -152,10 +156,12 @@ export async function findByEquipment(equipmentId: string) {
         },
       },
     },
+    take: Math.min(limit, 50),
+    skip,
   });
 }
 
-export async function findByUser(userId: string) {
+export async function findByUser(userId: string, limit = 20, skip = 0) {
   return prisma.review.findMany({
     where: { reviewerId: userId },
     orderBy: { createdAt: "desc" },
@@ -174,6 +180,8 @@ export async function findByUser(userId: string) {
         select: { id: true, user: { select: { name: true } } },
       },
     },
+    take: Math.min(limit, 100),
+    skip,
   });
 }
 
