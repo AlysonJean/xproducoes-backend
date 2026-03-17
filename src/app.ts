@@ -121,6 +121,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(inputSanitizationMiddleware);
 
 // ✅ CSRF TOKEN VALIDATION (após body parser, antes das rotas)
+// Applies to all /api/v1 routes but skips exempt public endpoints (auth, login, register, etc)
 app.use('/api/v1', csrfTokenValidator);
 
 // Swagger API Documentation

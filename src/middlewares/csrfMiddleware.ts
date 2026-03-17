@@ -101,11 +101,28 @@ export const csrfTokenGenerator = (req: CsrfRequest, res: Response, next: NextFu
 };
 
 /**
+ * Route patterns that are exempt from CSRF validation
+ * These are public endpoints that don't require authentication
+ * Users accessing these don't have a CSRF token yet
+ */
+const CSRF_EXEMPT_PATTERNS = [
+  /^\/auth\/(login|register|refresh|social\/.*|request-password-reset|reset-password|resend-verification|complete-registration|facebook\/data-deletion)$/,
+  /^\/public\//,
+  /^\/health/,
+  /^\/csrf-token$/,
+];
+
+function isCsrfExempt(path: string): boolean {
+  return CSRF_EXEMPT_PATTERNS.some(pattern => pattern.test(path));
+}
+
+/**
  * CSRF Token Validation Middleware
  * Validates CSRF token on state-changing requests (POST, PUT, DELETE, PATCH)
  * 
  * Implementation details:
  * - Skips GET/HEAD/OPTIONS requests (idempotent)
+ * - Skips public/exempt endpoints (login, register, etc)
  * - Requires token in X-CSRF-Token header
  * - Validates against cookie token
  * - Returns 403 on mismatch (CSRF attack detected)
@@ -114,6 +131,11 @@ export const csrfTokenValidator = (req: CsrfRequest, res: Response, next: NextFu
   // Skip validation for safe methods
   const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
   if (safeMethods.includes(req.method)) {
+    return next();
+  }
+
+  // Skip validation for exempt public endpoints (auth, register, password reset, etc)
+  if (isCsrfExempt(req.path)) {
     return next();
   }
 
