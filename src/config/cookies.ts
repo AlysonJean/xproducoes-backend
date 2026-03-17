@@ -8,10 +8,12 @@ import { CookieOptions, Response } from 'express';
 const isProduction = process.env.NODE_ENV === 'production';
 
 // Configurações base para cookies
+// In production, Vercel proxy makes API calls same-origin → sameSite:'lax' is safe
+// This is more secure than 'none' as it prevents cross-site cookie sending
 const baseOptions: CookieOptions = {
   httpOnly: true, // Previne acesso via JavaScript (XSS)
   secure: isProduction, // HTTPS apenas em produção
-  sameSite: isProduction ? 'none' : 'lax', // Permite cross-origin (Frontend em domínio separado do Backend)
+  sameSite: 'lax', // Same-origin via Vercel proxy — 'lax' is the 2026 gold standard
   path: '/',
 };
 
