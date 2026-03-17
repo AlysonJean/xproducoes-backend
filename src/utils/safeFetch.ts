@@ -1,4 +1,3 @@
-import fetch from 'node-fetch';
 import dns from 'dns';
 import { promisify } from 'util';
 import ipaddr from 'ipaddr.js';

@@ -1,11 +1,10 @@
 import { safeFetch } from '../safeFetch';
-import fetch from 'node-fetch';
 import dns from 'dns';
 
-jest.mock('node-fetch');
 jest.mock('dns');
 
-const mockedFetch = fetch as unknown as jest.MockedFunction<any>;
+const mockedFetch = jest.fn() as jest.MockedFunction<any>;
+global.fetch = mockedFetch as any;
 const mockedLookup = (dns.lookup as unknown) as jest.MockedFunction<any>;
 
 describe('safeFetch integration-like', () => {
