@@ -171,6 +171,32 @@ export const createUploadRateLimiter = () => {
 };
 
 /**
+ * Create strict rate limiter for CSRF token endpoint
+ * Protects against CSRF token enumeration/abuse
+ * Limit: 30 requests per 5 minutes per IP
+ */
+export const createCsrfRateLimiter = () => {
+  return buildLimiter({
+    windowMs: 5 * 60 * 1000,
+    limit: 30,
+    message: 'Too many CSRF token requests. Please try again later.',
+    keyGenerator: (req) => ipKeyGenerator(req.ip ?? 'unknown'),
+    handler: (req, res) => {
+      logger.warn(
+        { ip: req.ip, path: req.path },
+        'CSRF token rate limit exceeded - possible abuse attempt'
+      );
+      return res.status(429).json({
+        success: false,
+        message: 'CSRF token request limit exceeded. Please retry in a few minutes.',
+        retryAfter: req.rateLimit?.resetTime,
+      });
+    },
+  });
+};
+
+
+/**
  * Adaptive rate limiter that adjusts based on server load
  * If response times are high, tighten the limits
  * Requires performance monitoring data

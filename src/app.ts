@@ -16,7 +16,7 @@ import { performanceMonitoringMiddleware } from "./middlewares/performanceMonito
 import { setupSwagger } from "./config/swagger.js";
 import { initSentry, sentryErrorHandler } from "./config/sentryEnhanced.js";
 import { csrfTokenGenerator, csrfTokenValidator, getCsrfToken } from "./middlewares/csrfMiddleware.js";
-import { createApiRateLimiter, createAuthRateLimiter, createUploadRateLimiter } from "./middlewares/adaptiveRateLimiter.js";
+import { createApiRateLimiter, createAuthRateLimiter, createUploadRateLimiter, createCsrfRateLimiter } from "./middlewares/adaptiveRateLimiter.js";
 import { inputSanitizationMiddleware } from "./middlewares/inputSanitization.js";
 import { monitoringMiddleware, prometheusMetricsEndpoint, getDashboardSummary } from "./monitoring/advancedMetrics.js";
 import crypto from "node:crypto";
@@ -126,8 +126,9 @@ app.use('/api/v1', csrfTokenValidator);
 // Swagger API Documentation
 setupSwagger(app);
 
-// ✅ CSRF TOKEN ENDPOINT (GET - no validation needed)
-app.get("/api/v1/csrf-token", getCsrfToken);
+// ✅ CSRF TOKEN ENDPOINT (GET - no validation needed, but rate limited)
+const csrfRateLimiter = createCsrfRateLimiter();
+app.get("/api/v1/csrf-token", csrfRateLimiter, getCsrfToken);
 
 // ✅ AUTH RATE LIMITING (before auth routes)
 const authRateLimiter = createAuthRateLimiter();

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import logger from '../config/logger.js';
+import { allowedOrigins } from '../config/cors.js';
 
 /**
  * CSRF Protection Middleware - Double-Submit Cookie Pattern (2026 standard)
@@ -26,6 +27,39 @@ interface CsrfRequest extends Request {
 const CSRF_COOKIE_NAME = 'X-CSRF-Token';
 const CSRF_HEADER_NAMES = ['x-csrf-token', 'csrf-token'];
 const CSRF_TOKEN_LENGTH = 32;
+
+/**
+ * Validate Origin/Referer header (defense-in-depth)
+ * Ensures request comes from an allowed origin, additional to CSRF token
+ */
+function validateOrigin(req: CsrfRequest): boolean {
+  const origin = req.headers.origin || req.headers.referer;
+  if (!origin) return false; // Reject if no origin header (strict)
+
+  // Extract domain from origin or referer
+  let domain = '';
+  try {
+    if (req.headers.origin) {
+      domain = new URL(req.headers.origin).origin;
+    } else if (req.headers.referer) {
+      domain = new URL(req.headers.referer).origin;
+    }
+  } catch (e) {
+    return false; // Invalid URL format
+  }
+
+  // Check if origin is in allowedOrigins
+  const isAllowed = allowedOrigins.includes(domain);
+  
+  if (!isAllowed) {
+    logger.warn(
+      { origin: domain, allowedOrigins, method: req.method, path: req.path },
+      'Origin validation failed - possible CSRF attempt'
+    );
+  }
+  
+  return isAllowed;
+}
 
 /**
  * Generate a new CSRF token (cryptographically secure random)
@@ -84,6 +118,14 @@ export const csrfTokenValidator = (req: CsrfRequest, res: Response, next: NextFu
   }
 
   try {
+    // ✅ 2026 SECURITY: Validate Origin header first (defense-in-depth)
+    if (!validateOrigin(req)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Request origin not authorized. CSRF validation failed.',
+      });
+    }
+
     // Get token from cookie
     const cookieToken = req.cookies?.[CSRF_COOKIE_NAME];
     if (!cookieToken) {
