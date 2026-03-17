@@ -8,6 +8,10 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export const startReminderScheduler = () => {
+  if (process.env.ENABLE_CRON_JOBS !== 'true') {
+    logger.info('[ReminderScheduler] Disabled (ENABLE_CRON_JOBS !== true). Skipping to save Neon DB compute hours.');
+    return;
+  }
   logger.info('[ReminderScheduler] Starting scheduler (0 * * * *)...');
 
   // Run every hour at minute 0

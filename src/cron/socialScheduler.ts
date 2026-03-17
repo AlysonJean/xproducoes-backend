@@ -10,6 +10,10 @@ const POLL_INTERVAL = '0 * * * *';
 let isRunning = false;
 
 export const startSocialScheduler = () => {
+    if (process.env.ENABLE_CRON_JOBS !== 'true') {
+        logger.info('[SocialScheduler] Disabled (ENABLE_CRON_JOBS !== true). Skipping to save Neon DB compute hours.');
+        return;
+    }
     logger.info('[SocialScheduler] Starting scheduler...');
 
     cron.schedule(POLL_INTERVAL, async () => {
