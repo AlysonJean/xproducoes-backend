@@ -4,6 +4,7 @@
  * Redis para produção + Memory cache como fallback
  */
 
+import IORedis from 'ioredis';
 import logger from '../config/logger.js';
 import { duplicateRedisClient } from '../config/redis.js';
 
@@ -14,7 +15,7 @@ interface CacheItem {
 
 export class CacheService {
   private static instance: CacheService;
-  private redis: InstanceType<typeof Redis> | null = null;
+  private redis: IORedis | null = null;
   private memoryStore = new Map<string, CacheItem>();
   private isRedisConnected = false;
   private readonly keyPrefix = 'xproducoes:';
