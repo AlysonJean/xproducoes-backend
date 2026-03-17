@@ -807,8 +807,11 @@ export class BookingService {
       // Valida se a reserva existe
       await this.getBookingById(id);
 
-      await this.prisma.booking.delete({
-        where: { id }
+      await this.prisma.$transaction(async (tx) => {
+        // Desvincula chats (bookingId nullable — preserva histórico de mensagens)
+        await tx.chat.updateMany({ where: { bookingId: id }, data: { bookingId: null } });
+
+        await tx.booking.delete({ where: { id } });
       });
 
       logger.info(`Booking deleted: ${id}`);
