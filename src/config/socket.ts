@@ -5,11 +5,9 @@ import jwt from 'jsonwebtoken';
 import { prisma } from './prisma';
 import { config } from './environment';
 import logger from './logger';
-import IORedis from 'ioredis';
+import { duplicateRedisClient } from './redis.js';
 
 let io: SocketIOServer | null = null;
-let pubClient: IORedis | null = null;
-let subClient: IORedis | null = null;
 
 // Chave do Redis para status global (userId -> socketId)
 const REDIS_ONLINE_KEY = 'xproducoes:online_users';
@@ -23,15 +21,16 @@ export async function initializeSocket(server: any) {
     }
   });
 
-  // Configurar Redis Adapter para Escalabilidade (Multinode)
-  if (process.env.REDIS_URL) {
+  // Configurar Redis Adapter (apenas em multi-node; em instância única é desnecessário)
+  // Use Redis adapter only when explicitly enabled (saves 2 connections on free tier)
+  if (process.env.REDIS_URL && process.env.SOCKET_IO_REDIS_ADAPTER === 'true') {
     try {
-      pubClient = new IORedis(process.env.REDIS_URL);
-      subClient = pubClient.duplicate();
+      const pubClient = duplicateRedisClient('socket-pub');
+      const subClient = duplicateRedisClient('socket-sub');
       io.adapter(createAdapter(pubClient, subClient));
       logger.info('Socket.IO Redis Adapter configurado');
     } catch (error) {
-      logger.error({ err: error }, 'Erro ao conectar Redis para Socket.IO Adapter');
+      logger.warn({ err: error }, 'Falha ao configurar Redis Adapter — usando adapter padrão em memória');
     }
   }
 

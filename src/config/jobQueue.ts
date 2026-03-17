@@ -4,28 +4,9 @@
  */
 
 import { Queue, Worker, Job } from 'bullmq';
-import IORedis from 'ioredis';
+import type IORedis from 'ioredis';
 import logger from './logger';
-
-// Conexão Redis
-const getRedisConnection = () => {
-  const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-
-  const conn = new IORedis(redisUrl, {
-    maxRetriesPerRequest: null, // BullMQ requer isso
-    enableReadyCheck: false,
-  });
-
-  // BullMQ requires noeviction policy. Attempt to set it on connect;
-  // managed Redis providers (e.g. Upstash) may reject CONFIG SET — silently ignore.
-  conn.once('ready', () => {
-    conn.config('SET', 'maxmemory-policy', 'noeviction').catch(() => {
-      // CONFIG SET not permitted on this provider — policy must be set via dashboard
-    });
-  });
-
-  return conn;
-};
+import { getRedisClient } from './redis.js';
 
 // Configuração padrão para filas
 const defaultJobOptions = {
@@ -90,7 +71,9 @@ export async function initializeQueues(): Promise<void> {
   }
 
   try {
-    const connection = getRedisConnection();
+    // Use the singleton Redis client — BullMQ calls .duplicate() internally
+    // for each Queue and Worker, so total connections = 6 (3 queues + 3 workers)
+    const connection = getRedisClient();
     
     // Fila de emails
     emailQueue = new Queue<EmailJobData>('email', {
@@ -127,7 +110,7 @@ export async function initializeQueues(): Promise<void> {
 // WORKERS
 // ==========================================
 
-async function initializeWorkers(connection: IORedis): Promise<void> {
+async function initializeWorkers(connection: import('ioredis').default): Promise<void> {
   // Worker de emails
   emailWorker = new Worker<EmailJobData>(
     'email',

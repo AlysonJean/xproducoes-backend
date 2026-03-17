@@ -4,8 +4,8 @@
  * Redis para produção + Memory cache como fallback
  */
 
-import Redis from 'ioredis';
 import logger from '../config/logger.js';
+import { duplicateRedisClient } from '../config/redis.js';
 
 interface CacheItem {
   data: any;
@@ -47,21 +47,14 @@ export class CacheService {
       const redisUrl = process.env.REDIS_URL || process.env.UPSTASH_REDIS_REST_URL;
 
       if (!redisUrl) {
-        logger.warn('⚠️ Ambiente de produção mas Redis URL não configurada');
-        logger.warn('💡 Configure UPSTASH_REDIS_REST_URL para cache Redis em produção');
-        logger.info('🔄 Usando cache em memória como fallback');
+        logger.info('Redis URL não configurada — usando cache em memória');
         return;
       }
 
       logger.info('🚀 Inicializando Redis para produção...');
 
-      this.redis = new Redis(redisUrl, {
-        maxRetriesPerRequest: 3,
-        enableReadyCheck: false,
-        lazyConnect: true,
-        connectTimeout: 5000,
-        commandTimeout: 3000,
-      });
+      // Reuse a duplicate of the singleton — avoids opening an independent connection
+      this.redis = duplicateRedisClient('cache-service');
 
       this.redis.on('connect', () => {
         this.isRedisConnected = true;
@@ -70,8 +63,7 @@ export class CacheService {
 
       this.redis.on('error', (error: Error) => {
         this.isRedisConnected = false;
-        logger.error(`❌ Erro na conexão Redis (produção): ${error.message || String(error)}`);
-        logger.warn('🔄 Continuando com cache em memória');
+        logger.warn(`⚠️ Cache Redis error: ${error.message || String(error)} — usando memória`);
       });
 
       this.redis.on('close', () => {
