@@ -30,7 +30,8 @@ export function getRedisClient(): IORedis {
     enableReadyCheck: false,
     lazyConnect: true,
     connectTimeout: 5000,
-    commandTimeout: 3000,
+    // commandTimeout must NOT be set here: BullMQ workers use blocking commands
+    // (BRPOP/BZPOP) that legitimately wait up to 5 s. A short timeout kills them.
     retryStrategy: (times) => {
       if (times > 3) return null; // stop retrying — avoids endless reconnects
       return Math.min(times * 500, 2000);
@@ -41,11 +42,10 @@ export function getRedisClient(): IORedis {
 
   _client.once('ready', () => {
     logger.info('Redis connection ready');
-    // Attempt to set noeviction policy (required by BullMQ).
-    // Managed providers (Upstash) may reject this — silence the error.
-    _client!.config('SET', 'maxmemory-policy', 'noeviction').catch(() => {
-      // CONFIG SET not permitted — must be set via provider dashboard
-    });
+    // Note: CONFIG SET maxmemory-policy is rejected by most managed Redis providers.
+    // Set it manually via the provider dashboard (Upstash / Redis Cloud).
+    // BullMQ will log "IMPORTANT! Eviction policy..." for each of its connections
+    // until the policy is set to "noeviction" — this is informational only.
   });
 
   return _client;
