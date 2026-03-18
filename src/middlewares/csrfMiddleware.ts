@@ -75,9 +75,26 @@ function generateCsrfToken(): string {
  */
 export const csrfTokenGenerator = (req: CsrfRequest, res: Response, next: NextFunction) => {
   try {
-    // Generate new token (regenerate on each request for maximum security)
+    // Reuse existing token if already present in the cookie.
+    // Regenerating on every request causes the frontend-cached token to go stale
+    // when parallel GET requests overwrite the cookie before a POST fires.
+    const existingToken = req.cookies?.[CSRF_COOKIE_NAME];
+    if (existingToken) {
+      req.csrfToken = existingToken;
+      // Slide the expiry window so the session stays alive on active use
+      res.cookie(CSRF_COOKIE_NAME, existingToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 60 * 60 * 1000, // 1 hour
+        path: '/',
+      });
+      return next();
+    }
+
+    // No token yet – generate a fresh one
     const token = generateCsrfToken();
-    
+
     // Store token in httpOnly cookie
     // httpOnly prevents JS access (XSS protection)
     // secure flag ensures HTTPS-only in production
