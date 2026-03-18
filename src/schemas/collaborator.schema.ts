@@ -55,7 +55,7 @@ export const paymentCreateSchema = z.object({
 export const paymentUpdateSchema = paymentCreateSchema.partial();
 
 // --- Event Assignment Schemas ---
-export const eventAssignmentSchema = z.object({
+const eventAssignmentBaseSchema = z.object({
   bookingId: idSchema.optional(),
   eventId: idSchema.optional(),
   collaboratorId: idSchema,
@@ -64,7 +64,11 @@ export const eventAssignmentSchema = z.object({
   fixedRate: z.coerce.number().optional(),
   startTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM").optional(),
   endTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM").optional(),
-}).refine((data) => !!(data.bookingId || data.eventId), {
+});
+
+export const eventAssignmentSchema = eventAssignmentBaseSchema.refine((data) => !!(data.bookingId || data.eventId), {
   message: "bookingId é obrigatório",
   path: ["bookingId"],
 });
+
+export const eventAssignmentUpdateSchema = eventAssignmentBaseSchema.partial();

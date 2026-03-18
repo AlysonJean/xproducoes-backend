@@ -45,7 +45,8 @@ import {
   availabilityUpdateSchema, 
   paymentCreateSchema, 
   paymentUpdateSchema,
-  eventAssignmentSchema 
+  eventAssignmentSchema,
+  eventAssignmentUpdateSchema 
 } from "../schemas/collaborator.schema";
 
 const router = createSafeRouter();
@@ -89,7 +90,7 @@ router.get("/:collaboratorId/events", getCollaboratorEvents);
 router.post("/availabilities", adminOnly, createAvailability);
 router.get("/events/:eventId/collaborators", getEventCollaborators); // validateId('eventId')?
 router.post("/event-assignments", adminOnly, validateBody(eventAssignmentSchema), assignCollaboratorToEvent);
-router.put("/event-assignments/:id", adminOnly, validateId(), validateBody(eventAssignmentSchema.partial()), updateEventCollaborator);
+router.put("/event-assignments/:id", adminOnly, validateId(), validateBody(eventAssignmentUpdateSchema), updateEventCollaborator);
 router.delete(
   "/event-assignments/:id",
   adminOnly,
