@@ -95,9 +95,10 @@ export class CollaboratorController {
   // Gestão de Eventos
   async assignCollaboratorToEvent(req: Request, res: Response, _next: NextFunction) {
     const validatedData = req.body;
+    const bookingId = validatedData.bookingId || validatedData.eventId;
 
     const assignment = await collaboratorService.assignCollaboratorToEvent({
-      bookingId: validatedData.bookingId || validatedData.eventId,
+      bookingId,
       collaboratorId: validatedData.collaboratorId,
       role: validatedData.role as any,
       status: (validatedData.status as any) || "ASSIGNED",
@@ -120,7 +121,7 @@ export class CollaboratorController {
       });
 
       const booking = await prisma.booking.findUnique({
-        where: { id: validatedData.eventId },
+        where: { id: bookingId },
         include: { client: { include: { user: true } } }
       });
 
@@ -143,7 +144,7 @@ export class CollaboratorController {
             eventTime,
             role: validatedData.role,
             location,
-            bookingUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/collaborator/events`
+            bookingUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/colaborador/agenda`
           }
         );
         logger.info({ collaboratorId: collaborator.id }, 'Notificação de escalação enviada com sucesso');
