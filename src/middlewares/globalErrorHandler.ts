@@ -117,7 +117,7 @@ export function globalErrorHandler(err: any, req: Request, res: Response, _next:
     res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,PATCH,DELETE,OPTIONS');
     res.header(
       'Access-Control-Allow-Headers',
-      'Origin, X-Requested-With, Content-Type, Accept, Authorization, Idempotency-Key, X-Idempotency-Key, x-svg-proxy-token',
+      'Origin, X-Requested-With, Content-Type, Accept, Authorization, Idempotency-Key, X-Idempotency-Key, X-CSRF-Token, csrf-token, x-svg-proxy-token',
     );
   }
 
