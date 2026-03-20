@@ -100,6 +100,11 @@ export async function initializeSocket(server: any) {
       logger.info({ userName: user.name, chatId }, 'Usuário saiu do chat');
     });
 
+    // Rate limiter: max 2 messages per second per connection (prevents chat flooding/DoS)
+    const msgTimestamps: number[] = [];
+    const MSG_RATE_LIMIT = 2;     // max messages
+    const MSG_RATE_WINDOW = 1000; // per ms window
+
     socket.on('send_message', async (data: {
       chatId: string;
       content: string;
@@ -110,6 +115,16 @@ export async function initializeSocket(server: any) {
       if (!user) {
         return socket.emit('message_error', { error: 'Não autenticado' });
       }
+
+      // Enforce rate limit
+      const now = Date.now();
+      while (msgTimestamps.length > 0 && now - msgTimestamps[0] > MSG_RATE_WINDOW) {
+        msgTimestamps.shift();
+      }
+      if (msgTimestamps.length >= MSG_RATE_LIMIT) {
+        return socket.emit('message_error', { error: 'Muitas mensagens. Aguarde um momento.' });
+      }
+      msgTimestamps.push(now);
 
       try {
         const message = await prisma.chatMessage.create({

@@ -8,6 +8,11 @@ import { BadRequestError, NotFoundError, ForbiddenError, UnauthorizedError } fro
 
 const collaboratorService = new CollaboratorService();
 
+type AssignCollaboratorInput = Parameters<CollaboratorService["assignCollaboratorToEvent"]>[0];
+type SearchCollaboratorsInput = Parameters<CollaboratorService["searchCollaborators"]>[0];
+type CreateAvailabilityInput = Parameters<CollaboratorService["createAvailability"]>[0];
+type CreatePaymentInput = Parameters<CollaboratorService["createPaymentRecord"]>[0];
+
 
 
 export class CollaboratorController {
@@ -96,12 +101,11 @@ export class CollaboratorController {
   async assignCollaboratorToEvent(req: Request, res: Response, _next: NextFunction) {
     const validatedData = req.body;
     const bookingId = validatedData.bookingId || validatedData.eventId;
-
-    const assignment = await collaboratorService.assignCollaboratorToEvent({
+    const assignmentData: AssignCollaboratorInput = {
       bookingId,
       collaboratorId: validatedData.collaboratorId,
-      role: validatedData.role as any,
-      status: (validatedData.status as any) || "ASSIGNED",
+      role: validatedData.role as AssignCollaboratorInput["role"],
+      status: (validatedData.status as AssignCollaboratorInput["status"]) || "ASSIGNED",
       notes: validatedData.notes || null,
       hourlyRate: validatedData.hourlyRate || null,
       fixedRate: validatedData.fixedRate || null,
@@ -109,9 +113,12 @@ export class CollaboratorController {
       totalPayment: null,
       rating: null,
       feedback: null,
-      arrivalConfirmed: false,
-      departureConfirmed: false
-    } as any);
+      functionId: validatedData.functionId || null,
+      startTime: validatedData.startTime || "",
+      endTime: validatedData.endTime || "",
+    };
+
+    const assignment = await collaboratorService.assignCollaboratorToEvent(assignmentData);
 
     // Buscar dados para envio de notificação (não falha a requisição se falhar)
     try {
@@ -191,9 +198,9 @@ export class CollaboratorController {
   async searchCollaborators(req: Request, res: Response, _next: NextFunction) {
     const { role, status, name, page = "1", limit = "10" } = req.query;
 
-    const searchParams = {
-      role: role as any,
-      status: status as any,
+    const searchParams: SearchCollaboratorsInput = {
+      role: role as SearchCollaboratorsInput["role"],
+      status: status as SearchCollaboratorsInput["status"],
       name: name as string,
       page: parseInt(page as string),
       limit: parseInt(limit as string),
@@ -243,7 +250,7 @@ export class CollaboratorController {
             specialties: [],
           },
           include: { user: true }
-        }) as any;
+        });
       } catch (createError) {
         logger.error({ err: createError }, '[Dashboard] Erro ao criar perfil automático');
         throw new NotFoundError('Colaborador não encontrado');
@@ -282,7 +289,7 @@ export class CollaboratorController {
               }
             }
           }
-        }) as any;
+        });
         
       } catch (createError) {
         logger.error({ err: createError }, 'Erro ao criar perfil automático');
@@ -400,15 +407,17 @@ export class CollaboratorController {
 
     if (!collaboratorId) throw new BadRequestError("ID do colaborador é obrigatório");
 
-    const avail = await collaboratorService.createAvailability({
+    const availabilityData: CreateAvailabilityInput = {
       collaboratorId,
       date: new Date(validatedData.date || validatedData.startDate), 
       startTime: validatedData.startTime || "00:00",
       endTime: validatedData.endTime || "23:59",
-      status: validatedData.status as any,
+      status: validatedData.status as CreateAvailabilityInput["status"],
       notes: validatedData.notes || null,
       eventId: null
-    } as any);
+    };
+
+    const avail = await collaboratorService.createAvailability(availabilityData);
 
     return res.status(201).json({ success: true, data: avail });
   }
@@ -452,15 +461,16 @@ export class CollaboratorController {
 
   async createPayment(req: Request, res: Response, _next: NextFunction) {
     const validatedData = req.body;
-    const payment = await collaboratorService.createPaymentRecord({
+    const paymentData: CreatePaymentInput = {
       collaboratorId: validatedData.collaboratorId,
       eventId: validatedData.eventId,
       amount: validatedData.amount,
-      type: validatedData.type as any,
+      type: validatedData.type as CreatePaymentInput["type"],
       description: validatedData.description || "Pagamento manual",
       dueDate: new Date(validatedData.dueDate || validatedData.paymentDate),
       notes: validatedData.notes,
-    });
+    };
+    const payment = await collaboratorService.createPaymentRecord(paymentData);
     return res.status(201).json({ success: true, data: payment });
   }
 

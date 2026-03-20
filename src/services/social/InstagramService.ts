@@ -2,6 +2,7 @@ import { SocialPostStatus } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import logger from '../../config/logger';
 import { UploadService } from '../uploadService';
+import { NotFoundError } from '../../utils/errors';
 
 const uploadService = new UploadService();
 
@@ -69,7 +70,7 @@ export class InstagramService {
     });
 
     if (!setting) {
-      throw new Error(`EventSocialSetting ${settingId} not found`);
+      throw new NotFoundError(`EventSocialSetting ${settingId} not found`);
     }
 
     let credential;
@@ -164,13 +165,14 @@ export class InstagramService {
 
       return newPostsCount;
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const parsedError = error instanceof Error ? error : new Error(String(error));
       logger.error({ 
-        error: error.message, 
+        error: parsedError.message,
         settingId,
-        stack: error.stack 
+        stack: parsedError.stack 
       }, 'Failed to fetch Instagram media');
-      throw error;
+      throw parsedError;
     }
   }
 

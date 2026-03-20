@@ -7,7 +7,7 @@ export class DashboardController {
   getStats = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const stats = await dashboardService.getStats();
-      return res.json(stats);
+      return res.json({ success: true, data: stats });
     } catch (error) {
       return next(error);
     }
@@ -16,7 +16,7 @@ export class DashboardController {
   getChartData = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const chartData = await dashboardService.getChartData();
-      return res.json(chartData);
+      return res.json({ success: true, data: chartData });
     } catch (error) {
       return next(error);
     }
@@ -29,7 +29,7 @@ export class DashboardController {
   ) => {
     try {
       const activities = await dashboardService.getRecentActivities();
-      return res.json(activities);
+      return res.json({ success: true, data: activities });
     } catch (error) {
       return next(error);
     }
@@ -45,7 +45,7 @@ export class DashboardController {
         ? parseInt(req.query.year as string)
         : undefined;
       const data = await dashboardService.getMonthlyRevenue(year);
-      return res.json(data);
+      return res.json({ success: true, data });
     } catch (error) {
       return next(error);
     }
@@ -58,7 +58,7 @@ export class DashboardController {
   ) => {
     try {
       const years = await dashboardService.getAvailableYears();
-      return res.json(years);
+      return res.json({ success: true, data: years });
     } catch (error) {
       return next(error);
     }
@@ -71,7 +71,7 @@ export class DashboardController {
   ) => {
     try {
       const activities = await dashboardService.getRecentActivities();
-      return res.json(activities);
+      return res.json({ success: true, data: activities });
     } catch (error) {
       return next(error);
     }
@@ -85,7 +85,7 @@ export class DashboardController {
     try {
       const period = req.query.period as string || 'month';
       const revenue = await dashboardService.getRevenue(period);
-      return res.json(revenue);
+      return res.json({ success: true, data: revenue });
     } catch (error) {
       return next(error);
     }
@@ -98,7 +98,7 @@ export class DashboardController {
   ) => {
     try {
       const trends = await dashboardService.getBookingTrends();
-      return res.json(trends);
+      return res.json({ success: true, data: trends });
     } catch (error) {
       return next(error);
     }
@@ -111,7 +111,7 @@ export class DashboardController {
   ) => {
     try {
       const equipment = await dashboardService.getTopEquipment();
-      return res.json(equipment);
+      return res.json({ success: true, data: equipment });
     } catch (error) {
       return next(error);
     }
@@ -124,7 +124,7 @@ export class DashboardController {
   ) => {
     try {
       const clients = await dashboardService.getTopClients();
-      return res.json(clients);
+      return res.json({ success: true, data: clients });
     } catch (error) {
       return next(error);
     }
@@ -137,7 +137,7 @@ export class DashboardController {
   ) => {
     try {
       const stats = await dashboardService.getLiveStats();
-      return res.json(stats);
+      return res.json({ success: true, data: stats });
     } catch (error) {
       return next(error);
     }
@@ -150,7 +150,7 @@ export class DashboardController {
   ) => {
     try {
       const notifications = await dashboardService.getNotifications();
-      return res.json(notifications);
+      return res.json({ success: true, data: notifications });
     } catch (error) {
       return next(error);
     }
@@ -163,7 +163,7 @@ export class DashboardController {
   ) => {
     try {
       const collaborators = await dashboardService.getTopCollaboratorsData();
-      return res.json(collaborators);
+      return res.json({ success: true, data: collaborators });
     } catch (error) {
       return next(error);
     }

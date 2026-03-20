@@ -3,12 +3,20 @@ import { prisma } from '../config/prisma';
 import logger from '../config/logger';
 import { getSocketIO } from '../config/socket'; // Assuming this exists or similar getter
 import { triggerImmediateSync } from '../config/jobQueue';
-import { SocialPostStatus } from '@prisma/client';
+import { Prisma, SocialPostStatus } from '@prisma/client';
 import { UploadService } from '../services/uploadService';
 
 const uploadService = new UploadService();
 
 export class SocialController {
+    private getStringParam(param: unknown): string | undefined {
+        return typeof param === 'string' ? param : undefined;
+    }
+
+    private getUserId(req: Request): string | undefined {
+        const reqWithUser = req as Request & { user?: { id?: string } };
+        return reqWithUser.user?.id;
+    }
     
     // --- Admin Endpoints ---
 
@@ -18,17 +26,15 @@ export class SocialController {
      */
     async getPosts(req: Request, res: Response) {
         try {
-            const getParam = (p: any): string | undefined => typeof p === 'string' ? p : undefined;
-            
             const page = Number(req.query.page) || 1;
             const limit = Number(req.query.limit) || 50;
             const status = req.query.status as SocialPostStatus | undefined;
             
-            const eventId = getParam(req.query.eventId);
-            const slug = getParam(req.query.slug);
-            const querySettingId = getParam(req.query.settingId);
+            const eventId = this.getStringParam(req.query.eventId);
+            const slug = this.getStringParam(req.query.slug);
+            const querySettingId = this.getStringParam(req.query.settingId);
             
-            const where: any = {};
+            const where: Prisma.SocialPostWhereInput = {};
             
             // Resolve Setting ID
             let settingId: string | undefined;
@@ -48,7 +54,7 @@ export class SocialController {
             }
 
             if (!settingId) {
-                 return res.json({ data: [], meta: { total: 0, page: 1 } });
+                  return res.json({ success: true, data: [], meta: { total: 0, page: 1 } });
             }
 
             where.settingId = String(settingId);
@@ -67,6 +73,7 @@ export class SocialController {
             const total = await prisma.socialPost.count({ where });
 
             res.json({
+                success: true,
                 data: posts,
                 settingId, // Return for frontend context
                 meta: {
@@ -78,7 +85,7 @@ export class SocialController {
             });
         } catch (error) {
             logger.error({ error }, 'Error fetching social posts');
-            res.status(500).json({ error: 'Failed to fetch posts' });
+            res.status(500).json({ success: false, message: 'Failed to fetch posts' });
         }
     }
 
@@ -88,10 +95,9 @@ export class SocialController {
      */
     async getLeaderboard(req: Request, res: Response) {
         try {
-            const getParam = (p: any): string | undefined => typeof p === 'string' ? p : undefined;
-            const eventId = getParam(req.query.eventId);
-            const slug = getParam(req.query.slug);
-            const settingId = getParam(req.query.settingId);
+            const eventId = this.getStringParam(req.query.eventId);
+            const slug = this.getStringParam(req.query.slug);
+            const settingId = this.getStringParam(req.query.settingId);
 
             let targetSettingId: string | undefined = settingId;
 
@@ -105,7 +111,7 @@ export class SocialController {
                 }
             }
 
-            if (!targetSettingId) return res.status(400).json({ error: 'Setting context required' });
+            if (!targetSettingId) return res.status(400).json({ success: false, message: 'Setting context required' });
 
             // Group by author and count posts
             const groupResult = await prisma.socialPost.groupBy({
@@ -153,10 +159,10 @@ export class SocialController {
                 };
             }));
 
-            res.json({ data: leaderboard });
+            res.json({ success: true, data: leaderboard });
         } catch (error) {
             logger.error({ error }, 'Error fetching leaderboard');
-            res.status(500).json({ error: 'Failed to fetch leaderboard' });
+            res.status(500).json({ success: false, message: 'Failed to fetch leaderboard' });
         }
     }
 
@@ -170,14 +176,14 @@ export class SocialController {
             const status = String(req.body.status); // APPROVED | REJECTED
 
             if (!['APPROVED', 'REJECTED', 'PENDING'].includes(status)) {
-                return res.status(400).json({ error: 'Invalid status' });
+                return res.status(400).json({ success: false, message: 'Invalid status' });
             }
 
             const post = await prisma.socialPost.update({
                 where: { id: String(id) },
                 data: { 
                     status: status as SocialPostStatus,
-                    moderatedBy: (req as any).user?.id,
+                    moderatedBy: this.getUserId(req),
                     moderatedAt: new Date()
                 },
                 include: { setting: true }
@@ -188,7 +194,7 @@ export class SocialController {
             // Let's standardise on `wall:{settingId}` but keep `event:{bookingId}` for backward compat if booking exists.
             
             const io = getSocketIO();
-            const setting = (post as any).setting; // Requires include: { setting: true } which we did
+            const setting = post.setting;
             
             if (post.status === 'APPROVED') {
                  if (setting) {
@@ -211,10 +217,10 @@ export class SocialController {
                  }
             }
 
-            res.json({ data: post });
+            res.json({ success: true, data: post });
         } catch (error) {
             logger.error({ error }, 'Error moderating post');
-            res.status(500).json({ error: 'Failed to moderate post' });
+            res.status(500).json({ success: false, message: 'Failed to moderate post' });
         }
     }
 
@@ -233,16 +239,16 @@ export class SocialController {
                 setting = await prisma.eventSocialSetting.findFirst({ where: { bookingId: eventId } });
             }
             
-            if (!setting) return res.status(404).json({ error: 'Settings not found' });
+            if (!setting) return res.status(404).json({ success: false, message: 'Settings not found' });
 
             await triggerImmediateSync({
                 settingId: setting.id,
                 hashtag: setting.hashtag
             });
 
-            res.json({ message: 'Sync triggered' });
+            res.json({ success: true, message: 'Sync triggered' });
         } catch {
-             res.status(500).json({ error: 'Sync failed' });
+             res.status(500).json({ success: false, message: 'Sync failed' });
         }
     }
 
@@ -255,12 +261,12 @@ export class SocialController {
             const { name, slug, hashtag, autoApprove } = req.body;
 
             // Basic validation
-            if (!hashtag) return res.status(400).json({ error: 'Hashtag is required' });
+            if (!hashtag) return res.status(400).json({ success: false, message: 'Hashtag is required' });
 
             // Ensure unique slug if provided
             if (slug) {
                 const existing = await prisma.eventSocialSetting.findUnique({ where: { slug } });
-                if (existing) return res.status(400).json({ error: 'Slug already taken' });
+                if (existing) return res.status(400).json({ success: false, message: 'Slug already taken' });
             }
 
             const wall = await prisma.eventSocialSetting.create({
@@ -279,7 +285,7 @@ export class SocialController {
                     enableGamification: req.body.enableGamification !== undefined ? Boolean(req.body.enableGamification) : false,
 
                     bookingId: null, // Explicitly null for standalone
-                    userId: (req as any).user?.id, // Link to creator
+                    userId: this.getUserId(req), // Link to creator
 
                     sponsors: req.body.sponsorIds ? {
                         connect: req.body.sponsorIds.map((id: string) => ({ id }))
@@ -287,10 +293,10 @@ export class SocialController {
                 }
             });
 
-            res.json({ data: wall });
+            res.json({ success: true, data: wall });
         } catch (err) {
             logger.error({ error: err }, 'Error creating social wall');
-            res.status(500).json({ error: 'Failed to create social wall' });
+            res.status(500).json({ success: false, message: 'Failed to create social wall' });
         }
     }
 
@@ -308,9 +314,9 @@ export class SocialController {
                 }
             });
 
-            res.json({ data: walls });
+            res.json({ success: true, data: walls });
         } catch {
-             res.status(500).json({ error: 'Failed to list walls' });
+             res.status(500).json({ success: false, message: 'Failed to list walls' });
         }
     }
 
@@ -325,10 +331,10 @@ export class SocialController {
                     booking: true
                 }
             });
-            if (!wall) return res.status(404).json({ error: 'Wall not found' });
-            res.json({ data: wall });
+            if (!wall) return res.status(404).json({ success: false, message: 'Wall not found' });
+            res.json({ success: true, data: wall });
         } catch {
-            res.status(500).json({ error: 'Failed to fetch wall' });
+            res.status(500).json({ success: false, message: 'Failed to fetch wall' });
         }
     }
 
@@ -348,7 +354,7 @@ export class SocialController {
                 });
                 if (existing) {
                     logger.warn({ slug: data.slug }, '[updateWall] Slug já em uso');
-                    return res.status(400).json({ error: 'Este link (slug) já está em uso por outro mural.' });
+                    return res.status(400).json({ success: false, message: 'Este link (slug) já está em uso por outro mural.' });
                 }
             }
 
@@ -384,10 +390,10 @@ export class SocialController {
                 logger.info({ wallId: wall.id }, 'Broadcasted config:update event');
             }
 
-            res.json({ data: wall });
-        } catch (err: any) {
+            res.json({ success: true, data: wall });
+        } catch (err: unknown) {
             logger.error({ error: err, id, data }, '[updateWall] Erro ao atualizar mural');
-            res.status(500).json({ error: 'Failed to update wall' });
+            res.status(500).json({ success: false, message: 'Failed to update wall' });
         }
     }
 
@@ -409,7 +415,7 @@ export class SocialController {
             res.json({ success: true });
         } catch (error) {
             logger.error({ error }, 'Failed to delete wall');
-            res.status(500).json({ error: 'Failed to delete wall' });
+            res.status(500).json({ success: false, message: 'Failed to delete wall' });
         }
     }
 
@@ -435,10 +441,10 @@ export class SocialController {
                 orderBy: { createdAt: 'desc' }
             });
 
-            res.json({ data: announcements });
+            res.json({ success: true, data: announcements });
         } catch (error) {
             logger.error({ error }, 'Error fetching announcements');
-            res.status(500).json({ error: 'Failed to fetch announcements' });
+            res.status(500).json({ success: false, message: 'Failed to fetch announcements' });
         }
     }
 
@@ -468,10 +474,10 @@ export class SocialController {
                 }
             });
 
-            res.json({ data: announcement });
+            res.json({ success: true, data: announcement });
         } catch (error) {
              logger.error({ error }, 'Error creating announcement');
-             res.status(500).json({ error: 'Failed to create announcement' });
+             res.status(500).json({ success: false, message: 'Failed to create announcement' });
         }
     }
 
@@ -497,9 +503,9 @@ export class SocialController {
                 }
             });
 
-            res.json({ data: announcement });
+            res.json({ success: true, data: announcement });
          } catch {
-             res.status(500).json({ error: 'Failed to update announcement' });
+             res.status(500).json({ success: false, message: 'Failed to update announcement' });
          }
     }
 
@@ -511,9 +517,9 @@ export class SocialController {
         try {
             const { id } = req.params;
             await prisma.socialAnnouncement.delete({ where: { id: String(id) } });
-            res.json({ success: true });
+            res.json({ success: true, message: 'Announcement removido com sucesso' });
         } catch {
-            res.status(500).json({ error: 'Failed to delete announcement' });
+            res.status(500).json({ success: false, message: 'Failed to delete announcement' });
         }
     }
 
@@ -537,12 +543,12 @@ export class SocialController {
                 if (setting) {
                     targetSettingId = setting.id;
                 } else {
-                    return res.status(404).json({ error: 'Event social settings not found for the provided eventId.' });
+                    return res.status(404).json({ success: false, message: 'Event social settings not found for the provided eventId.' });
                 }
             }
 
             if (!targetSettingId) {
-                return res.status(400).json({ error: 'É necessário fornecer o ID do evento ou do mural para o pareamento.' });
+                return res.status(400).json({ success: false, message: 'É necessário fornecer o ID do evento ou do mural para o pareamento.' });
             }
 
             // Verify if the setting actually exists
@@ -551,7 +557,7 @@ export class SocialController {
             });
 
             if (!existingSetting) {
-                return res.status(404).json({ error: 'A configuração do mural social não foi encontrada.' });
+                return res.status(404).json({ success: false, message: 'A configuração do mural social não foi encontrada.' });
             }
 
             // Implementing the Admin side of pairing here:
@@ -572,10 +578,10 @@ export class SocialController {
             });
             
             logger.info({ deviceId: device.id, pairingCode, settingId: targetSettingId }, 'TV Device successfully paired');
-            res.json({ data: device });
-        } catch (error: any) {
-             logger.error({ error: error.message, stack: error.stack, body: req.body }, 'Error pairing device');
-             res.status(500).json({ error: 'Falha interna ao parear TV. Tente novamente.' });
+                        res.json({ success: true, data: device });
+           } catch (error: unknown) {
+               logger.error({ error, body: req.body }, 'Error pairing device');
+                         res.status(500).json({ success: false, message: 'Falha interna ao parear TV. Tente novamente.' });
         }
     }
 
@@ -585,9 +591,8 @@ export class SocialController {
      */
     async getDeviceConfig(req: Request, res: Response) {
          try {
-            const getParam = (p: any): string | undefined => typeof p === 'string' ? p : undefined;
-            const pairingCode = getParam(req.query.pairingCode);
-            const slug = getParam(req.query.slug);
+            const pairingCode = this.getStringParam(req.query.pairingCode);
+            const slug = this.getStringParam(req.query.slug);
             
             // 1. Support Public Slug Access
             if (slug) {
@@ -597,27 +602,30 @@ export class SocialController {
                 });
                 
                 if (!setting) {
-                    return res.status(404).json({ error: 'Mural não encontrado' });
+                    return res.status(404).json({ success: false, message: 'Mural não encontrado' });
                 }
 
                 return res.json({ 
-                    linked: true,
-                    settingId: setting.id,
-                    slug: setting.slug,
-                    eventName: setting.name || 'Mural Social',
-                    hashtag: setting.hashtag,
-                    layoutMode: setting.layoutMode,
-                    sponsors: setting.sponsors,
-                    enableQrCode: setting.enableQrCode,
-                    qrCodeText: setting.qrCodeText,
-                    mosaicFrequency: setting.mosaicFrequency,
-                    enableMosaic: setting.enableMosaic,
-                    enableGamification: setting.enableGamification
+                    success: true,
+                    data: {
+                        linked: true,
+                        settingId: setting.id,
+                        slug: setting.slug,
+                        eventName: setting.name || 'Mural Social',
+                        hashtag: setting.hashtag,
+                        layoutMode: setting.layoutMode,
+                        sponsors: setting.sponsors,
+                        enableQrCode: setting.enableQrCode,
+                        qrCodeText: setting.qrCodeText,
+                        mosaicFrequency: setting.mosaicFrequency,
+                        enableMosaic: setting.enableMosaic,
+                        enableGamification: setting.enableGamification
+                    }
                 });
             }
 
             // 2. Legacy/Device Pairing Code Access
-            if (!pairingCode) return res.status(400).json({ error: 'Código de pareamento ou slug obrigatório' });
+            if (!pairingCode) return res.status(400).json({ success: false, message: 'Código de pareamento ou slug obrigatório' });
 
             const code = String(pairingCode);
 
@@ -627,7 +635,7 @@ export class SocialController {
             });
 
             if (!device || (!device.bookingId && !device.settingId)) {
-                return res.json({ linked: false });
+                return res.json({ success: true, data: { linked: false } });
             }
 
             let settingId = device.settingId;
@@ -654,29 +662,32 @@ export class SocialController {
             }
 
             if (!fullSetting) {
-                return res.json({ linked: false, error: 'Configuração não encontrada para este dispositivo' });
+                return res.json({ success: true, data: { linked: false }, message: 'Configuração não encontrada para este dispositivo' });
             }
 
             // Return full config for the TV
             res.json({ 
-                linked: true,
-                deviceToken: device.deviceToken,
-                settingId: settingId,
-                slug: fullSetting.slug,
-                eventName: fullSetting.name || device.booking?.eventTitle || 'Mural Social',
-                hashtag: fullSetting.hashtag,
-                layoutMode: fullSetting.layoutMode,
-                sponsors: fullSetting.sponsors,
-                enableQrCode: fullSetting.enableQrCode,
-                qrCodeText: fullSetting.qrCodeText,
-                mosaicFrequency: fullSetting.mosaicFrequency,
-                enableMosaic: fullSetting.enableMosaic,
-                enableGamification: fullSetting.enableGamification
+                success: true,
+                data: {
+                    linked: true,
+                    deviceToken: device.deviceToken,
+                    settingId: settingId,
+                    slug: fullSetting.slug,
+                    eventName: fullSetting.name || device.booking?.eventTitle || 'Mural Social',
+                    hashtag: fullSetting.hashtag,
+                    layoutMode: fullSetting.layoutMode,
+                    sponsors: fullSetting.sponsors,
+                    enableQrCode: fullSetting.enableQrCode,
+                    qrCodeText: fullSetting.qrCodeText,
+                    mosaicFrequency: fullSetting.mosaicFrequency,
+                    enableMosaic: fullSetting.enableMosaic,
+                    enableGamification: fullSetting.enableGamification
+                }
             });
 
         } catch (error) {
              logger.error({ error }, 'Error fetching device config');
-             res.status(500).json({ error: 'Falha ao carregar configuração' });
+             res.status(500).json({ success: false, message: 'Falha ao carregar configuração' });
          }
     }
 
@@ -691,7 +702,7 @@ export class SocialController {
             const file = req.file;
 
             if (!file) {
-                return res.status(400).json({ error: 'Nenhuma imagem enviada' });
+                return res.status(400).json({ success: false, message: 'Nenhuma imagem enviada' });
             }
 
             const setting = await prisma.eventSocialSetting.findUnique({
@@ -699,7 +710,7 @@ export class SocialController {
             });
 
             if (!setting) {
-                return res.status(404).json({ error: 'Mural não encontrado' });
+                return res.status(404).json({ success: false, message: 'Mural não encontrado' });
             }
 
             // Upload to Cloudinary
@@ -728,10 +739,10 @@ export class SocialController {
                 }
             }
 
-            res.json({ success: true, post });
+            res.json({ success: true, data: post });
         } catch (error) {
             logger.error({ error }, 'Error in direct upload');
-            res.status(500).json({ error: 'Falha ao enviar foto' });
+            res.status(500).json({ success: false, message: 'Falha ao enviar foto' });
         }
     }
 }

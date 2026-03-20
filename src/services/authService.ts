@@ -3,6 +3,7 @@ import { prisma } from "../config/prisma.js";
 import * as userService from "./userService.js";
 import jwt from "jsonwebtoken";
 import { config as envConfig } from "../config/environment.js";
+import { NotFoundError } from "../utils/errors.js";
 
 interface RegisterData {
   name: string;
@@ -102,7 +103,7 @@ export class AuthService {
 
   async loginById(userId: string) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new Error('Usuário não encontrado');
+    if (!user) throw new NotFoundError('Usuário não encontrado');
     const token = jwt.sign({ userId: user.id, role: user.role }, envConfig.jwtSecret, { expiresIn: '15m' });
     const refreshToken = jwt.sign({ userId: user.id, role: user.role }, envConfig.jwtSecret, { expiresIn: '7d' });
     return {

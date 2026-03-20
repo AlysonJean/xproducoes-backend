@@ -1,19 +1,26 @@
 import { AuthService } from "../../services/authService";
 
 jest.mock("../../services/userService", () => ({
-  register: jest.fn(async (data) => {
+  register: jest.fn(async (data: any) => {
     if (data.email.includes("duplicate")) throw new Error("Email já está em uso.");
     return { id: 'u1', ...data };
   }),
-  login: jest.fn(async (data) => {
+  login: jest.fn(async (data: any) => {
     if (data.password === "senhaerrada") throw new Error("Credenciais inválidas");
     return { token: 'jwt', user: { id: 'u1', ...data } };
   }),
-  requestPasswordReset: jest.fn(async (email) => ({ success: true })),
-  resetPassword: jest.fn(async (token, newPassword) => ({ success: true })),
-  getProfile: jest.fn(async (userId) => ({ id: userId, name: 'User' })),
-  updateProfile: jest.fn(async (userId, data, file) => ({ id: userId, ...data })),
-  changePassword: jest.fn(async (userId, currentPassword, newPassword) => ({ success: true })),
+  requestPasswordReset: jest.fn(async (_email: string) => ({ success: true })),
+  resetPassword: jest.fn(async (_token: string, _newPassword: string) => ({ success: true })),
+  getProfile: jest.fn(async (userId: string) => ({ id: userId, name: 'User' })),
+  updateProfile: jest.fn(async (userId: string, data: any, _file: any) => ({ id: userId, ...data })),
+  changePassword: jest.fn(async (_userId: string, _currentPassword: string, _newPassword: string) => ({ success: true })),
+}));
+
+// Mock do BookingService para evitar conexão real com banco durante o register
+jest.mock("../../services/bookingService", () => ({
+  BookingService: jest.fn().mockImplementation(() => ({
+    linkBookingsToUser: jest.fn().mockResolvedValue(undefined),
+  })),
 }));
 
 describe("AuthService", () => {

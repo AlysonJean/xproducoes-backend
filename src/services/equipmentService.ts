@@ -1,7 +1,12 @@
 import { prisma } from "../config/prisma";
-import type { Equipment, Prisma } from "@prisma/client";
+import { ItemStatus, Prisma, type Equipment } from "@prisma/client";
 import { generateSlug } from "../utils/slug";
 import { randomBytes } from "crypto";
+import { BadRequestError, NotFoundError } from "../utils/errors";
+
+const toNullableJsonInput = (value: Prisma.JsonValue): Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue => {
+  return value === null ? Prisma.JsonNull : (value as Prisma.InputJsonValue);
+};
 
 type EquipmentCreateData = {
   name: string;
@@ -138,7 +143,7 @@ export class EquipmentService {
     });
 
     if (bookingsCount > 0) {
-      throw new Error(`Este equipamento possui ${bookingsCount} reservas registradas e não pode ser excluído. Considere torná-lo 'IsAvailable = false' para mantê-lo no histórico.`);
+      throw new BadRequestError(`Este equipamento possui ${bookingsCount} reservas registradas e não pode ser excluído. Considere torná-lo inativo para mantê-lo no histórico.`);
     }
 
     // Get equipment to retrieve image URL before deletion
@@ -165,7 +170,7 @@ export class EquipmentService {
       where: {
         ...(name && { name: { contains: name, mode: "insensitive" as const } }),
         ...(categoryId && { categoryId }),
-        ...(status && { status: status as any }),
+        ...(status && { status: status as ItemStatus }),
       },
       include: { category: true }
     });
@@ -197,7 +202,7 @@ export class EquipmentService {
     });
 
     if (!original) {
-      throw new Error('Equipment not found');
+      throw new NotFoundError('Equipamento não encontrado');
     }
 
     // Create copy with modified name
@@ -211,7 +216,7 @@ export class EquipmentService {
     }
 
     // Create duplicate (excluding id, createdAt, updatedAt, slug)
-    const duplicateData: any = {
+    const duplicateData: Prisma.EquipmentUncheckedCreateInput = {
       name: copyName,
       description: original.description,
       imageUrl: original.imageUrl,
@@ -220,9 +225,9 @@ export class EquipmentService {
       quantity: original.quantity,
       status: original.status,
       tags: original.tags,
-      specifications: original.specifications,
+      specifications: toNullableJsonInput(original.specifications),
       weight: original.weight,
-      dimensions: original.dimensions,
+      dimensions: toNullableJsonInput(original.dimensions),
       powerRequirements: original.powerRequirements,
       maintenanceNotes: original.maintenanceNotes,
       condition: original.condition,

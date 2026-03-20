@@ -5,7 +5,7 @@ export class FaqController {
   create = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const faqItem = await FaqService.create(req.body);
-      return res.status(201).json(faqItem);
+      return res.status(201).json({ success: true, data: faqItem });
     } catch (error) {
       return next(error);
     }
@@ -14,7 +14,7 @@ export class FaqController {
   findAll = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const items = await FaqService.findAll();
-      return res.json(items);
+      return res.json({ success: true, data: items });
     } catch (error) {
       return next(error);
     }
@@ -24,7 +24,7 @@ export class FaqController {
     try {
       const { id } = req.params as { id: string };
       const faqItem = await FaqService.update(id, req.body);
-      return res.json(faqItem);
+      return res.json({ success: true, data: faqItem });
     } catch (error) {
       return next(error);
     }

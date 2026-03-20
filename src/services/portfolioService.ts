@@ -1,6 +1,7 @@
 import { prisma } from "../config/prisma";
 import logger from "../config/logger";
 import type { Prisma } from "@prisma/client";
+import { AppError, BadRequestError } from "../utils/errors";
 
 
 export async function updatePortfolio(id: string, data: Partial<{ title: string; description: string; eventDate: string | Date; imageUrl?: string; isPinned?: boolean; uploadedFiles?: any[]; coverIndex?: string | number }>) {
@@ -73,17 +74,17 @@ export async function create(
 ) {
   // Validação dos dados
   if (!data.title || !data.description || !data.eventDate) {
-    throw new Error('Dados obrigatórios não fornecidos: title, description, eventDate');
+    throw new BadRequestError('Dados obrigatórios não fornecidos: title, description, eventDate');
   }
 
   let eventDate: Date;
   try {
     eventDate = typeof data.eventDate === 'string' ? new Date(data.eventDate) : data.eventDate;
     if (isNaN(eventDate.getTime())) {
-      throw new Error('Data inválida fornecida');
+      throw new BadRequestError('Data inválida fornecida');
     }
   } catch {
-    throw new Error('Erro ao processar data do evento');
+    throw new BadRequestError('Erro ao processar data do evento');
   }
 
   // Determine cover image and media items
@@ -147,7 +148,7 @@ export async function create(
 
   } catch (error) {
     logger.error({obj:error}, 'Erro ao criar portfólio no banco de dados:');
-    throw new Error('Erro interno ao salvar portfólio');
+    throw new AppError('Erro interno ao salvar portfólio', 500, true, 'PORTFOLIO_SAVE_FAILED');
   }
 }
 

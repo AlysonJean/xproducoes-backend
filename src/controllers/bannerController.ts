@@ -23,7 +23,7 @@ export class BannerController {
           sortOrder: 'asc'
         }
       });
-      res.json(banners);
+      res.json({ success: true, data: banners });
     } catch (error) {
       next(error);
     }
@@ -35,7 +35,7 @@ export class BannerController {
       const banners = await prisma.banner.findMany({
         orderBy: { sortOrder: 'asc' }
       });
-      res.json(banners);
+      res.json({ success: true, data: banners });
     } catch (error) {
       next(error);
     }
@@ -58,7 +58,7 @@ export class BannerController {
           endDate: endDate ? new Date(endDate) : null,
         }
       });
-      res.status(201).json(banner);
+      res.status(201).json({ success: true, data: banner });
     } catch (error) {
       next(error);
     }
@@ -83,7 +83,7 @@ export class BannerController {
           endDate: endDate ? new Date(endDate) : (endDate === null ? null : undefined),
         }
       });
-      res.json(banner);
+      res.json({ success: true, data: banner });
     } catch (error) {
       next(error);
     }

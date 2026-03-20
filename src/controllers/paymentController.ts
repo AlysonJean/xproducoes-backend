@@ -12,13 +12,13 @@ export class PaymentController {
       if (!bookingId) {
         return res
           .status(400)
-          .json({ message: "O ID da reserva é obrigatório." });
+          .json({ success: false, message: "O ID da reserva é obrigatório." });
       }
       const session = await paymentService.createCheckoutSession(
         bookingId,
         req.userId!,
       );
-      return res.json(session);
+      return res.json({ success: true, data: session });
     } catch (error) {
       return next(error);
     }
@@ -31,7 +31,7 @@ export class PaymentController {
   ) => {
     try {
       await paymentService.handleWebhookEvent(req);
-      return res.status(200).json({ received: true });
+      return res.status(200).json({ success: true, data: { received: true } });
     } catch (error) {
       return next(error);
     }
@@ -46,11 +46,11 @@ export class PaymentController {
       const { bookingId } = req.params as { bookingId: string };
       
       if (!bookingId) {
-        return res.status(400).json({ message: "ID da reserva é obrigatório." });
+        return res.status(400).json({ success: false, message: "ID da reserva é obrigatório." });
       }
 
       const paymentIntent = await paymentService.createPaymentIntent(bookingId);
-      return res.json(paymentIntent);
+      return res.json({ success: true, data: paymentIntent });
     } catch (error) {
       return next(error);
     }
@@ -65,11 +65,11 @@ export class PaymentController {
       const { paymentIntentId } = req.params as { paymentIntentId: string };
       
       if (!paymentIntentId) {
-        return res.status(400).json({ message: "ID do payment intent é obrigatório." });
+        return res.status(400).json({ success: false, message: "ID do payment intent é obrigatório." });
       }
 
       const payment = await paymentService.confirmPayment(paymentIntentId);
-      return res.json(payment);
+      return res.json({ success: true, data: payment });
     } catch (error) {
       return next(error);
     }
@@ -85,11 +85,11 @@ export class PaymentController {
       const { amount } = req.body;
       
       if (!paymentId) {
-        return res.status(400).json({ message: "ID do pagamento é obrigatório." });
+        return res.status(400).json({ success: false, message: "ID do pagamento é obrigatório." });
       }
 
       const refund = await paymentService.refund(paymentId, amount);
-      return res.json(refund);
+      return res.json({ success: true, data: refund });
     } catch (error) {
       return next(error);
     }
@@ -102,7 +102,7 @@ export class PaymentController {
   ) => {
     try {
       const history = await paymentService.getHistory(req.userId!);
-      return res.json(history);
+      return res.json({ success: true, data: history });
     } catch (error) {
       return next(error);
     }
@@ -117,11 +117,11 @@ export class PaymentController {
       const { bookingId } = req.params as { bookingId: string };
       
       if (!bookingId) {
-        return res.status(400).json({ message: "ID da reserva é obrigatório." });
+        return res.status(400).json({ success: false, message: "ID da reserva é obrigatório." });
       }
 
       const payment = await paymentService.getByBooking(bookingId);
-      return res.json(payment);
+      return res.json({ success: true, data: payment });
     } catch (error) {
       return next(error);
     }
@@ -135,7 +135,7 @@ export class PaymentController {
     try {
       const filters = req.query;
       const payments = await paymentService.getAllPayments(filters);
-      return res.json(payments);
+      return res.json({ success: true, data: payments });
     } catch (error) {
       return next(error);
     }
@@ -148,7 +148,7 @@ export class PaymentController {
   ) => {
     try {
       const stats = await paymentService.getPaymentStats();
-      return res.json(stats);
+      return res.json({ success: true, data: stats });
     } catch (error) {
       return next(error);
     }

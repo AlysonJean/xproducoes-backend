@@ -64,7 +64,9 @@ import { UploadService } from "../services/uploadService";
 import EmailService from "../services/emailService";
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
-import { Client, User, Prisma } from "@prisma/client";
+import { BookingStatus, Client, User, Prisma } from "@prisma/client";
+import { isPrismaError } from "../types/common";
+import { NotFoundError } from "../utils/errors";
 
 const bookingService = new BookingService();
 const equipmentService = new EquipmentService();
@@ -124,7 +126,7 @@ export class AdminController {
 
       // Avatar via upload middleware (req.file) -> usa UploadService
       let avatarUrl: string | undefined = undefined;
-      const uploadedFile = (req as any).file as Express.Multer.File | undefined;
+      const uploadedFile = req.file;
       if (uploadedFile) {
         const us = new UploadService();
         avatarUrl = await us.uploadAvatar(userData.email ?? 'temp', uploadedFile);
@@ -169,7 +171,7 @@ export class AdminController {
 
       // Audit log mínimo (se houver sistema de audit, gravar; caso contrário, logar)
       try {
-        const actorId = (req as any).user?.id || 'system';
+        const actorId = req.user?.id || 'system';
         logger.info(`admin.createClient actor=${actorId} clientId=${result.createdClient.id}`);
       } catch (e) {
         logger.warn('Falha ao gravar audit in-memory: ' + String(e));
@@ -197,23 +199,27 @@ export class AdminController {
 
       // ✅ NUNCA retornar senha temporária na resposta HTTP
       return res.status(201).json({ 
-        client, 
-        inviteUrl,
+        success: true,
         message: emailSent 
           ? 'Cliente criado com sucesso. Email de convite enviado.'
           : 'Cliente criado com sucesso. Atenção: não foi possível enviar o email de convite.',
-        emailSent
+        data: {
+          client,
+          inviteUrl,
+          emailSent,
+        },
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: 'Validação falhou', issues: error.issues });
+        return res.status(400).json({ success: false, message: 'Validação falhou', issues: error.issues });
       }
       // ✅ Tratar unique constraint violation (email duplicado)
-      if ((error as any)?.code === 'P2002') {
+      if (isPrismaError(error) && error.code === 'P2002') {
         return res.status(409).json({ 
+          success: false,
           code: 'EMAIL_EXISTS', 
           message: 'Email já cadastrado. Use outro endereço de email.',
-          field: (error as any)?.meta?.target?.[0] || 'email'
+          field: (Array.isArray(error.meta?.target) ? error.meta?.target[0] : undefined) || 'email'
         });
       }
       return next(error);
@@ -248,6 +254,7 @@ export class AdminController {
       });
 
       return res.json({
+        success: true,
         data: clients,
         meta: {
           total,
@@ -267,14 +274,14 @@ export class AdminController {
     try {
       const id = req.params["id"] as string;
       if (!id) {
-        return res.status(400).json({ error: "ID é obrigatório" });
+        return res.status(400).json({ success: false, message: "ID é obrigatório" });
       }
       const client = await clientService.getClientById(id);
       if (!client) {
-        return res.status(404).json({ error: "Cliente não encontrado" });
+        return res.status(404).json({ success: false, message: "Cliente não encontrado" });
       }
       // ✅ Usar helper function
-      return res.json(mapClientResponse(client));
+      return res.json({ success: true, data: mapClientResponse(client) });
     } catch (error) {
       return next(error);
     }
@@ -286,7 +293,7 @@ export class AdminController {
     try {
       const id = req.params["id"] as string;
       if (!id) {
-        return res.status(400).json({ error: "ID é obrigatório" });
+        return res.status(400).json({ success: false, message: "ID é obrigatório" });
       }
       // Atualiza dados do perfil de cliente
       // Separa campos de client e user
@@ -318,7 +325,7 @@ export class AdminController {
         }
 
         if (!updatedClient) {
-          throw new Error('Cliente não encontrado');
+          throw new NotFoundError('Cliente não encontrado');
         }
 
         // Se houver dados de usuário, atualiza também
@@ -333,10 +340,10 @@ export class AdminController {
       // Retorna o cliente atualizado com dados do usuário
       const client = await clientService.getClientById(id);
       if (!client) {
-        return res.status(404).json({ error: "Cliente não encontrado" });
+        return res.status(404).json({ success: false, message: "Cliente não encontrado" });
       }
       // ✅ Usar helper function
-      return res.json(mapClientResponse(client));
+      return res.json({ success: true, data: mapClientResponse(client) });
     } catch (error) {
       return next(error);
     }
@@ -348,7 +355,7 @@ export class AdminController {
     try {
       const id = req.params["id"] as string;
       if (!id) {
-        return res.status(400).json({ error: "ID é obrigatório" });
+        return res.status(400).json({ success: false, message: "ID é obrigatório" });
       }
 
       // Buscar cliente para obter o userId antes de deletar
@@ -358,7 +365,7 @@ export class AdminController {
       });
 
       if (!client) {
-        return res.status(404).json({ error: "Cliente não encontrado" });
+        return res.status(404).json({ success: false, message: "Cliente não encontrado" });
       }
 
       // Executar limpeza em transação para evitar erros de constraint (FK)
@@ -408,7 +415,7 @@ export class AdminController {
       });
 
       logger.info(`Cliente deletado com sucesso: ${id}`);
-      return res.status(204).send();
+      return res.status(200).json({ success: true, message: 'Cliente removido com sucesso' });
     } catch (error) {
       logger.error('Erro ao deletar cliente: ' + String(error));
       return next(error);
@@ -424,7 +431,7 @@ export class AdminController {
         limit: Number(limit),
         search: search as string,
       });
-      res.json(users);
+      res.json({ success: true, data: users });
     } catch (error) {
       logger.error('Erro ao buscar usuários: ' + String(error));
       next(error);
@@ -436,9 +443,9 @@ export class AdminController {
       const { id } = req.params as { id: string };
       const user = await userService.getUserById(Number(id));
       if (!user) {
-        return res.status(404).json({ message: "Usuário não encontrado" });
+        return res.status(404).json({ success: false, message: "Usuário não encontrado" });
       }
-      res.json(user);
+      res.json({ success: true, data: user });
     } catch (error) {
       logger.error('Erro ao buscar usuário: ' + String(error));
       next(error);
@@ -451,7 +458,7 @@ export class AdminController {
       const { role } = req.body;
       
       const user = await userService.updateUserRole(Number(id), role);
-      res.json(user);
+      res.json({ success: true, data: user });
     } catch (error) {
       logger.error('Erro ao atualizar role do usuário: ' + String(error));
       next(error);
@@ -480,7 +487,7 @@ export class AdminController {
         totalEquipments: await equipmentService.getTotalEquipments(),
         recentBookings: await bookingService.getAllBookings({ eventDateFrom: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }),
       };
-      res.json(stats);
+      res.json({ success: true, data: stats });
     } catch (error) {
       logger.error('Erro ao buscar dashboard: ' + String(error));
       next(error);
@@ -493,9 +500,13 @@ export class AdminController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
       const { status, startDate, endDate } = req.query;
+      const normalizedStatus =
+        typeof status === 'string' && Object.values(BookingStatus).includes(status as BookingStatus)
+          ? (status as BookingStatus)
+          : undefined;
       
       const filters = {
-        status: status as any,
+        status: normalizedStatus,
         eventDateFrom: startDate ? new Date(startDate as string) : undefined,
         eventDateTo: endDate ? new Date(endDate as string) : undefined,
       };
@@ -510,6 +521,7 @@ export class AdminController {
       const paginatedBookings = bookings.slice(start, start + limit);
       
       res.json({
+        success: true,
         data: paginatedBookings,
         meta: {
           total,
@@ -530,7 +542,7 @@ export class AdminController {
       const { status } = req.body;
       
       const booking = await bookingService.updateBookingStatus(id, status);
-      res.json(booking);
+      res.json({ success: true, data: booking });
     } catch (error) {
       logger.error('Erro ao atualizar status da reserva: ' + String(error));
       next(error);
@@ -541,15 +553,15 @@ export class AdminController {
   async verifyUserEmail(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params as { id: string }; // user id
-      if (!id) return res.status(400).json({ message: 'ID do usuário é obrigatório' });
+      if (!id) return res.status(400).json({ success: false, message: 'ID do usuário é obrigatório' });
 
       const user = await prisma.user.findUnique({ where: { id } });
-      if (!user) return res.status(404).json({ message: 'Usuário não encontrado' });
+      if (!user) return res.status(404).json({ success: false, message: 'Usuário não encontrado' });
 
-      if (user.verified) return res.status(200).json({ message: 'E-mail já verificado' });
+      if (user.verified) return res.status(200).json({ success: true, message: 'E-mail já verificado' });
 
       const updated = await prisma.user.update({ where: { id }, data: { verified: true } });
-      return res.json({ success: true, user: { id: updated.id, email: updated.email, verified: updated.verified } });
+      return res.json({ success: true, data: { user: { id: updated.id, email: updated.email, verified: updated.verified } } });
     } catch (error) {
       logger.error('Erro ao verificar email de usuário: ' + String(error));
       next(error);
@@ -560,11 +572,11 @@ export class AdminController {
   async resendVerification(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params as { id: string }; // user id
-      if (!id) return res.status(400).json({ message: 'ID do usuário é obrigatório' });
+      if (!id) return res.status(400).json({ success: false, message: 'ID do usuário é obrigatório' });
 
       const user = await prisma.user.findUnique({ where: { id } });
-      if (!user) return res.status(404).json({ message: 'Usuário não encontrado' });
-      if (user.verified) return res.status(400).json({ message: 'E-mail já verificado' });
+      if (!user) return res.status(404).json({ success: false, message: 'Usuário não encontrado' });
+      if (user.verified) return res.status(400).json({ success: false, message: 'E-mail já verificado' });
 
       const token = crypto.randomBytes(20).toString('hex');
 

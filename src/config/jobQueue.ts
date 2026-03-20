@@ -4,7 +4,6 @@
  */
 
 import { Queue, Worker, Job } from 'bullmq';
-import type IORedis from 'ioredis';
 import logger from './logger';
 import { getRedisClient } from './redis.js';
 

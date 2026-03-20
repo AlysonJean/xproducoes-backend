@@ -5,6 +5,7 @@ import type { UploadApiErrorResponse, UploadApiResponse } from "cloudinary";
 import type { Request } from "express";
 import { JSDOM } from 'jsdom';
 import createDOMPurify from 'dompurify';
+import { AppError } from "../utils/errors";
 
 const dompurify = createDOMPurify(new JSDOM('').window as any);
 
@@ -193,14 +194,14 @@ export class UploadService {
           const result = await cloudinary.uploader.upload(url, options);
           
           if (!result.secure_url) {
-              throw new Error('No secure_url received from Cloudinary');
+              throw new AppError('No secure_url received from Cloudinary', 502, true, 'CLOUDINARY_MISSING_SECURE_URL');
           }
 
           logger.info({ obj: result.secure_url }, '[UploadService] URL upload successful');
           return result.secure_url;
       } catch (error: any) {
           logger.error({ obj: { error: error.message, url } }, '[UploadService] URL upload failed');
-          throw new Error(`Failed to upload from URL: ${error.message}`);
+            throw new AppError(`Failed to upload from URL: ${error.message}`, 502, true, 'CLOUDINARY_URL_UPLOAD_FAILED');
       }
   }
 

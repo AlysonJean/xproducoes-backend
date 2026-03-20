@@ -12,7 +12,7 @@ export class EquipmentController {
     req: Request,
     res: Response,
     _next: NextFunction,
-  ): Promise<any> => {
+  ): Promise<void> => {
     if (req.userRole !== "ADMIN") {
       throw new ForbiddenError("Acesso negado");
     }
@@ -42,16 +42,17 @@ export class EquipmentController {
     // Invalidar cache após criar equipamento
     await cacheService.invalidateEquipmentCaches();
 
-    return res
+    res
       .status(201)
-      .json({ equipment, message: "Equipamento criado com sucesso" });
+      .json({ success: true, data: equipment, message: "Equipamento criado com sucesso" });
+    return;
   };
 
   update = async (
     req: Request,
     res: Response,
     _next: NextFunction,
-  ): Promise<any> => {
+  ): Promise<void> => {
     if (req.userRole !== "ADMIN") {
       throw new ForbiddenError("Acesso negado");
     }
@@ -88,14 +89,15 @@ export class EquipmentController {
       }
     }
 
-    return res.json(equipment);
+    res.json({ success: true, data: equipment });
+    return;
   };
 
   findAll = async (
     req: Request,
     res: Response,
     next: NextFunction,
-  ): Promise<any> => {
+  ): Promise<void> => {
     try {
       const cacheKey = "equipment:all";
 
@@ -111,7 +113,8 @@ export class EquipmentController {
         () => equipmentService.findAll(limit, publicView),
         CacheService.TTL.SHORT
       );
-      return res.json(equipments);
+      res.json({ success: true, data: equipments });
+      return;
     } catch (error) {
       return next(error);
     }
@@ -121,7 +124,7 @@ export class EquipmentController {
     req: Request,
     res: Response,
     _next: NextFunction,
-  ): Promise<any> => {
+  ): Promise<void> => {
     const { id } = req.params as { id: string };
     if (!id) throw new BadRequestError("ID do equipamento é obrigatório.");
 
@@ -135,14 +138,15 @@ export class EquipmentController {
     if (!equipment) {
       throw new NotFoundError("Equipamento não encontrado.");
     }
-    return res.json(equipment);
+    res.json({ success: true, data: equipment });
+    return;
   };
 
   delete = async (
     req: Request,
     res: Response,
     _next: NextFunction,
-  ): Promise<any> => {
+  ): Promise<void> => {
     if (req.userRole !== "ADMIN") {
       throw new ForbiddenError("Acesso negado");
     }
@@ -162,14 +166,15 @@ export class EquipmentController {
     // Invalidar cache após deletar equipamento
     await cacheService.invalidateEquipmentCaches(id);
 
-    return res.status(204).send();
+    res.status(204).send();
+    return;
   };
 
   getAvailability = async (
     req: Request,
     res: Response,
     _next: NextFunction,
-  ): Promise<any> => {
+  ): Promise<void> => {
     const { id } = req.params as { id: string };
     const { month, year } = req.query;
 
@@ -181,17 +186,19 @@ export class EquipmentController {
       Number(month),
       Number(year),
     );
-    return res.json(availability);
+    res.json({ success: true, data: availability });
+    return;
   };
 
   search = async (
     req: Request,
     res: Response,
     next: NextFunction,
-  ): Promise<any> => {
+  ): Promise<void> => {
     try {
       const equipments = await equipmentService.search(req.query);
-      return res.json(equipments);
+      res.json({ success: true, data: equipments });
+      return;
     } catch (error) {
       return next(error);
     }
@@ -201,20 +208,21 @@ export class EquipmentController {
     req: Request,
     res: Response,
     _next: NextFunction,
-  ): Promise<any> => {
+  ): Promise<void> => {
     const { categoryId } = req.params as { categoryId: string };
     
     if (!categoryId) throw new BadRequestError("ID da categoria é obrigatório.");
 
     const equipments = await equipmentService.findByCategory(categoryId);
-    return res.json(equipments);
+    res.json({ success: true, data: equipments });
+    return;
   };
 
   duplicate = async (
     req: Request,
     res: Response,
     _next: NextFunction,
-  ): Promise<any> => {
+  ): Promise<void> => {
     if (req.userRole !== "ADMIN") {
       throw new ForbiddenError("Acesso negado");
     }
@@ -226,6 +234,7 @@ export class EquipmentController {
 
     await cacheService.invalidateEquipmentCaches();
 
-    return res.status(201).json({ equipment: duplicate, message: "Equipamento duplicado com sucesso" });
+    res.status(201).json({ success: true, data: duplicate, message: "Equipamento duplicado com sucesso" });
+    return;
   };
 }

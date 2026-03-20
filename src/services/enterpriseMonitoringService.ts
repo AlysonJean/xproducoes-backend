@@ -8,6 +8,7 @@ import { cacheService } from "./cacheService";
 import logger from "../config/logger";
 import os from "os";
 import * as si from "systeminformation";
+import { AppError } from "../utils/errors";
 
 interface IntegrationHealth {
   name: string;
@@ -116,7 +117,7 @@ class EnterpriseMonitoringService {
       }
     }
     
-    throw new Error(`All retries failed for ${integration}`);
+    throw new AppError(`All retries failed for ${integration}`, 503, true, "INTEGRATION_RETRY_FAILED");
   }
 
   private async checkSingleIntegration(integration: string): Promise<IntegrationHealth> {
@@ -140,7 +141,7 @@ class EnterpriseMonitoringService {
           await this.checkAI();
           break;
         default:
-          throw new Error(`Unknown integration: ${integration}`);
+          throw new AppError(`Unknown integration: ${integration}`, 400, true, "UNKNOWN_INTEGRATION");
       }
 
       const responseTime = Date.now() - startTime;
@@ -177,28 +178,28 @@ class EnterpriseMonitoringService {
     await cacheService.set(testKey, 'test', 10);
     const result = await cacheService.get(testKey);
     if (result !== 'test') {
-      throw new Error('Cache read/write test failed');
+      throw new AppError('Cache read/write test failed', 503, true, "CACHE_CHECK_FAILED");
     }
   }
 
   private async checkCloudinary(): Promise<void> {
     // Simulate Cloudinary check
     if (!process.env.CLOUDINARY_URL && !process.env.CLOUDINARY_CLOUD_NAME) {
-      throw new Error('Cloudinary not configured');
+      throw new AppError('Cloudinary not configured', 503, true, "CLOUDINARY_NOT_CONFIGURED");
     }
   }
 
   private async checkSMTP(): Promise<void> {
     // Simulate SMTP check
     if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
-      throw new Error('SMTP not configured');
+      throw new AppError('SMTP not configured', 503, true, "SMTP_NOT_CONFIGURED");
     }
   }
 
   private async checkAI(): Promise<void> {
     // Check for either Gemini or Hugging Face (HUGGIE) configuration
     if (!process.env.GEMINI_API_KEY && !process.env.HF_API_KEY) {
-      throw new Error('AI Provider (Gemini or Hugging Face) not configured');
+      throw new AppError('AI Provider (Gemini or Hugging Face) not configured', 503, true, "AI_PROVIDER_NOT_CONFIGURED");
     }
   }
 

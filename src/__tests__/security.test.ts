@@ -18,7 +18,7 @@ jest.mock('../config/prisma', () => ({
   prisma: {
     user: { findUnique: jest.fn() },
     sponsorLogo: { create: jest.fn(), findMany: jest.fn() },
-    newsletterSubscription: { create: jest.fn() },
+    newsletterSubscriber: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
     collaborator: { create: jest.fn() },
     // Adicione outros modelos conforme necessário
   },
@@ -30,8 +30,55 @@ jest.mock('../middlewares/upload', () => ({
   uploadMultiple: () => (req: any, res: any, next: any) => next(),
   processUpload: (req: any, res: any, next: any) => {
     req.body.imageUrl = 'http://example.com/image.jpg'; // Simula upload
+    req.file = {
+      originalname: 'image.jpg',
+      mimetype: 'image/jpeg',
+      buffer: Buffer.from('fake-image'),
+      size: 10,
+    };
     next();
   },
+}));
+
+// Mock do multer para que a rota de sponsors tenha req.file disponível
+jest.mock('multer', () => {
+  const multerMock = () => ({
+    single: () => (req: any, _res: any, next: any) => {
+      req.file = {
+        originalname: 'image.jpg',
+        mimetype: 'image/jpeg',
+        buffer: Buffer.from('fake-image'),
+        size: 10,
+      };
+      next();
+    },
+    array: () => (req: any, _res: any, next: any) => next(),
+    fields: () => (req: any, _res: any, next: any) => next(),
+  });
+  multerMock.memoryStorage = () => ({});
+  multerMock.diskStorage = () => ({});
+  return multerMock;
+});
+
+// Mock do UploadService para evitar chamadas reais ao Cloudinary
+jest.mock('../services/uploadService', () => ({
+  UploadService: jest.fn().mockImplementation(() => ({
+    uploadFile: jest.fn().mockResolvedValue('http://res.cloudinary.com/test/image.jpg'),
+    getCloudinaryMulterConfig: jest.fn().mockReturnValue({
+      single: () => (req: any, _res: any, next: any) => {
+        req.file = {
+          originalname: 'image.jpg',
+          mimetype: 'image/jpeg',
+          buffer: Buffer.from('fake-image'),
+          size: 10,
+        };
+        next();
+      },
+      array: () => (req: any, _res: any, next: any) => next(),
+      fields: () => (req: any, _res: any, next: any) => next(),
+    }),
+    deleteFile: jest.fn().mockResolvedValue(undefined),
+  })),
 }));
 
 import request from 'supertest';
@@ -53,7 +100,7 @@ describe('🛡️ Security Blindagem Tests', () => {
         .send({});
       
       expect(res.status).toBe(400);
-      expect(res.body.success).toBe(false);
+      // validateBody retorna { message, errors } sem campo success
       expect(JSON.stringify(res.body)).toContain('email'); // Deve reclamar do email
     });
 
@@ -66,8 +113,9 @@ describe('🛡️ Security Blindagem Tests', () => {
     });
 
     it('POST /newsletter/subscribe - deve aceitar email válido (200/201)', async () => {
-      // Mock prisma response
-      (prisma.newsletterSubscription.create as jest.Mock<any>).mockResolvedValue({ id: '1', email: 'test@test.com' });
+      // Mock prisma response - controller usa newsletterSubscriber
+      (prisma.newsletterSubscriber.findUnique as jest.Mock<any>).mockResolvedValue(null);
+      (prisma.newsletterSubscriber.create as jest.Mock<any>).mockResolvedValue({ id: '1', email: 'test@test.com' });
 
       const res = await request(app)
         .post('/api/v1/newsletter/subscribe')
@@ -107,12 +155,14 @@ describe('🛡️ Security Blindagem Tests', () => {
     it('POST /admin/sponsors - deve aceitar requisição válida de admin (200/201)', async () => {
       (prisma.sponsorLogo.create as jest.Mock<any>).mockResolvedValue({ id: '1', name: 'Sponsor Valid' });
       
+      // O mock do multer já injeta req.file, enviamos o name como JSON
       const res = await request(app)
         .post('/api/v1/admin/sponsors')
         .set('Authorization', 'Bearer valid-admin-token')
-        .send({ name: 'Sponsor Valid' }); // Imagem mockada pelo middleware
+        .set('Content-Type', 'application/json')
+        .send({ name: 'Sponsor Valid' });
       
-      expect(res.status).toBe(200); // Sponsor controller retorna json direto (200) ou 201? Controller usa res.json(sponsor) -> 200
+      expect(res.status).toBe(200);
     });
   });
 

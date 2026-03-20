@@ -20,7 +20,7 @@ export class CategoryController {
       // Invalidar cache após criar categoria
       await cacheService.deletePattern("category:*");
 
-      return res.status(201).json(category);
+      return res.status(201).json({ success: true, data: category });
     } catch (error) {
       return next(error);
     }
@@ -34,7 +34,7 @@ export class CategoryController {
         () => categoryService.findAll(),
         CacheService.TTL.MEDIUM
       );
-      return res.json(categories);
+      return res.json({ success: true, data: categories });
     } catch (error) {
       return next(error);
     }
@@ -43,7 +43,7 @@ export class CategoryController {
   update = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (req.userRole !== "ADMIN") {
-        return res.status(403).json({ message: "Acesso negado" });
+        return res.status(403).json({ success: false, message: "Acesso negado" });
       }
 
       const validation = categoryUpdateSchema.safeParse(req.body);
@@ -57,7 +57,7 @@ export class CategoryController {
       if (!id) {
         return res
           .status(400)
-          .json({ message: "ID da categoria é obrigatório." });
+          .json({ success: false, message: "ID da categoria é obrigatório." });
       }
 
       const category = await categoryService.update(id, { name, imageUrl, imageAlt });
@@ -65,7 +65,7 @@ export class CategoryController {
       // Invalidar cache após atualizar categoria
       await cacheService.deletePattern("category:*");
 
-      return res.json(category);
+      return res.json({ success: true, data: category });
     } catch (error) {
       return next(error);
     }
@@ -74,14 +74,14 @@ export class CategoryController {
   delete = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (req.userRole !== "ADMIN") {
-        return res.status(403).json({ message: "Acesso negado" });
+        return res.status(403).json({ success: false, message: "Acesso negado" });
       }
 
       const { id } = req.params as { id: string };
       if (!id) {
         return res
           .status(400)
-          .json({ message: "ID da categoria é obrigatório." });
+          .json({ success: false, message: "ID da categoria é obrigatório." });
       }
 
       await categoryService.deleteCategory(id);
@@ -101,15 +101,15 @@ export class CategoryController {
       if (!id) {
         return res
           .status(400)
-          .json({ message: "ID da categoria é obrigatório." });
+          .json({ success: false, message: "ID da categoria é obrigatório." });
       }
 
       const category = await categoryService.findById(id);
       if (!category) {
-        return res.status(404).json({ message: "Categoria não encontrada." });
+        return res.status(404).json({ success: false, message: "Categoria não encontrada." });
       }
       
-      return res.json(category);
+      return res.json({ success: true, data: category });
     } catch (error) {
       return next(error);
     }
@@ -123,7 +123,7 @@ export class CategoryController {
         () => categoryService.findAllWithEquipmentCount(),
         CacheService.TTL.MEDIUM
       );
-      return res.json(categories);
+      return res.json({ success: true, data: categories });
     } catch (error) {
       return next(error);
     }
@@ -132,7 +132,7 @@ export class CategoryController {
   getFeatured = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const categories = await categoryService.findFeatured();
-      return res.json(categories);
+      return res.json({ success: true, data: categories });
     } catch (error) {
       return next(error);
     }

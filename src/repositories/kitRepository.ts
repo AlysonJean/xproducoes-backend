@@ -1,8 +1,8 @@
-// OBSOLETO: Centralizado no Prisma Client
 import { prisma } from "../config/prisma";
+import type { Prisma } from "@prisma/client";
 
 export class KitRepository {
-  async create(data: any) {
+  async create(data: Prisma.KitCreateInput) {
     return prisma.kit.create({ data });
   }
   async findAll(limit?: number) {
@@ -70,7 +70,7 @@ export class KitRepository {
       nextSlug: next?.slug || null
     };
   }
-  async update(id: string, data: any) {
+  async update(id: string, data: Prisma.KitUpdateInput) {
     return prisma.kit.update({ where: { id }, data });
   }
   async delete(id: string) {

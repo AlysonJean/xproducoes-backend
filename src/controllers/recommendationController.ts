@@ -13,7 +13,7 @@ import logger from '../config/logger';
  */
 export const getPersonalizedRecommendations = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     const limit = parseInt(req.query.limit as string) || 8;
 
     if (!userId) {
@@ -79,10 +79,10 @@ export const getPersonalizedRecommendations = async (req: Request, res: Response
       take: limit
     });
 
-    res.json(recommendations);
+    res.json({ success: true, data: recommendations });
   } catch (error) {
     logger.error({ err: error }, 'Error getting personalized recommendations');
-    res.status(500).json({ error: 'Failed to get personalized recommendations' });
+    res.status(500).json({ success: false, message: 'Failed to get personalized recommendations' });
   }
 };
 
@@ -102,7 +102,7 @@ export const getSimilarRecommendations = async (req: Request, res: Response) => 
       });
 
       if (!equipment) {
-        return res.status(404).json({ error: 'Equipment not found' });
+        return res.status(404).json({ success: false, message: 'Equipment not found' });
       }
 
       const similar = await prisma.equipment.findMany({
@@ -118,7 +118,7 @@ export const getSimilarRecommendations = async (req: Request, res: Response) => 
         take: limit
       });
 
-      return res.json(similar);
+      return res.json({ success: true, data: similar });
     } else if (type === 'kit') {
       const kit = await prisma.kit.findUnique({
         where: { id: itemId },
@@ -128,7 +128,7 @@ export const getSimilarRecommendations = async (req: Request, res: Response) => 
       });
 
       if (!kit) {
-        return res.status(404).json({ error: 'Kit not found' });
+        return res.status(404).json({ success: false, message: 'Kit not found' });
       }
 
       const similar = await prisma.kit.findMany({
@@ -138,13 +138,13 @@ export const getSimilarRecommendations = async (req: Request, res: Response) => 
         take: limit
       });
 
-      return res.json(similar);
+      return res.json({ success: true, data: similar });
     }
 
-    res.status(400).json({ error: 'Invalid type. Must be equipment or kit' });
+    res.status(400).json({ success: false, message: 'Invalid type. Must be equipment or kit' });
   } catch (error) {
     logger.error({ err: error }, 'Error getting similar recommendations');
-    res.status(500).json({ error: 'Failed to get similar recommendations' });
+    res.status(500).json({ success: false, message: 'Failed to get similar recommendations' });
   }
 };
 
@@ -158,7 +158,7 @@ export const getFrequentlyBoughtTogether = async (req: Request, res: Response) =
     const limit = parseInt(req.query.limit as string) || 4;
 
     if (type !== 'equipment' && type !== 'kit') {
-      return res.status(400).json({ error: 'Invalid type' });
+      return res.status(400).json({ success: false, message: 'Invalid type' });
     }
 
     const bookingsWithItem = await prisma.booking.findMany({
@@ -203,9 +203,9 @@ export const getFrequentlyBoughtTogether = async (req: Request, res: Response) =
           include: { category: true },
           take: limit
         });
-        return res.json(fallback);
+        return res.json({ success: true, data: fallback });
       }
-      return res.json([]);
+      return res.json({ success: true, data: [] });
     }
 
     const recommendations = await prisma.equipment.findMany({
@@ -217,10 +217,10 @@ export const getFrequentlyBoughtTogether = async (req: Request, res: Response) =
       .map(eqId => recommendations.find(r => r.id === eqId))
       .filter(Boolean);
 
-    res.json(sorted);
+    res.json({ success: true, data: sorted });
   } catch (error) {
     logger.error({ err: error }, 'Error getting frequently bought together');
-    res.status(500).json({ error: 'Failed to get frequently bought together' });
+    res.status(500).json({ success: false, message: 'Failed to get frequently bought together' });
   }
 };
 
@@ -279,10 +279,10 @@ export const getTrendingRecommendations = async (req: Request, res: Response) =>
       });
     }
 
-    res.json(recommendations);
+    res.json({ success: true, data: recommendations });
   } catch (error) {
     logger.error({ err: error }, 'Error getting trending recommendations');
-    res.status(500).json({ error: 'Failed to get trending recommendations' });
+    res.status(500).json({ success: false, message: 'Failed to get trending recommendations' });
   }
 };
 
@@ -306,10 +306,10 @@ export const getNewRecommendations = async (req: Request, res: Response) => {
       take: limit
     });
 
-    res.json(recommendations);
+    res.json({ success: true, data: recommendations });
   } catch (error) {
     logger.error({ err: error }, 'Error getting new recommendations');
-    res.status(500).json({ error: 'Failed to get new recommendations' });
+    res.status(500).json({ success: false, message: 'Failed to get new recommendations' });
   }
 };
 
@@ -348,10 +348,10 @@ export const getSeasonalRecommendations = async (req: Request, res: Response) =>
       return getTrendingRecommendations(req, res);
     }
 
-    res.json(recommendations);
+    res.json({ success: true, data: recommendations });
   } catch (error) {
     logger.error({ err: error }, 'Error getting seasonal recommendations');
-    res.status(500).json({ error: 'Failed to get seasonal recommendations' });
+    res.status(500).json({ success: false, message: 'Failed to get seasonal recommendations' });
   }
 };
 
@@ -360,11 +360,11 @@ export const getSeasonalRecommendations = async (req: Request, res: Response) =>
  */
 export const getRecommendationsBasedOnFavorites = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     const limit = parseInt(req.query.limit as string) || 8;
 
     if (!userId) {
-      return res.status(401).json({ error: 'Authentication required' });
+      return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
     const client = await prisma.client.findUnique({ where: { userId } });
@@ -401,10 +401,10 @@ export const getRecommendationsBasedOnFavorites = async (req: Request, res: Resp
       take: limit
     });
 
-    res.json(recommendations);
+    res.json({ success: true, data: recommendations });
   } catch (error) {
     logger.error({ err: error }, 'Error getting recommendations based on favorites');
-    res.status(500).json({ error: 'Failed to get recommendations based on favorites' });
+    res.status(500).json({ success: false, message: 'Failed to get recommendations based on favorites' });
   }
 };
 
@@ -428,10 +428,10 @@ export const getRecommendationsByCategory = async (req: Request, res: Response) 
       take: limit
     });
 
-    res.json(recommendations);
+    res.json({ success: true, data: recommendations });
   } catch (error) {
     logger.error({ err: error }, 'Error getting recommendations by category');
-    res.status(500).json({ error: 'Failed to get recommendations by category' });
+    res.status(500).json({ success: false, message: 'Failed to get recommendations by category' });
   }
 };
 
@@ -456,9 +456,9 @@ export const getRecommendationsByBudget = async (req: Request, res: Response) =>
       take: limit
     });
 
-    res.json(recommendations);
+    res.json({ success: true, data: recommendations });
   } catch (error) {
     logger.error({ err: error }, 'Error getting recommendations by budget');
-    res.status(500).json({ error: 'Failed to get recommendations by budget' });
+    res.status(500).json({ success: false, message: 'Failed to get recommendations by budget' });
   }
 };

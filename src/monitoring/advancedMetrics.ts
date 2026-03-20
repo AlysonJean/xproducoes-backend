@@ -51,11 +51,8 @@ interface SystemHealth {
 let metricsBuffer: MetricsData[] = [];
 const maxMetricsAge = 60 * 60 * 1000; // 1 hour
 
-// Periodic cleanup to prevent unbounded memory growth
-setInterval(() => {
-  const now = Date.now();
-  metricsBuffer = metricsBuffer.filter((m) => now - m.timestamp < maxMetricsAge);
-}, 5 * 60 * 1000); // Every 5 minutes
+// Cleanup is done lazily inside recordEndpointMetric to avoid keeping
+// the event loop alive (important for Neon scale-to-zero free tier).
 
 /**
  * Collect system health metrics

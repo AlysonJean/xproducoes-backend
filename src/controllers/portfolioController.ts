@@ -7,9 +7,9 @@ export class PortfolioController {
     try {
       const { id } = req.params as { id: string };
 
-        const updated = await portfolioService.updatePortfolio(id, req.body);
-        await cacheService.delete('portfolio:all'); // Invalidar cache
-      return res.json(updated);
+      const updated = await portfolioService.updatePortfolio(id, req.body);
+      await cacheService.delete('portfolio:all'); // Invalidar cache
+      return res.json({ success: true, data: updated });
     } catch (error) {
       return next(error);
     }
@@ -20,12 +20,12 @@ export class PortfolioController {
 
       const portfolio = await portfolioService.create(req.body);
       await cacheService.delete('portfolio:all'); // Invalidar cache
-      return res.status(201).json(portfolio);
+      return res.status(201).json({ success: true, data: portfolio });
     } catch (error) {
       if (error instanceof Error) {
         // Se é um erro conhecido/esperado, retorne 400
         if (error.message.includes('obrigatórios') || error.message.includes('inválida')) {
-          return res.status(400).json({ message: error.message });
+          return res.status(400).json({ success: false, message: error.message });
         }
       }
       // Para outros erros, use o handler de erro padrão
@@ -43,7 +43,7 @@ export class PortfolioController {
         await cacheService.set(cacheKey, items, 600); // Cache por 10 minutos
       }
 
-      return res.json(items);
+      return res.json({ success: true, data: items });
     } catch (error) {
       return next(error);
     }
@@ -53,7 +53,7 @@ export class PortfolioController {
     try {
       const { id } = req.params as { id: string };
       if (!id) {
-        return res.status(400).json({ message: "ID é obrigatório." });
+        return res.status(400).json({ success: false, message: "ID é obrigatório." });
       }
 
       await portfolioService.deletePortfolio(id);
@@ -71,7 +71,7 @@ export class PortfolioController {
 
 
       await portfolioService.updateOrder(items);
-      return res.json({ message: "Ordem atualizada com sucesso" });
+      return res.json({ success: true, message: "Ordem atualizada com sucesso" });
     } catch (error) {
       return next(error);
     }

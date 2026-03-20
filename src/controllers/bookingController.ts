@@ -710,6 +710,37 @@ export class BookingController {
     }
   };
 
+  createTask = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const bookingId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const { title, description } = req.body as { title?: string; description?: string };
+
+      if (!bookingId) {
+        throw new BadRequestError("ID da reserva é obrigatório.");
+      }
+
+      if (!title || !title.trim()) {
+        throw new BadRequestError("Título da tarefa é obrigatório.");
+      }
+
+      const created = await bookingService.createBookingTask(bookingId, {
+        title: title.trim(),
+        description: description?.trim() || undefined,
+      });
+
+      try {
+        const io = getSocketIO();
+        io.to(`event:${bookingId}`).emit('task_created', created);
+      } catch (_e) {
+        logger.warn('Falha ao emitir socket event task_created');
+      }
+
+      res.status(201).json({ success: true, data: created });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   toggleTask = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const taskId = Array.isArray(req.params.taskId) ? req.params.taskId[0] : req.params.taskId;

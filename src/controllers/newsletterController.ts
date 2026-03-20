@@ -12,7 +12,7 @@ export class NewsletterController {
     const validation = schema.safeParse(req.body);
 
     if (!validation.success) {
-      res.status(400).json({ error: 'Email inválido' });
+      res.status(400).json({ success: false, message: 'Email inválido' });
       return;
     }
 
@@ -30,10 +30,10 @@ export class NewsletterController {
             where: { email },
             data: { isActive: true },
           });
-          res.json({ message: 'Inscrição reativada com sucesso!' });
+          res.json({ success: true, message: 'Inscrição reativada com sucesso!' });
           return;
         }
-        res.status(400).json({ error: 'Email já cadastrado.' });
+        res.status(400).json({ success: false, message: 'Email já cadastrado.' });
         return;
       }
 
@@ -41,10 +41,10 @@ export class NewsletterController {
         data: { email },
       });
 
-      res.status(201).json({ message: 'Inscrição realizada com sucesso!' });
+      res.status(201).json({ success: true, message: 'Inscrição realizada com sucesso!' });
     } catch (error) {
       logger.error({ err: error }, 'Newsletter subscribe error');
-      res.status(500).json({ error: 'Erro interno ao processar inscrição' });
+      res.status(500).json({ success: false, message: 'Erro interno ao processar inscrição' });
     }
   }
 
@@ -54,15 +54,15 @@ export class NewsletterController {
         orderBy: { createdAt: 'desc' },
       });
 
-      res.json(subscribers);
+      res.json({ success: true, data: subscribers });
     } catch (error) {
       logger.error({ err: error }, 'Newsletter list error');
-      res.status(500).json({ error: 'Erro ao listar inscritos' });
+      res.status(500).json({ success: false, message: 'Erro ao listar inscritos' });
     }
   }
 
   async unsubscribe(req: Request, res: Response): Promise<void> {
-     res.status(501).json({ error: 'Not implemented' });
+     res.status(501).json({ success: false, message: 'Not implemented' });
   }
 }
 

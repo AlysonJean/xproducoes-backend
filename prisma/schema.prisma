@@ -92,6 +92,7 @@ model User {
   googleCalendarEmail          String?
   googleRefreshToken           String?
   googleResourceId             String?
+  socialProvider               String?    // 'google' | 'facebook' | null = local account
   auditLogs                    BookingAuditLog[]
   assignedBookings             Booking[]             @relation("BookingAssignee")
   createdBookings              Booking[]             @relation("BookingCreator")
@@ -392,7 +393,6 @@ model Booking {
   @@index([eventDate, status])
   @@index([creatorId, status])
   @@index([clientId, status])
-  @@index([status, eventDate])
   @@index([eventDate, eventEndDate])
   @@map("bookings")
 }

@@ -8,7 +8,7 @@ export class CollaboratorFunctionController {
   async getAll(req: Request, res: Response) {
     try {
       const functions = await service.getAll();
-      res.json(functions);
+      res.json({ success: true, data: functions });
     } catch (error) {
       logger.error({ err: error }, "Erro ao listar funções");
       res.status(500).json({ success: false, message: "Erro interno ao listar funções" });

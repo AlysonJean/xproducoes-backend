@@ -25,7 +25,7 @@ export class ContactController {
 
       const validatedData = validation.data;
       const submission = await contactService.createSubmission(validatedData);
-      return res.status(201).json(submission);
+      return res.status(201).json({ success: true, data: submission });
     } catch (error) {
       return next(error);
     }
@@ -35,7 +35,7 @@ export class ContactController {
   getAll = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const submissions = await contactService.getAllSubmissions();
-      return res.json(submissions);
+      return res.json({ success: true, data: submissions });
     } catch (error) {
       return next(error);
     }
@@ -45,10 +45,10 @@ export class ContactController {
     try {
       const { id } = req.params as { id: string };
       if (!id) {
-        return res.status(400).json({ error: "ID é obrigatório" });
+        return res.status(400).json({ success: false, message: "ID é obrigatório" });
       }
       const updatedSubmission = await contactService.markAsRead(id);
-      return res.json(updatedSubmission);
+      return res.json({ success: true, data: updatedSubmission });
     } catch (error) {
       return next(error);
     }

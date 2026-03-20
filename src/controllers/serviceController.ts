@@ -9,10 +9,10 @@ export class ServiceController {
     try {
       const publicView = req.userRole !== 'ADMIN';
       const services = await service.findAll(undefined, publicView);
-      return res.json(services);
+      return res.json({ success: true, data: services });
     } catch (error) {
       logger.error({ error }, 'Erro ao buscar serviços');
-      return res.status(500).json({ message: 'Erro ao buscar serviços' });
+      return res.status(500).json({ success: false, message: 'Erro ao buscar serviços' });
     }
   }
 
@@ -20,10 +20,10 @@ export class ServiceController {
     try {
       const { id } = req.params;
       const serviceData = await service.findOne(String(id));
-      if (!serviceData) return res.status(404).json({ message: 'Serviço não encontrado' });
-      return res.json(serviceData);
+      if (!serviceData) return res.status(404).json({ success: false, message: 'Serviço não encontrado' });
+      return res.json({ success: true, data: serviceData });
     } catch {
-      return res.status(500).json({ message: 'Erro ao buscar serviço' });
+      return res.status(500).json({ success: false, message: 'Erro ao buscar serviço' });
     }
   }
 
@@ -35,10 +35,10 @@ export class ServiceController {
       if (data.duration !== undefined) data.duration = Number(data.duration);
       
       const serviceData = await service.create(data);
-      return res.status(201).json(serviceData);
+      return res.status(201).json({ success: true, data: serviceData });
     } catch (error) {
       logger.error({ error }, 'Erro ao criar serviço');
-      return res.status(400).json({ message: 'Erro ao criar serviço' });
+      return res.status(400).json({ success: false, message: 'Erro ao criar serviço' });
     }
   }
 
@@ -50,9 +50,9 @@ export class ServiceController {
       if (data.duration !== undefined) data.duration = Number(data.duration);
 
       const serviceData = await service.update(String(id), data);
-      return res.json(serviceData);
+      return res.json({ success: true, data: serviceData });
     } catch {
-      return res.status(400).json({ message: 'Erro ao atualizar serviço' });
+      return res.status(400).json({ success: false, message: 'Erro ao atualizar serviço' });
     }
   }
 
@@ -62,22 +62,22 @@ export class ServiceController {
       await service.delete(String(id));
       return res.status(204).send();
     } catch {
-      return res.status(400).json({ message: 'Erro ao deletar serviço' });
+      return res.status(400).json({ success: false, message: 'Erro ao deletar serviço' });
     }
   }
 
   async duplicate(req: Request, res: Response) {
     try {
       if (req.userRole !== 'ADMIN') {
-        return res.status(403).json({ message: 'Acesso negado' });
+        return res.status(403).json({ success: false, message: 'Acesso negado' });
       }
 
       const { id } = req.params;
       const duplicate = await service.duplicate(String(id));
-      return res.status(201).json({ service: duplicate, message: 'Serviço duplicado com sucesso' });
+      return res.status(201).json({ success: true, data: duplicate, message: 'Serviço duplicado com sucesso' });
     } catch (error) {
       logger.error({ error }, 'Erro ao duplicar serviço');
-      return res.status(500).json({ message: 'Erro ao duplicar serviço' });
+      return res.status(500).json({ success: false, message: 'Erro ao duplicar serviço' });
     }
   }
 }

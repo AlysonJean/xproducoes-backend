@@ -42,7 +42,20 @@ class WhatsappService {
 
   public initialize() {
     if (this.isReady || this.currentQr) return; // Already running or starting
-    
+
+    // Guard against OOM on Render free tier (512MB limit):
+    // Chromium can spike to 500-800MB; restart when approaching limit.
+    const memoryGuard = setInterval(() => {
+      const usage = process.memoryUsage();
+      if (usage.heapUsed > 400 * 1024 * 1024) { // 400MB threshold
+        logger.warn({ heapMB: Math.round(usage.heapUsed / 1024 / 1024) }, 'WhatsApp heap alto — reiniciando cliente');
+        clearInterval(memoryGuard);
+        void this.restart();
+      }
+    }, 30_000);
+    // Don't keep event loop alive (Neon scale-to-zero)
+    memoryGuard.unref();
+
     this.client.on('qr', (qr: string) => {
       logger.info('QR Code do WhatsApp gerado! Escaneie no terminal ou na página Admin:');
       this.currentQr = qr;

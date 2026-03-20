@@ -17,6 +17,7 @@ import { Request, Response } from "express";
 import * as clientService from "../services/clientService";
 import { prisma } from "../config/prisma";
 import logger from "../config/logger";
+import { AppError } from "../utils/errors";
 
 
 export class ProfileController {
@@ -25,7 +26,7 @@ export class ProfileController {
     try {
       const userId = req.userId;
       if (!userId) {
-        return res.status(401).json({ message: "Usuário não autenticado" });
+        return res.status(401).json({ success: false, message: "Usuário não autenticado" });
       }
 
       const user = await prisma.user.findUnique({
@@ -49,13 +50,13 @@ export class ProfileController {
       });
 
       if (!user) {
-        return res.status(404).json({ message: "Usuário não encontrado" });
+        return res.status(404).json({ success: false, message: "Usuário não encontrado" });
       }
 
-      return res.json(user);
+      return res.json({ success: true, data: user });
     } catch (error) {
       logger.error({obj:error}, "Erro ao buscar perfil:");
-      return res.status(500).json({ message: "Erro interno do servidor" });
+      return res.status(500).json({ success: false, message: "Erro interno do servidor" });
     }
   }
 
@@ -64,7 +65,7 @@ export class ProfileController {
     try {
       const userId = req.userId;
       if (!userId) {
-        return res.status(401).json({ message: "Usuário não autenticado" });
+        return res.status(401).json({ success: false, message: "Usuário não autenticado" });
       }
 
       const { name, bio, location, website, socialLinks } = req.body;
@@ -84,10 +85,10 @@ export class ProfileController {
         },
       });
 
-      return res.json(updatedUser);
+      return res.json({ success: true, data: updatedUser });
     } catch (error) {
       logger.error({obj:error}, "Erro ao atualizar perfil:");
-      return res.status(500).json({ message: "Erro interno do servidor" });
+      return res.status(500).json({ success: false, message: "Erro interno do servidor" });
     }
   }
 
@@ -132,10 +133,10 @@ export class ProfileController {
         },
       });
 
-      return res.json(collaborators);
+      return res.json({ success: true, data: collaborators });
     } catch (error) {
       logger.error({obj:error}, "Erro ao buscar colaboradores:");
-      return res.status(500).json({ message: "Erro interno do servidor" });
+      return res.status(500).json({ success: false, message: "Erro interno do servidor" });
     }
   }
 
@@ -176,13 +177,13 @@ export class ProfileController {
       });
 
       if (!collaborator) {
-        return res.status(404).json({ message: "Colaborador não encontrado" });
+        return res.status(404).json({ success: false, message: "Colaborador não encontrado" });
       }
 
-      return res.json(collaborator);
+      return res.json({ success: true, data: collaborator });
     } catch (error) {
       logger.error({obj:error}, "Erro ao buscar detalhes do colaborador:");
-      return res.status(500).json({ message: "Erro interno do servidor" });
+      return res.status(500).json({ success: false, message: "Erro interno do servidor" });
     }
   }
 
@@ -191,7 +192,7 @@ export class ProfileController {
     try {
       const userId = req.userId;
       if (!userId || typeof userId !== "string") {
-        return res.status(401).json({ message: "Usuário não autenticado" });
+        return res.status(401).json({ success: false, message: "Usuário não autenticado" });
       }
 
       const collaboratorProfile = await prisma.collaborator.findUnique({
@@ -201,7 +202,7 @@ export class ProfileController {
       if (!collaboratorProfile) {
         return res
           .status(404)
-          .json({ message: "Perfil de colaborador não encontrado" });
+          .json({ success: false, message: "Perfil de colaborador não encontrado" });
       }
 
       const {
@@ -225,10 +226,10 @@ export class ProfileController {
         },
       });
 
-      return res.json(updatedProfile);
+      return res.json({ success: true, data: updatedProfile });
     } catch (error) {
       logger.error({obj:error}, "Erro ao atualizar perfil de colaborador:");
-      return res.status(500).json({ message: "Erro interno do servidor" });
+      return res.status(500).json({ success: false, message: "Erro interno do servidor" });
     }
   }
 
@@ -237,17 +238,17 @@ export class ProfileController {
     try {
       const userId = req.userId;
       if (!userId) {
-        return res.status(401).json({ message: "Usuário não autenticado" });
+        return res.status(401).json({ success: false, message: "Usuário não autenticado" });
       }
       const parsed = clientProfileSchema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ error: "Dados inválidos", details: parsed.error.issues });
+        return res.status(400).json({ success: false, message: "Dados inválidos", details: parsed.error.issues });
       }
       const updatedProfile = await clientService.updateClientProfileByUserId(userId, parsed.data);
-      return res.json(updatedProfile);
+      return res.json({ success: true, data: updatedProfile });
     } catch (error) {
       logger.error({obj:error}, "Erro ao atualizar perfil de cliente:");
-      return res.status(500).json({ message: "Erro interno do servidor" });
+      return res.status(500).json({ success: false, message: "Erro interno do servidor" });
     }
   }
 
@@ -256,7 +257,7 @@ export class ProfileController {
     try {
       const userId = req.userId;
       if (!userId) {
-        return res.status(401).json({ message: "Usuário não autenticado" });
+        return res.status(401).json({ success: false, message: "Usuário não autenticado" });
       }
 
       const collaborator = await prisma.collaborator.findUnique({
@@ -266,16 +267,19 @@ export class ProfileController {
       if (!collaborator) {
         return res
           .status(404)
-          .json({ message: "Perfil de colaborador não encontrado" });
+          .json({ success: false, message: "Perfil de colaborador não encontrado" });
       }
 
       // Os campos do req.body não são usados pois a funcionalidade não está implementada
-      throw new Error(
+      throw new AppError(
         "Portfolio functionality not implemented - PortfolioItem model missing from schema",
+        501,
+        true,
+        "PORTFOLIO_NOT_IMPLEMENTED"
       );
     } catch (error) {
       logger.error({obj:error}, "Erro ao adicionar item ao portfolio:");
-      return res.status(500).json({ message: "Erro interno do servidor" });
+      return res.status(500).json({ success: false, message: "Erro interno do servidor" });
     }
   }
 
@@ -284,10 +288,10 @@ export class ProfileController {
     try {
       const { industry, companySize, location } = req.query;
       const clients = await clientService.listClientsWithProfiles({ industry, companySize, location });
-      return res.json(clients);
+      return res.json({ success: true, data: clients });
     } catch (error) {
       logger.error({obj:error}, "Erro ao buscar clientes:");
-      return res.status(500).json({ message: "Erro interno do servidor" });
+      return res.status(500).json({ success: false, message: "Erro interno do servidor" });
     }
   }
 }

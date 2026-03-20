@@ -2,18 +2,20 @@ import { prisma } from "../config/prisma";
 import type { Service, Prisma } from "@prisma/client";
 import { generateSlug } from "../utils/slug";
 import { randomBytes } from "crypto";
+import { NotFoundError } from "../utils/errors";
 
 export class ServiceService {
   async create(data: Prisma.ServiceCreateInput): Promise<Service> {
-    const imageUrl = data.imageUrl || "";
-    const serviceData = { ...data } as any;
-    
-    delete serviceData.fileName;
-    delete serviceData.folder;
-    delete serviceData.uploadedFile;
-    delete serviceData.imageUrl;
-    
-    let slug = generateSlug(serviceData.name);
+    const {
+      name,
+      description,
+      price,
+      duration,
+      imageUrl,
+      ...rest
+    } = data;
+
+    let slug = generateSlug(name);
     
     const slugExists = await prisma.service.findUnique({ where: { slug } });
     if (slugExists) {
@@ -22,10 +24,12 @@ export class ServiceService {
 
     return prisma.service.create({
       data: {
-        ...serviceData,
-        price: Number(data.price),
-        duration: Number(data.duration),
-        imageUrl,
+        ...rest,
+        name,
+        description,
+        price: Number(price),
+        duration: Number(duration),
+        imageUrl: imageUrl || "",
         slug,
       },
     });
@@ -36,7 +40,7 @@ export class ServiceService {
     data: Prisma.ServiceUpdateInput,
   ): Promise<Service | null> {
     const imageUrl = data.imageUrl;
-    const serviceData = { ...data } as any;
+    const serviceData: Record<string, unknown> = { ...data };
     
     delete serviceData.fileName;
     delete serviceData.folder;
@@ -95,7 +99,7 @@ export class ServiceService {
     ]);
 
     return {
-      ...(service as any),
+      ...service,
       prevSlug: prev?.slug || null,
       nextSlug: next?.slug || null
     };
@@ -124,7 +128,7 @@ export class ServiceService {
     });
 
     if (!original) {
-      throw new Error('Service not found');
+      throw new NotFoundError('Serviço não encontrado');
     }
 
     const copyName = `${original.name} (Cópia)`;

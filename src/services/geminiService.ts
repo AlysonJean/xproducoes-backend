@@ -4,6 +4,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { prisma } from "../config/prisma";
 import logger from "../config/logger";
 import { HfInference } from "@huggingface/inference";
+import { AppError } from "../utils/errors";
 
 /**
  * ✅ IA SERVICE (GEMINI & HUGGING FACE)
@@ -45,7 +46,7 @@ function getMockSuggestion() {
 
 export class GeminiService {
   private async callHuggingFace(prompt: string): Promise<string> {
-    if (!HF_KEY) throw new Error("Chave Hugging Face ausente");
+    if (!HF_KEY) throw new AppError("Chave Hugging Face ausente", 503, true, "AI_PROVIDER_NOT_CONFIGURED");
 
     try {
         const hf = new HfInference(HF_KEY);
@@ -78,7 +79,7 @@ export class GeminiService {
     // Se nenhum provedor configurado, mas mock ativo
     if (!genAI && !HF_KEY) {
       if (USE_MOCK_FALLBACK) return getMockSuggestion();
-      throw new Error('Serviço de IA não configurado no ambiente.');
+      throw new AppError('Serviço de IA não configurado no ambiente.', 503, true, "AI_PROVIDER_NOT_CONFIGURED");
     }
 
     try {
@@ -138,7 +139,7 @@ export class GeminiService {
     } catch (error: any) {
       logger.error('IA Sugestão falhou:', error?.message || error);
       if (USE_MOCK_FALLBACK) return getMockSuggestion();
-      throw new Error('Não foi possível gerar a sugestão agora.');
+      throw new AppError('Não foi possível gerar a sugestão agora.', 502, true, "AI_SUGGESTION_FAILED");
     }
   }
 }

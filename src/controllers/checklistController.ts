@@ -1,7 +1,11 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database';
 import logger from '../config/logger';
-import { ChecklistItemStatus, ChecklistAssignmentStatus, Prisma } from '@prisma/client';
+import { ChecklistItemStatus, ChecklistAssignmentStatus, ChecklistStatus, ChecklistType, Prisma } from '@prisma/client';
+
+const isEnumValue = <T extends string>(value: unknown, enumObject: Record<string, T>): value is T => {
+  return typeof value === 'string' && Object.values(enumObject).includes(value as T);
+};
 
 // ================================
 // CONTROLLER DE CHECKLIST
@@ -9,18 +13,19 @@ import { ChecklistItemStatus, ChecklistAssignmentStatus, Prisma } from '@prisma/
 
 export class ChecklistController {
   // Buscar checklists do colaborador atual
-  static async getMyChecklists(req: Request, res: Response) {
+  getMyChecklists = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = req.user!.id;
       const { status, page = 1, limit = 10 } = req.query;
 
       const skip = (Number(page) - 1) * Number(limit);
+      const normalizedStatus = isEnumValue(status, ChecklistAssignmentStatus) ? status : undefined;
 
       // Buscar checklists atribuídos ao usuário
       const assignments = await prisma.checklistAssignment.findMany({
         where: {
           assignedToId: userId,
-          ...(status && { status: status as any }),
+          ...(normalizedStatus && { status: normalizedStatus }),
         },
         include: {
           checklist: {
@@ -53,7 +58,7 @@ export class ChecklistController {
       const total = await prisma.checklistAssignment.count({
         where: {
           assignedToId: userId,
-          ...(status && { status: status as any }),
+          ...(normalizedStatus && { status: normalizedStatus }),
         },
       });
 
@@ -68,12 +73,12 @@ export class ChecklistController {
       });
     } catch (error) {
       logger.error({ err: error }, 'Erro ao buscar checklists');
-      res.status(500).json({ error: 'Erro interno do servidor' });
+      return next(error);
     }
   }
 
   // Buscar checklist específico
-  static async getChecklist(req: Request, res: Response) {
+  getChecklist = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params as { id: string };
       const userId = req.user!.id;
@@ -118,18 +123,18 @@ export class ChecklistController {
       });
 
       if (!assignment) {
-        return res.status(404).json({ error: 'Checklist não encontrado' });
+        return res.status(404).json({ success: false, message: 'Checklist não encontrado' });
       }
 
-      res.json(assignment);
+      res.json({ success: true, data: assignment });
     } catch (error) {
       logger.error({ err: error }, 'Erro ao buscar checklist');
-      res.status(500).json({ error: 'Erro interno do servidor' });
+      return next(error);
     }
   }
 
   // Atualizar status de um item do checklist
-  static async updateChecklistItem(req: Request, res: Response) {
+  updateChecklistItem = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { checklistId, itemId } = req.params as { checklistId: string; itemId: string };
       const { status, notes } = req.body;
@@ -144,7 +149,7 @@ export class ChecklistController {
       });
 
       if (!assignment) {
-        return res.status(404).json({ error: 'Checklist não encontrado ou sem permissão' });
+        return res.status(404).json({ success: false, message: 'Checklist não encontrado ou sem permissão' });
       }
 
       const updateData: Prisma.ChecklistItemUpdateInput = {
@@ -205,15 +210,15 @@ export class ChecklistController {
         }
       }
 
-      res.json(updatedItem);
+      res.json({ success: true, data: updatedItem });
     } catch (error) {
       logger.error({ err: error }, 'Erro ao atualizar item do checklist');
-      res.status(500).json({ error: 'Erro interno do servidor' });
+      return next(error);
     }
   }
 
   // Atualizar status do assignment do checklist
-  static async updateChecklistStatus(req: Request, res: Response) {
+  updateChecklistStatus = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params as { id: string };
       const { status, notes } = req.body;
@@ -227,7 +232,7 @@ export class ChecklistController {
       });
 
       if (!assignment) {
-        return res.status(404).json({ error: 'Checklist não encontrado ou sem permissão' });
+        return res.status(404).json({ success: false, message: 'Checklist não encontrado ou sem permissão' });
       }
 
       const updateData: Prisma.ChecklistAssignmentUpdateInput = {
@@ -273,10 +278,10 @@ export class ChecklistController {
         },
       });
 
-      res.json(updatedAssignment);
+      res.json({ success: true, data: updatedAssignment });
     } catch (error) {
       logger.error({ err: error }, 'Erro ao atualizar status do checklist');
-      res.status(500).json({ error: 'Erro interno do servidor' });
+      return next(error);
     }
   }
 
@@ -285,7 +290,7 @@ export class ChecklistController {
   // ================================
 
   // Criar novo checklist
-  static async createChecklist(req: Request, res: Response) {
+  createChecklist = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { title, description, type, items, assignedToIds, dueDate, priority } = req.body;
       const createdById = req.user!.id;
@@ -324,24 +329,26 @@ export class ChecklistController {
         });
       }
 
-      res.status(201).json(checklist);
+      res.status(201).json({ success: true, data: checklist });
     } catch (error) {
       logger.error({ err: error }, 'Erro ao criar checklist');
-      res.status(500).json({ error: 'Erro interno do servidor' });
+      return next(error);
     }
   }
 
   // Buscar todos os checklists (admin)
-  static async getAllChecklists(req: Request, res: Response) {
+  getAllChecklists = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { status, type, assignedTo, page = 1, limit = 10 } = req.query;
+      const normalizedStatus = isEnumValue(status, ChecklistStatus) ? status : undefined;
+      const normalizedType = isEnumValue(type, ChecklistType) ? type : undefined;
 
       const skip = (Number(page) - 1) * Number(limit);
 
       const checklists = await prisma.checklist.findMany({
         where: {
-          ...(status && { status: status as any }),
-          ...(type && { type: type as any }),
+          ...(normalizedStatus && { status: normalizedStatus }),
+          ...(normalizedType && { type: normalizedType }),
         },
         include: {
           items: {
@@ -383,12 +390,13 @@ export class ChecklistController {
 
       const total = await prisma.checklist.count({
         where: {
-          ...(status && { status: status as any }),
-          ...(type && { type: type as any }),
+          ...(normalizedStatus && { status: normalizedStatus }),
+          ...(normalizedType && { type: normalizedType }),
         },
       });
 
       res.json({
+        success: true,
         data: checklists,
         pagination: {
           page: Number(page),
@@ -399,12 +407,12 @@ export class ChecklistController {
       });
     } catch (error) {
       logger.error({ err: error }, 'Erro ao buscar checklists');
-      res.status(500).json({ error: 'Erro interno do servidor' });
+      return next(error);
     }
   }
 
   // Atualizar checklist
-  static async updateChecklist(req: Request, res: Response) {
+  updateChecklist = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params as { id: string };
       const { title, description, type, status, items } = req.body;
@@ -457,15 +465,15 @@ export class ChecklistController {
         }
       }
 
-      res.json(checklist);
+      res.json({ success: true, data: checklist });
     } catch (error) {
       logger.error({ err: error }, 'Erro ao atualizar checklist');
-      res.status(500).json({ error: 'Erro interno do servidor' });
+      return next(error);
     }
   }
 
   // Deletar checklist
-  static async deleteChecklist(req: Request, res: Response) {
+  deleteChecklist = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params as { id: string };
 
@@ -473,15 +481,15 @@ export class ChecklistController {
         where: { id },
       });
 
-      res.json({ message: 'Checklist deletado com sucesso' });
+      res.json({ success: true, message: 'Checklist deletado com sucesso' });
     } catch (error) {
       logger.error({ err: error }, 'Erro ao deletar checklist');
-      res.status(500).json({ error: 'Erro interno do servidor' });
+      return next(error);
     }
   }
 
   // Atribuir checklist a usuários
-  static async assignChecklist(req: Request, res: Response) {
+  assignChecklist = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { checklistId } = req.params as { checklistId: string };
       const { assignedToIds, dueDate, priority, notes } = req.body;
@@ -499,15 +507,15 @@ export class ChecklistController {
         skipDuplicates: true,
       });
 
-      res.status(201).json(assignments);
+      res.status(201).json({ success: true, data: assignments });
     } catch (error) {
       logger.error({ err: error }, 'Erro ao atribuir checklist');
-      res.status(500).json({ error: 'Erro interno do servidor' });
+      return next(error);
     }
   }
 
   // Remover atribuição de checklist
-  static async unassignChecklist(req: Request, res: Response) {
+  unassignChecklist = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { checklistId, userId } = req.params as { checklistId: string; userId: string };
 
@@ -518,10 +526,10 @@ export class ChecklistController {
         },
       });
 
-      res.json({ message: 'Atribuição removida com sucesso' });
+      res.json({ success: true, message: 'Atribuição removida com sucesso' });
     } catch (error) {
       logger.error({ err: error }, 'Erro ao remover atribuição');
-      res.status(500).json({ error: 'Erro interno do servidor' });
+      return next(error);
     }
   }
 }

@@ -14,16 +14,16 @@ const syncBookingInclude = {
 // Retorna JSON com a URL para o frontend redirecionar
 export async function connect(req: Request, res: Response) {
   try {
-    const userId = (req as any).user?.id || (req as any).userId; // Compatibilidade com middlewares diferentes
+    const userId = req.user?.id || req.userId; // Compatibilidade com middlewares diferentes
     if (!userId) {
-      return res.status(401).json({ error: 'Usuário não autenticado' });
+      return res.status(401).json({ success: false, message: 'Usuário não autenticado' });
     }
 
     const url = googleCalendarService.generateAuthUrl(userId);
-    return res.json({ url });
+    return res.json({ success: true, data: { url } });
   } catch (error) {
     logger.error('Google Connect Error', error);
-    return res.status(500).json({ error: 'Erro ao gerar URL de autenticação' });
+    return res.status(500).json({ success: false, message: 'Erro ao gerar URL de autenticação' });
   }
 }
 
@@ -54,31 +54,31 @@ export async function callback(req: Request, res: Response) {
 
 export async function disconnect(req: Request, res: Response) {
   try {
-      const userId = (req as any).user?.id || (req as any).userId;
-      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  const userId = req.user?.id || req.userId;
+      if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
       await googleCalendarService.disconnect(userId);
-      return res.json({ success: true });
+      return res.json({ success: true, message: 'Google Calendar desconectado com sucesso' });
   } catch (error) {
       logger.error('Google Disconnect Error', error);
-      return res.status(500).json({ error: 'Erro ao desconectar' });
+      return res.status(500).json({ success: false, message: 'Erro ao desconectar' });
   }
 }
 
 export async function syncBooking(req: Request, res: Response) {
     try {
-        const userId = (req as any).user?.id || (req as any).userId;
+    const userId = req.user?.id || req.userId;
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
-        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-    if (!id) return res.status(400).json({ error: 'ID da reserva é obrigatório' });
+        if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      if (!id) return res.status(400).json({ success: false, message: 'ID da reserva é obrigatório' });
 
         const booking = await prisma.booking.findUnique({
             where: { id },
       include: syncBookingInclude
         });
 
-        if (!booking) return res.status(404).json({ error: 'Reserva não encontrada' });
+        if (!booking) return res.status(404).json({ success: false, message: 'Reserva não encontrada' });
         
         // Verificar permissão: dono da booking ou cliente associado
         let hasPermission = false;
@@ -90,7 +90,7 @@ export async function syncBooking(req: Request, res: Response) {
         }
 
         if (!hasPermission) {
-            return res.status(403).json({ error: 'Sem permissão para sincronizar esta reserva' });
+          return res.status(403).json({ success: false, message: 'Sem permissão para sincronizar esta reserva' });
         }
 
         // Endereço formatado
@@ -117,13 +117,13 @@ export async function syncBooking(req: Request, res: Response) {
         const event = await googleCalendarService.createEvent(userId, eventData);
         
         if (!event) {
-            return res.status(400).json({ error: 'Não foi possível sincronizar. Verifique se sua conta Google está conectada no perfil.' });
+          return res.status(400).json({ success: false, message: 'Não foi possível sincronizar. Verifique se sua conta Google está conectada no perfil.' });
         }
 
-        return res.json({ success: true, eventId: event.id, htmlLink: event.htmlLink });
+        return res.json({ success: true, data: { eventId: event.id, htmlLink: event.htmlLink } });
 
     } catch (error) {
         logger.error('Sync Booking Error', error);
-        return res.status(500).json({ error: 'Erro ao sincronizar reserva' });
+        return res.status(500).json({ success: false, message: 'Erro ao sincronizar reserva' });
     }
 }

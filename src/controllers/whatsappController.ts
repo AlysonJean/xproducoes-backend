@@ -6,7 +6,7 @@ export class WhatsappController {
   
   getStatus(req: Request, res: Response) {
     const status = whatsappService.getStatus();
-    return res.json(status);
+    return res.json({ success: true, data: status });
   }
 
   async logout(req: Request, res: Response) {

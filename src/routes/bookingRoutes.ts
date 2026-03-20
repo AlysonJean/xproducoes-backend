@@ -45,6 +45,8 @@ router.post('/:id/attachments', validateId(), bookingController.addAttachment);
 router.delete('/:id/attachments/:attachmentId', validateId(), bookingController.removeAttachment);
 
 // Checklist e Despesas (Crew Experience)
+router.get("/roadmap/:id", adminOrCollaborator, validateId(), bookingController.getRoadmap);
+router.post("/:id/tasks", adminOnly, validateId(), validateJsonContentType, bookingController.createTask);
 router.put("/tasks/:taskId/toggle", adminOrCollaborator, bookingController.toggleTask);
 router.post("/:id/expenses", adminOrCollaborator, bookingController.addExpense);
 

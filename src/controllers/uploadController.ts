@@ -12,11 +12,11 @@ export class UploadController {
   uploadAvatar = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.userId) {
-        return res.status(401).json({ message: "Utilizador não autenticado." });
+        return res.status(401).json({ success: false, message: "Utilizador não autenticado." });
       }
 
       if (!req.file) {
-        return res.status(400).json({ message: "Nenhum arquivo foi enviado." });
+        return res.status(400).json({ success: false, message: "Nenhum arquivo foi enviado." });
       }
 
       const avatarUrl = await this.uploadService.uploadAvatar(
@@ -25,8 +25,9 @@ export class UploadController {
       );
 
       return res.status(200).json({
+        success: true,
         message: "Avatar carregado com sucesso.",
-        avatarUrl,
+        data: { avatarUrl },
       });
     } catch (error) {
       return next(error);
@@ -36,15 +37,16 @@ export class UploadController {
   uploadImage = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ message: "Nenhum arquivo foi enviado." });
+        return res.status(400).json({ success: false, message: "Nenhum arquivo foi enviado." });
       }
 
       const { folder, fileName } = req.body;
       const imageUrl = await this.uploadService.uploadImage(req.file, folder, fileName);
 
       return res.status(200).json({
+        success: true,
         message: "Imagem carregada com sucesso.",
-        imageUrl,
+        data: { imageUrl },
       });
     } catch (error) {
       return next(error);

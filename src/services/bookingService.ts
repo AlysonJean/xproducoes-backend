@@ -2,7 +2,8 @@ import { Prisma, BookingStatus, DeliveryStatus } from "@prisma/client";
 import { BookingCreateInput, BookingUpdateInput, BookingFilters } from "../validators/bookingSchema.js";
 import { 
   BookingValidationError, 
-  BookingNotFoundError
+  BookingNotFoundError,
+  BookingBusinessLogicError
 } from "../utils/bookingErrors.js";
 import logger from "../config/logger.js";
 import { prisma } from "../config/prisma.js";
@@ -400,7 +401,7 @@ export class BookingService {
       ) {
         throw new BookingValidationError("É necessário identificar um cliente para a reserva");
       }
-      throw new Error(`Erro interno ao criar reserva: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+      throw new BookingBusinessLogicError(`Erro interno ao criar reserva: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
   }
 
@@ -456,7 +457,7 @@ export class BookingService {
       if (error instanceof BookingNotFoundError) {
         throw error;
       }
-      throw new Error(`Erro ao buscar reserva: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+      throw new BookingBusinessLogicError(`Erro ao buscar reserva: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
   }
 
@@ -509,7 +510,7 @@ export class BookingService {
 
       return bookings;
     } catch (error) {
-      throw new Error(`Erro ao buscar reservas: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+      throw new BookingBusinessLogicError(`Erro ao buscar reservas: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
   }
 
@@ -556,7 +557,7 @@ export class BookingService {
 
       return await this.prisma.booking.count({ where });
     } catch (error) {
-      throw new Error(`Erro ao contar reservas: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+      throw new BookingBusinessLogicError(`Erro ao contar reservas: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
   }
 
@@ -567,7 +568,7 @@ export class BookingService {
     try {
       return await this.getAllBookings({ clientId });
     } catch (error) {
-      throw new Error(`Erro ao buscar reservas do cliente: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+      throw new BookingBusinessLogicError(`Erro ao buscar reservas do cliente: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
   }
 
@@ -651,7 +652,7 @@ export class BookingService {
       if (error instanceof BookingNotFoundError) {
         throw error;
       }
-      throw new Error(`Erro ao atualizar reserva: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+      throw new BookingBusinessLogicError(`Erro ao atualizar reserva: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
   }
 
@@ -716,7 +717,7 @@ export class BookingService {
       if (error instanceof BookingNotFoundError) {
         throw error;
       }
-      throw new Error(`Erro ao atualizar status da reserva: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+      throw new BookingBusinessLogicError(`Erro ao atualizar status da reserva: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
   }
 
@@ -795,7 +796,7 @@ export class BookingService {
       if (error instanceof BookingNotFoundError) {
         throw error;
       }
-      throw new Error(`Erro ao atualizar status de entrega: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+      throw new BookingBusinessLogicError(`Erro ao atualizar status de entrega: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
   }
 
@@ -822,7 +823,7 @@ export class BookingService {
       if (error instanceof BookingNotFoundError) {
         throw error;
       }
-      throw new Error(`Erro ao deletar reserva: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+      throw new BookingBusinessLogicError(`Erro ao deletar reserva: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
   }
 
@@ -893,7 +894,7 @@ export class BookingService {
 
       return booking;
     } catch (error) {
-       throw new Error(`Erro ao confirmar com detalhes: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+      throw new BookingBusinessLogicError(`Erro ao confirmar com detalhes: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
   }
 
@@ -918,7 +919,7 @@ export class BookingService {
       void cacheService.invalidateBookingCaches(id);
       return booking;
     } catch (error) {
-       throw new Error(`Erro ao cancelar reserva: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+      throw new BookingBusinessLogicError(`Erro ao cancelar reserva: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
   }
 
@@ -1024,7 +1025,7 @@ Confirme sua presença no painel.`;
 
       return bookings;
     } catch (error) {
-      throw new Error(`Erro ao buscar próximas reservas: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+      throw new BookingBusinessLogicError(`Erro ao buscar próximas reservas: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
   }
 
@@ -1049,7 +1050,7 @@ Confirme sua presença no painel.`;
 
       return bookings;
     } catch (error) {
-      throw new Error(`Erro ao buscar histórico de reservas: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+      throw new BookingBusinessLogicError(`Erro ao buscar histórico de reservas: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
   }
 
@@ -1151,7 +1152,7 @@ Confirme sua presença no painel.`;
         };
       });
     } catch (error) {
-      throw new Error(`Erro ao buscar calendário: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+      throw new BookingBusinessLogicError(`Erro ao buscar calendário: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
   }
 
@@ -1202,7 +1203,7 @@ Confirme sua presença no painel.`;
         monthlyRevenue: monthlyRevenue._sum.totalPrice || 0
       };
     } catch (error) {
-      throw new Error(`Erro ao buscar estatísticas: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+      throw new BookingBusinessLogicError(`Erro ao buscar estatísticas: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
   }
 

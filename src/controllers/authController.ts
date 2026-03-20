@@ -7,6 +7,7 @@ import crypto from "node:crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { config } from "../config/environment.js";
+import { blacklistToken, isTokenBlacklisted } from "../services/jwtBlacklistService.js";
 
 // Função para validar access token do Google
 async function validateGoogleToken(accessToken: string): Promise<{
@@ -236,7 +237,7 @@ export class AuthController {
         return next(new UnauthorizedError("ID do utilizador não encontrado no token."));
       }
       const user = await this.authService.getProfile(req.userId);
-      res.json(user);
+      res.json({ success: true, data: user });
     } catch (error) {
       next(error);
     }
@@ -256,7 +257,7 @@ export class AuthController {
         name,
         avatarUrl,
       });
-      res.json(user);
+      res.json({ success: true, data: user });
     } catch (error) {
       next(error);
     }
@@ -435,7 +436,7 @@ export class AuthController {
 
       // Após registro, fazer login para obter token
       const loginResult = await this.authService.loginById(result.id);
-      res.status(201).json(loginResult);
+      res.status(201).json({ success: true, data: loginResult });
       }
     } catch (error) {
       logger.error({ err: error }, "Erro no socialLogin");
@@ -460,7 +461,7 @@ export class AuthController {
       const redirectUri = (process.env.GOOGLE_REDIRECT_URI || this.getBackendRedirect(req, 'google')).toString();
       const svc = await import('../services/oauthService.js');
       const { url } = await svc.getGoogleAuthorizationUrl({ redirectUri });
-      res.json({ url });
+      res.json({ success: true, data: { url } });
     } catch (error) {
       next(error);
     }
@@ -473,8 +474,9 @@ export class AuthController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-  const { code, state } = req.query as any;
-  const redirectUri = (process.env.GOOGLE_REDIRECT_URI || this.getBackendRedirect(req, 'google')).toString();
+      const code = typeof req.query.code === 'string' ? req.query.code : undefined;
+      const state = typeof req.query.state === 'string' ? req.query.state : undefined;
+      const redirectUri = (process.env.GOOGLE_REDIRECT_URI || this.getBackendRedirect(req, 'google')).toString();
       const svc = await import('../services/oauthService.js');
       const result = await svc.handleGoogleCallback({ code, state, redirectUri });
       // If browser requested (HTML), redirect to frontend with token in fragment
@@ -485,7 +487,7 @@ export class AuthController {
         res.redirect(302, redirect);
         return;
       }
-      res.json(result);
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }
@@ -501,7 +503,7 @@ export class AuthController {
       const redirectUri = (process.env.FACEBOOK_REDIRECT_URI || this.getBackendRedirect(req, 'facebook')).toString();
       const svc = await import('../services/oauthService.js');
       const { url } = await svc.getFacebookAuthorizationUrl({ redirectUri });
-      res.json({ url });
+      res.json({ success: true, data: { url } });
     } catch (error) {
       next(error);
     }
@@ -514,8 +516,9 @@ export class AuthController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-  const { code, state } = req.query as any;
-  const redirectUri = (process.env.FACEBOOK_REDIRECT_URI || this.getBackendRedirect(req, 'facebook')).toString();
+      const code = typeof req.query.code === 'string' ? req.query.code : undefined;
+      const state = typeof req.query.state === 'string' ? req.query.state : undefined;
+      const redirectUri = (process.env.FACEBOOK_REDIRECT_URI || this.getBackendRedirect(req, 'facebook')).toString();
       const svc = await import('../services/oauthService.js');
       const result = await svc.handleFacebookCallback({ code, state, redirectUri });
       const accept = (req.headers['accept'] as string) || '';
@@ -525,7 +528,7 @@ export class AuthController {
         res.redirect(302, redirect);
         return;
       }
-      res.json(result);
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }
@@ -542,23 +545,33 @@ export class AuthController {
       }
       
       const user = await this.authService.getProfile(req.userId);
-      res.json(user);
+      res.json({ success: true, data: user });
     } catch (error) {
       next(error);
     }
   };
 
   logout = async (
-    _req: Request,
+    req: Request,
     res: Response,
     next: NextFunction,
   ): Promise<void> => {
     try {
+      const authHeader = req.headers.authorization;
+      const accessToken = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : undefined;
+      const refreshToken = req.cookies?.x_refresh_token || req.body?.refreshToken;
+
+      if (accessToken) {
+        await blacklistToken(accessToken);
+      }
+      if (refreshToken) {
+        await blacklistToken(refreshToken);
+      }
+
       // Limpar cookies httpOnly
       clearAuthCookies(res);
-      
-      // Para JWT, o logout também pode implementar blacklist de tokens se necessário
-      res.status(200).json({ message: "Logout realizado com sucesso." });
+
+      res.status(200).json({ success: true, message: "Logout realizado com sucesso." });
     } catch (error) {
       next(error);
     }
@@ -576,7 +589,13 @@ export class AuthController {
     }
 
     try {
-      const decoded = jwt.verify(refreshToken, config.jwtSecret) as any;
+      const refreshIsBlacklisted = await isTokenBlacklisted(refreshToken);
+      if (refreshIsBlacklisted) {
+        clearAuthCookies(res);
+        return next(new UnauthorizedError('Refresh token invalidado'));
+      }
+
+      const decoded = jwt.verify(refreshToken, config.jwtSecret) as { userId: string; role: string };
 
       const user = await this.authService.getProfile(decoded.userId);
       if (!user) {
@@ -598,13 +617,16 @@ export class AuthController {
       setAuthCookies(res, newToken, newRefreshToken);
 
       res.status(200).json({
-        accessToken: newToken,
-        refreshToken: newRefreshToken,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role
+        success: true,
+        data: {
+          accessToken: newToken,
+          refreshToken: newRefreshToken,
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role
+          }
         }
       });
     } catch {

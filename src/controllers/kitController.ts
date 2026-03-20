@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import * as kitService from "../services/kitService.js";
 import logger from "../config/logger.js";
+import { NotFoundError } from "../utils/errors.js";
 
 export class KitController {
   create = async (req: Request, res: Response, next: NextFunction) => {
@@ -19,7 +20,7 @@ export class KitController {
       }
 
       const kit = await kitService.create(data, req.file);
-      return res.status(201).json(kit);
+      return res.status(201).json({ success: true, data: kit });
     } catch (error) {
       return next(error);
     }
@@ -42,11 +43,11 @@ export class KitController {
 
       const { id } = req.params as { id: string };
       if (!id) {
-        return res.status(400).json({ message: "ID é obrigatório." });
+        return res.status(400).json({ success: false, message: "ID é obrigatório." });
       }
 
       const kit = await kitService.update(id, data, req.file);
-      return res.json(kit);
+      return res.json({ success: true, data: kit });
     } catch (error) {
       return next(error);
     }
@@ -62,7 +63,7 @@ export class KitController {
       const publicView = req.userRole !== 'ADMIN';
       
       const kits = await kitService.findAll(limit, publicView);
-      return res.json(kits);
+      return res.json({ success: true, data: kits });
     } catch (error) {
       return next(error);
     }
@@ -72,14 +73,14 @@ export class KitController {
     try {
       const { id } = req.params as { id: string };
       if (!id) {
-        return res.status(400).json({ message: "ID é obrigatório." });
+        return res.status(400).json({ success: false, message: "ID é obrigatório." });
       }
 
       const kit = await kitService.findOne(id);
       if (!kit) {
-        throw new Error("Kit não encontrado.");
+        throw new NotFoundError("Kit não encontrado.");
       }
-      return res.json(kit);
+      return res.json({ success: true, data: kit });
     } catch (error) {
       return next(error);
     }
@@ -89,7 +90,7 @@ export class KitController {
     try {
       const { id } = req.params as { id: string };
       if (!id) {
-        return res.status(400).json({ message: "ID é obrigatório." });
+        return res.status(400).json({ success: false, message: "ID é obrigatório." });
       }
 
       await kitService.deleteKit(id);
@@ -102,7 +103,7 @@ export class KitController {
   getRecommended = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const kits = await kitService.findRecommended();
-      return res.json(kits);
+      return res.json({ success: true, data: kits });
     } catch (error) {
       return next(error);
     }
@@ -111,7 +112,7 @@ export class KitController {
   getPopular = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const kits = await kitService.findPopular();
-      return res.json(kits);
+      return res.json({ success: true, data: kits });
     } catch (error) {
       return next(error);
     }

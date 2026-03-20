@@ -7,7 +7,7 @@ export class ReviewController {
   async getPublicReviews(req: Request, res: Response, next: NextFunction) {
     try {
       const reviews = await reviewService.findPublicReviews();
-      return res.status(200).json(reviews);
+      return res.status(200).json({ success: true, data: reviews });
     } catch (error) {
       return next(error);
     }
@@ -17,7 +17,7 @@ export class ReviewController {
     try {
       const filters = req.query;
       const reviews = await reviewService.findAll(filters);
-      return res.status(200).json(reviews);
+      return res.status(200).json({ success: true, data: reviews });
     } catch (error) {
       return next(error);
     }
@@ -27,7 +27,7 @@ export class ReviewController {
     try {
       const { equipmentId } = req.params as { equipmentId: string };
       const reviews = await reviewService.findByEquipment(equipmentId);
-      return res.status(200).json(reviews);
+      return res.status(200).json({ success: true, data: reviews });
     } catch (error) {
       return next(error);
     }
@@ -38,7 +38,7 @@ export class ReviewController {
       const { userId } = req.params as { userId: string };
       const actualUserId = userId === 'me' ? req.userId : userId;
       const reviews = await reviewService.findByUser(actualUserId!);
-      return res.status(200).json(reviews);
+      return res.status(200).json({ success: true, data: reviews });
     } catch (error) {
       return next(error);
     }
@@ -47,7 +47,7 @@ export class ReviewController {
   async create(req: Request, res: Response, next: NextFunction) {
     try {
       if (req.userRole !== 'CLIENT') {
-        return res.status(403).json({ message: 'Apenas clientes podem deixar avaliações' });
+        return res.status(403).json({ success: false, message: 'Apenas clientes podem deixar avaliações' });
       }
       // Forçar reviewerId do token e validar payload mínimo
       const parsed = reviewCreateSchema.parse({
@@ -63,8 +63,8 @@ export class ReviewController {
         rating: parsed.rating,
         comment: parsed.comment,
         // Ignorar quaisquer campos de collaboratorId para garantir regra de negócio
-      } as any);
-      return res.status(201).json(review);
+      });
+      return res.status(201).json({ success: true, data: review });
     } catch (error) {
       return next(error);
     }
@@ -74,10 +74,10 @@ export class ReviewController {
     try {
       const { id } = req.params as { id: string };
       const review = await reviewService.update(id, req.body);
-      return res.status(200).json(review);
+      return res.status(200).json({ success: true, data: review });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return res.status(404).json({ message: 'Avaliação não encontrada' });
+        return res.status(404).json({ success: false, message: 'Avaliação não encontrada' });
       }
       return next(error);
     }
@@ -87,10 +87,10 @@ export class ReviewController {
     try {
       const { id } = req.params as { id: string };
       await reviewService.deleteReview(id);
-      return res.status(204).send();
+      return res.status(200).json({ success: true, message: 'Avaliação removida com sucesso' });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return res.status(404).json({ message: 'Avaliação não encontrada' });
+        return res.status(404).json({ success: false, message: 'Avaliação não encontrada' });
       }
       return next(error);
     }
@@ -100,10 +100,10 @@ export class ReviewController {
     try {
       const { id } = req.params as { id: string };
       const review = await reviewService.approve(id);
-      return res.status(200).json(review);
+      return res.status(200).json({ success: true, data: review });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return res.status(404).json({ message: 'Avaliação não encontrada' });
+        return res.status(404).json({ success: false, message: 'Avaliação não encontrada' });
       }
       return next(error);
     }
@@ -113,10 +113,10 @@ export class ReviewController {
     try {
       const { id } = req.params as { id: string };
       const review = await reviewService.reject(id);
-      return res.status(200).json(review);
+      return res.status(200).json({ success: true, data: review });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return res.status(404).json({ message: 'Avaliação não encontrada' });
+        return res.status(404).json({ success: false, message: 'Avaliação não encontrada' });
       }
       return next(error);
     }
@@ -125,7 +125,7 @@ export class ReviewController {
   async getStats(req: Request, res: Response, next: NextFunction) {
     try {
       const stats = await reviewService.getStats();
-      return res.status(200).json(stats);
+      return res.status(200).json({ success: true, data: stats });
     } catch (error) {
       return next(error);
     }
@@ -135,7 +135,7 @@ export class ReviewController {
     try {
       const limit = parseInt(req.query.limit as string) || 5;
       const reviews = await reviewService.getRecent(limit);
-      return res.status(200).json(reviews);
+      return res.status(200).json({ success: true, data: reviews });
     } catch (error) {
       return next(error);
     }

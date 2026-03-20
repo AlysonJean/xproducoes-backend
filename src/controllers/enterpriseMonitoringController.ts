@@ -8,7 +8,7 @@ export class EnterpriseMonitoringController {
   getDashboard = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const dashboard = await enterpriseMonitoringService.getExecutiveDashboard();
-      return res.json(dashboard);
+      return res.json({ success: true, data: dashboard });
     } catch (error) {
       logger.error("Erro ao buscar dashboard executivo: " + String(error));
       return next(error);
@@ -20,9 +20,12 @@ export class EnterpriseMonitoringController {
     try {
       const integrations = await enterpriseMonitoringService.getIntegrationsOverview();
       return res.json({
-        timestamp: new Date(),
-        count: integrations.length,
-        integrations
+        success: true,
+        data: {
+          timestamp: new Date(),
+          count: integrations.length,
+          integrations
+        }
       });
     } catch (error) {
       logger.error("Erro ao buscar integrações: " + String(error));
@@ -39,13 +42,16 @@ export class EnterpriseMonitoringController {
       const statusCode = summary.status === 'healthy' ? 200 : 
                         summary.status === 'warning' ? 207 : 503;
       
-      return res.status(statusCode).json(summary);
+      return res.status(statusCode).json({ success: true, data: summary });
     } catch (error) {
       logger.error("Erro ao buscar resumo de saúde: " + String(error));
       return res.status(503).json({
-        status: 'error',
-        error: 'Service monitoring unavailable',
-        timestamp: new Date()
+        success: false,
+        message: 'Service monitoring unavailable',
+        data: {
+          status: 'error',
+          timestamp: new Date()
+        }
       });
     }
   };
@@ -55,8 +61,11 @@ export class EnterpriseMonitoringController {
     try {
       const metrics = await enterpriseMonitoringService.getPerformanceMetrics();
       return res.json({
-        timestamp: new Date(),
-        metrics
+        success: true,
+        data: {
+          timestamp: new Date(),
+          metrics
+        }
       });
     } catch (error) {
       logger.error("Erro ao buscar métricas de performance: " + String(error));
@@ -69,8 +78,11 @@ export class EnterpriseMonitoringController {
     try {
       const health = await enterpriseMonitoringService.getSystemHealth();
       return res.json({
-        timestamp: new Date(),
-        system: health
+        success: true,
+        data: {
+          timestamp: new Date(),
+          system: health
+        }
       });
     } catch (error) {
             logger.error("Erro ao buscar saúde do sistema: " + String(error));
@@ -82,7 +94,7 @@ export class EnterpriseMonitoringController {
   getResourceUsage = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const usage = await enterpriseMonitoringService.getResourceUsage();
-      return res.json(usage);
+      return res.json({ success: true, data: usage });
     } catch (error) {
       logger.error("Erro ao buscar uso de recursos: " + String(error));
       return next(error);
@@ -96,20 +108,25 @@ export class EnterpriseMonitoringController {
       
       if (!name) {
         return res.status(400).json({ 
-          error: 'Nome da integração é obrigatório' 
+          success: false,
+          message: 'Nome da integração é obrigatório' 
         });
       }
 
       const result = await enterpriseMonitoringService.testIntegration(name);
       return res.json({
-        integration: name,
-        result,
-        testedAt: new Date()
+        success: true,
+        data: {
+          integration: name,
+          result,
+          testedAt: new Date()
+        }
       });
     } catch (error) {
       logger.error(`Erro ao testar integração ${req.params.name}: ` + String(error));
       return res.status(500).json({
-        error: 'Erro ao testar integração',
+        success: false,
+        message: 'Erro ao testar integração',
         details: error instanceof Error ? error.message : String(error)
       });
     }
@@ -120,9 +137,12 @@ export class EnterpriseMonitoringController {
     try {
       const alerts = await enterpriseMonitoringService.getActiveAlerts();
       return res.json({
-        timestamp: new Date(),
-        count: alerts.length,
-        alerts
+        success: true,
+        data: {
+          timestamp: new Date(),
+          count: alerts.length,
+          alerts
+        }
       });
     } catch (error) {
       logger.error("Erro ao buscar alertas: " + String(error));
@@ -139,9 +159,12 @@ export class EnterpriseMonitoringController {
         resolved === 'true'
       );
       return res.json({
-        timestamp: new Date(),
-        count: history.length,
-        history
+        success: true,
+        data: {
+          timestamp: new Date(),
+          count: history.length,
+          history
+        }
       });
     } catch (error) {
       logger.error("Erro ao buscar histórico de alertas: " + String(error));
@@ -155,19 +178,25 @@ export class EnterpriseMonitoringController {
       const summary = await enterpriseMonitoringService.getHealthSummary();
       
       return res.status(summary.status === 'healthy' ? 200 : 503).json({
-        status: summary.status,
-        timestamp: new Date(),
-        uptime: process.uptime(),
-        integrations: {
-          total: summary.totalIntegrations,
-          healthy: summary.healthyIntegrations
+        success: true,
+        data: {
+          status: summary.status,
+          timestamp: new Date(),
+          uptime: process.uptime(),
+          integrations: {
+            total: summary.totalIntegrations,
+            healthy: summary.healthyIntegrations
+          }
         }
       });
     } catch {
       return res.status(503).json({
-        status: 'error',
-        error: 'Monitoring service unavailable',
-        timestamp: new Date()
+        success: false,
+        message: 'Monitoring service unavailable',
+        data: {
+          status: 'error',
+          timestamp: new Date()
+        }
       });
     }
   };

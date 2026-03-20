@@ -165,7 +165,7 @@ export class QuoteController {
         updatedAt: new Date().toISOString(),
       };
 
-      logger.info("Quote status updated: " + JSON.stringify({ quoteId: id, newStatus: status, updatedBy: (req as any).user?.id }));
+      logger.info("Quote status updated: " + JSON.stringify({ quoteId: id, newStatus: status, updatedBy: req.user?.id }));
 
       res.json({
         success: true,
@@ -204,11 +204,11 @@ export class QuoteController {
         id: `response_${Date.now()}`,
         quoteId: id,
         ...validatedData,
-        respondedBy: (req as any).user?.id,
+        respondedBy: req.user?.id,
         respondedAt: new Date().toISOString(),
       };
 
-      logger.info("Quote response sent: " + JSON.stringify({ quoteId: id, responseId: response.id, respondedBy: (req as any).user?.id }));
+      logger.info("Quote response sent: " + JSON.stringify({ quoteId: id, responseId: response.id, respondedBy: req.user?.id }));
 
       res.json({
         success: true,

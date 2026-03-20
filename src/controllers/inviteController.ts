@@ -19,7 +19,7 @@ export async function sendInvite(req: Request, res: Response, _next: NextFunctio
   const expiresAt = new Date(Date.now() + INVITE_EXPIRATION_HOURS * 60 * 60 * 1000);
 
   const invite = await prisma.inviteToken.create({
-    data: { token, email, invitedBy: (req as any).userId || null, expiresAt },
+    data: { token, email, invitedBy: req.userId || null, expiresAt },
   });
 
   // construir link de registro — frontend deve ter rota para completar registro

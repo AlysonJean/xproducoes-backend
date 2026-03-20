@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { EmailTemplates } from '../templates/emailTemplates';
 import logger from "../config/logger";
+import { AppError } from "../utils/errors";
 
 
 const SMTP_HOST = process.env.SMTP_HOST;
@@ -51,7 +52,7 @@ export class EmailService {
 
   async sendMail(to: string, subject: string, html: string, text?: string) {
     if (!this.transporter) {
-      throw new Error('Email transporter is not initialized');
+      throw new AppError('Email transporter is not initialized', 503, true, 'EMAIL_TRANSPORT_NOT_INITIALIZED');
     }
     const info = await this.transporter.sendMail({ from: FROM, to, subject, html, text });
     try {

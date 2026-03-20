@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import { prisma } from '../config/prisma';
 import logger from '../config/logger';
+import { AppError } from '../utils/errors';
 
 // Escopos necessários para ler/escrever no calendário
 const SCOPES = [
@@ -53,7 +54,7 @@ export class GoogleCalendarService {
       return true;
     } catch (error) {
       logger.error('Erro ao autenticar com Google Calendar', error);
-      throw new Error('Falha na integração com Google Calendar');
+      throw new AppError('Falha na integração com Google Calendar', 502, true, 'GOOGLE_CALENDAR_INTEGRATION_FAILED');
     }
   }
 

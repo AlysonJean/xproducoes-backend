@@ -1,8 +1,8 @@
 import { prisma } from "../config/prisma";
-import { ItemStatus } from "@prisma/client";
+import { ItemStatus, type Prisma } from "@prisma/client";
 
 export class ServiceRepository {
-  async create(data: any) {
+  async create(data: Prisma.ServiceCreateInput) {
     // Ensure status is valid or default
     if (!data.status) data.status = 'ACTIVE';
     return prisma.service.create({ data });
@@ -25,7 +25,7 @@ export class ServiceRepository {
     });
   }
 
-  async update(id: string, data: any) {
+  async update(id: string, data: Prisma.ServiceUpdateInput) {
     return prisma.service.update({
       where: { id },
       data

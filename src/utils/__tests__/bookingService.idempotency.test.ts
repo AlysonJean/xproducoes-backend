@@ -3,6 +3,7 @@ import { BookingService } from '../../services/bookingService';
 jest.mock('../../config/prisma', () => {
   return {
     prisma: {
+      $transaction: jest.fn(),
       booking: {
         create: jest.fn(),
         findFirst: jest.fn(),
@@ -11,8 +12,7 @@ jest.mock('../../config/prisma', () => {
         findUnique: jest.fn(),
       },
       client: {
-        findFirst: jest.fn(),
-        create: jest.fn(),
+        upsert: jest.fn(),
       },
       kit: {
         findUnique: jest.fn(),
@@ -31,6 +31,9 @@ describe('BookingService idempotency', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback: (tx: typeof prisma) => unknown) => {
+      return callback(prisma);
+    });
   });
 
   it('returns existing booking when create fails with P2002', async () => {
@@ -45,7 +48,7 @@ describe('BookingService idempotency', () => {
 
     // Prepare other prisma mocks that the service will call
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'creator-1', name: 'Creator' });
-    (prisma.client.findFirst as jest.Mock).mockResolvedValue({ id: 'client-1' });
+    (prisma.client.upsert as jest.Mock).mockResolvedValue({ id: 'client-1' });
 
     // Simulate prisma.create throwing unique constraint error
     (prisma.booking.create as jest.Mock).mockImplementation(() => {
@@ -55,7 +58,9 @@ describe('BookingService idempotency', () => {
     });
 
     const existing = { id: 'existing-1', idempotencyKey };
-    (prisma.booking.findFirst as jest.Mock).mockResolvedValue(existing);
+    (prisma.booking.findFirst as jest.Mock)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(existing);
 
     const result = await service.createBooking(bookingData as any, 'creator-1', idempotencyKey);
 

@@ -6,9 +6,41 @@ import jwt from "jsonwebtoken";
 import { config as envConfig } from "../config/environment";
 import logger from "../config/logger";
 import { queueEmail } from "../config/jobQueue";
+import { AppError, BadRequestError, ConflictError, NotFoundError, UnauthorizedError } from "../utils/errors";
 
 // Use centralized, cryptographically generated secret from environment config
 const config = { jwtSecret: envConfig.jwtSecret };
+
+// ---------- Account lockout (in-memory for dev; Redis should be used in prod) ----------
+// Key: normalized email → { attempts, lockedUntil }
+const failedLoginMap = new Map<string, { attempts: number; lockedUntil: number }>();
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
+function checkAndRecordFailedLogin(email: string): void {
+  const key = email.toLowerCase();
+  const record = failedLoginMap.get(key) ?? { attempts: 0, lockedUntil: 0 };
+  record.attempts += 1;
+  if (record.attempts >= MAX_FAILED_ATTEMPTS) {
+    record.lockedUntil = Date.now() + LOCKOUT_DURATION_MS;
+    record.attempts = 0; // reset counter after lock
+  }
+  failedLoginMap.set(key, record);
+}
+
+function assertNotLocked(email: string): void {
+  const key = email.toLowerCase();
+  const record = failedLoginMap.get(key);
+  if (record && record.lockedUntil > Date.now()) {
+    const retryAfterSec = Math.ceil((record.lockedUntil - Date.now()) / 1000);
+    throw new AppError(`Conta temporariamente bloqueada. Tente novamente em ${retryAfterSec}s.`, 429, true, "TOO_MANY_REQUESTS");
+  }
+}
+
+function clearFailedLogins(email: string): void {
+  failedLoginMap.delete(email.toLowerCase());
+}
+// -----------------------------------------------------------------------------------------
 
 // Listar todos os clientes (role CLIENT)
 export async function findAllClients() {
@@ -135,17 +167,17 @@ export async function generateEmailVerificationToken(userId: string) {
 
 export async function verifyEmailByToken(token: string) {
   const user = await prisma.user.findFirst({ where: { emailVerificationToken: token, emailVerificationTokenExpiry: { gte: new Date() } } });
-  if (!user) throw new Error('Token inválido ou expirado');
+  if (!user) throw new BadRequestError('Token inválido ou expirado');
   await prisma.user.update({ where: { id: user.id }, data: { verified: true, emailVerificationToken: null, emailVerificationTokenExpiry: null } });
   return true;
 }
 
 export async function resendEmailVerification(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) throw new Error('Usuário não encontrado');
+  if (!user) throw new NotFoundError('Usuário não encontrado');
   // ADMINs não precisam concluir verificação
   if (user.role === 'ADMIN') return { success: true };
-  if (user.verified) throw new Error('E-mail já verificado');
+  if (user.verified) throw new ConflictError('E-mail já verificado');
   const token = await generateEmailVerificationToken(userId);
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
   const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
@@ -165,13 +197,13 @@ export async function resendEmailVerification(userId: string) {
 export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
-    throw new Error("Usuário não encontrado");
+    throw new NotFoundError("Usuário não encontrado");
   }
   
   // Verificar senha atual
   const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
   if (!isValid) {
-    throw new Error("Senha atual incorreta");
+    throw new UnauthorizedError("Senha atual incorreta");
   }
   
   // Atualizar senha
@@ -191,7 +223,7 @@ export async function register(data: RegisterInput) {
   const existing = await prisma.user.findUnique({
     where: { email: data.email },
   });
-  if (existing) throw new Error("Email já está em uso.");
+  if (existing) throw new ConflictError("Email já está em uso.");
   const hash = await bcrypt.hash(data.password, 10);
   const role = (data.role as any) || "CLIENT";
   const user = await prisma.user.create({
@@ -228,16 +260,27 @@ export async function register(data: RegisterInput) {
 }
 
 export async function login(data: LoginInput) {
+  assertNotLocked(data.email);
+
   const user = await prisma.user.findUnique({ where: { email: data.email } });
-  if (!user) throw new Error("Credenciais inválidas");
+  if (!user) {
+    checkAndRecordFailedLogin(data.email);
+    throw new UnauthorizedError("Credenciais inválidas");
+  }
   const valid = await bcrypt.compare(data.password, user.passwordHash);
-  if (!valid) throw new Error("Credenciais inválidas");
+  if (!valid) {
+    checkAndRecordFailedLogin(data.email);
+    throw new UnauthorizedError("Credenciais inválidas");
+  }
   // Exigir verificação de e-mail se habilitado por ambiente; ADMINs são dispensados
   if (process.env.REQUIRE_EMAIL_VERIFICATION === 'true' && !user.verified && user.role !== 'ADMIN') {
     const err = new Error('E-mail não verificado') as Error & { code?: string };
     err.code = 'EMAIL_NOT_VERIFIED';
     throw err;
   }
+
+  // Login bem-sucedido — limpar contador de tentativas
+  clearFailedLogins(data.email);
   const token = jwt.sign(
     { userId: user.id, role: user.role },
     config.jwtSecret,
@@ -295,7 +338,7 @@ export async function getProfile(userId: string) {
       googleCalendarEmail: true,
     },
   });
-  if (!user) throw new Error("Usuário não encontrado");
+  if (!user) throw new NotFoundError("Usuário não encontrado");
   return user;
 }
 
@@ -362,7 +405,7 @@ export async function updateProfile(
     return user;
   } catch (error: unknown) {
     if (error instanceof Error && 'code' in error && error.code === "P2002") {
-      throw new Error("Email já está em uso.");
+      throw new ConflictError("Email já está em uso.");
     }
     throw error;
   }
@@ -376,7 +419,7 @@ export async function listUsers() {
 
 export async function forgotPassword(email: string) {
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) throw new Error("Credenciais inválidas");
+  if (!user) throw new UnauthorizedError("Credenciais inválidas");
   const token = crypto.randomBytes(32).toString("hex");
   const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
   await prisma.user.update({
@@ -396,7 +439,7 @@ export async function resetPassword(token: string, newPassword: string, ipAddres
       passwordResetTokenExpiry: { gte: new Date() },
     },
   });
-  if (!user) throw new Error("Token inválido ou expirado");
+  if (!user) throw new BadRequestError("Token inválido ou expirado");
   
   const hash = await bcrypt.hash(newPassword, 10);
   await prisma.user.update({
@@ -494,17 +537,17 @@ export async function getUserStats(userId: string) {
 export async function promoteToVip(userId: string) {
   // Verificar existência do usuário e perfil de cliente
   const user = await prisma.user.findUnique({ where: { id: userId }, include: { clientProfile: true } });
-  if (!user) throw new Error('Usuário não encontrado');
+  if (!user) throw new NotFoundError('Usuário não encontrado');
 
   // Se não tem clientProfile, não promovemos automaticamente
-  if (!user.clientProfile) throw new Error('Perfil de cliente não encontrado');
+  if (!user.clientProfile) throw new NotFoundError('Perfil de cliente não encontrado');
 
   // Recalcular total de reservas para evitar confiar no cliente
   const totalBookings = await prisma.booking.count({ where: { clientId: user.clientProfile.id } });
 
   if (totalBookings < 5) {
     // Não promover se a regra de negócio não for satisfeita
-    throw new Error('Regra de promoção para VIP não satisfeita');
+    throw new BadRequestError('Regra de promoção para VIP não satisfeita');
   }
 
   // Atualizar campo isVip no usuário

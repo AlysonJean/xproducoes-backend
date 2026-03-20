@@ -19,6 +19,7 @@ import { prisma } from "../config/prisma";
 import { UserRole } from "@prisma/client";
 import logger from "../config/logger";
 import { extractToken } from "../config/cookies";
+import { isTokenBlacklisted } from "../services/jwtBlacklistService";
 
 // ===== INTERFACES E TIPOS =====
 
@@ -56,16 +57,6 @@ declare global {
 
 // ===== HELPERS PRIVADOS =====
 
-const extractTokenFromHeader = (authHeader: string | undefined): string | null => {
-  if (!authHeader) return null;
-  
-  const [bearer, token] = authHeader.split(" ");
-  
-  if (bearer !== "Bearer" || !token) return null;
-  
-  return token;
-};
-
 const getUserContext = (req: Request) => ({
   ip: req.ip || req.connection.remoteAddress || "unknown",
   userAgent: req.get("User-Agent") || "unknown",
@@ -78,7 +69,7 @@ const getUserContext = (req: Request) => ({
  * Middleware principal de autenticação
  * Valida JWT, verifica segurança, popula req.userId, req.userRole, req.authUser
  */
-export function authenticate(req: Request, res: Response, next: NextFunction) {
+export async function authenticate(req: Request, res: Response, next: NextFunction) {
   const { ip, userAgent, endpoint } = getUserContext(req);
 
   // 1. Extrair token de cookies (prioridade) ou header (fallback)
@@ -104,6 +95,18 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
   // 3. Verificar e decodificar JWT
   try {
     const decoded = jwt.verify(token, config.jwtSecret) as JWTPayload;
+
+    const blacklisted = await isTokenBlacklisted(token);
+    if (blacklisted) {
+      securityMonitor.recordInvalidToken(ip, userAgent, endpoint, {
+        reason: "blacklisted_token",
+      });
+      return res.status(401).json({
+        success: false,
+        message: "Token invalidado",
+        code: "TOKEN_REVOKED",
+      });
+    }
 
     // 4. Validar campos obrigatórios
     if (!decoded.userId || !decoded.role) {
@@ -178,10 +181,14 @@ export async function authenticateWithDB(
   res: Response,
   next: NextFunction,
 ) {
-  const authHeader = req.headers.authorization;
   const { ip, userAgent, endpoint } = getUserContext(req);
 
-  if (!authHeader) {
+  const { accessToken: token, source } = extractToken(
+    req.cookies || {},
+    req.headers.authorization
+  );
+
+  if (!token) {
     return res.status(401).json({
       success: false,
       message: "Token de acesso obrigatório",
@@ -189,18 +196,19 @@ export async function authenticateWithDB(
     });
   }
 
-  const token = extractTokenFromHeader(authHeader);
-  
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: "Formato de token inválido",
-      code: "INVALID_TOKEN_FORMAT",
-    });
-  }
+  logger.debug({ source, endpoint }, "Token extracted from " + source + " (DB auth)");
 
   try {
     const decoded = jwt.verify(token, config.jwtSecret) as JWTPayload;
+
+    const blacklisted = await isTokenBlacklisted(token);
+    if (blacklisted) {
+      return res.status(401).json({
+        success: false,
+        message: "Token invalidado",
+        code: "TOKEN_REVOKED",
+      });
+    }
 
     if (!decoded.userId || !decoded.role) {
       return res.status(401).json({
@@ -274,14 +282,11 @@ export async function authenticateWithDB(
  * Middleware de autenticação opcional
  * Não falha se não houver token, apenas popula dados se token válido
  */
-export function optionalAuth(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader) {
-    return next();
-  }
-
-  const token = extractTokenFromHeader(authHeader);
+export async function optionalAuth(req: Request, res: Response, next: NextFunction) {
+  const { accessToken: token } = extractToken(
+    req.cookies || {},
+    req.headers.authorization
+  );
 
   if (!token) {
     return next();
@@ -289,6 +294,10 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
 
   try {
     const decoded = jwt.verify(token, config.jwtSecret) as JWTPayload;
+    const blacklisted = await isTokenBlacklisted(token);
+    if (blacklisted) {
+      return next();
+    }
     req.userId = decoded.userId;
     req.userRole = decoded.role;
   } catch {

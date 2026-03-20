@@ -16,11 +16,11 @@ export class SponsorController {
             const file = req.file;
 
             if (!file) {
-                return res.status(400).json({ error: 'Image file is required' });
+                return res.status(400).json({ success: false, message: 'Image file is required' });
             }
 
             if (!name) {
-                return res.status(400).json({ error: 'Sponsor name is required' });
+                return res.status(400).json({ success: false, message: 'Sponsor name is required' });
             }
 
             // Gera nome SEO para o arquivo
@@ -36,10 +36,10 @@ export class SponsorController {
                 }
             });
 
-            res.json(sponsor);
+            res.json({ success: true, data: sponsor });
         } catch (error) {
             logger.error({ error }, 'Error creating sponsor');
-            res.status(500).json({ error: 'Failed to create sponsor' });
+            res.status(500).json({ success: false, message: 'Failed to create sponsor' });
         }
     }
 
@@ -53,10 +53,10 @@ export class SponsorController {
                 where: { userId: req.userId },
                 orderBy: { createdAt: 'desc' }
             });
-            res.json(sponsors);
+            res.json({ success: true, data: sponsors });
         } catch (error) {
             logger.error({ error }, 'Error listing sponsors');
-            res.status(500).json({ error: 'Failed to list sponsors' });
+            res.status(500).json({ success: false, message: 'Failed to list sponsors' });
         }
     }
 
@@ -74,16 +74,16 @@ export class SponsorController {
             });
 
             if (!sponsor) {
-                return res.status(404).json({ error: 'Sponsor not found' });
+                return res.status(404).json({ success: false, message: 'Sponsor not found' });
             }
 
             // Optional: Delete from Cloudinary if needed, but for now we just remove DB record
             await prisma.sponsorLogo.delete({ where: { id: String(id) } });
 
-            res.json({ message: 'Sponsor deleted' });
+            res.json({ success: true, message: 'Sponsor deleted' });
         } catch (error) {
             logger.error({ error }, 'Error deleting sponsor');
-            res.status(500).json({ error: 'Failed to delete sponsor' });
+            res.status(500).json({ success: false, message: 'Failed to delete sponsor' });
         }
     }
 }

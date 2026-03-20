@@ -35,7 +35,7 @@ class WebhookService {
 
   private async sendWithRetries(logId: string, payload: any, attempt: number) {
     const maxAttempts = 3;
-    const backoffMs = Math.pow(2, attempt) * 1000;
+    const backoffMs = Math.min(Math.pow(2, attempt) * 1000, 30 * 1000); // Max 30s cap
 
     try {
       const res = await safeFetch(this.webhookUrl, {

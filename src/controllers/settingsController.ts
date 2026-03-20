@@ -15,24 +15,30 @@ export const getAppSettings = async (req: Request, res: Response) => {
       // (pode falhar se a tabela não existir ou não houver permissões)
       logger.warn('WARN: Configurações de app não encontradas, retornando valores padrão');
       return res.json({
+        success: true,
+        data: {
+          id: 'default',
+          logoUrl: null,
+          companyName: 'X Produçoes e Eventos',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+    }
+
+    res.json({ success: true, data: settings });
+  } catch (error) {
+    logger.error({obj:error}, 'Erro ao buscar configurações:');
+    // Retornar valores padrão em caso de erro
+    res.json({
+      success: true,
+      data: {
         id: 'default',
         logoUrl: null,
         companyName: 'X Produçoes e Eventos',
         createdAt: new Date(),
         updatedAt: new Date()
-      });
-    }
-
-    res.json(settings);
-  } catch (error) {
-    logger.error({obj:error}, 'Erro ao buscar configurações:');
-    // Retornar valores padrão em caso de erro
-    res.json({
-      id: 'default',
-      logoUrl: null,
-      companyName: 'X Produçoes e Eventos',
-      createdAt: new Date(),
-      updatedAt: new Date()
+      }
     });
   }
 };
@@ -59,9 +65,9 @@ export const updateAppSettings = async (req: Request, res: Response) => {
       }
     });
 
-    res.json(updatedSettings);
+    res.json({ success: true, data: updatedSettings });
   } catch (error) {
     logger.error({obj:error}, 'Erro ao atualizar configurações:');
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    res.status(500).json({ success: false, message: 'Erro interno do servidor' });
   }
 };
