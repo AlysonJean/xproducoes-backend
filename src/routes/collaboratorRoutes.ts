@@ -110,7 +110,7 @@ router.get("/payments/stats", adminOnly, getPaymentStats);
 router.post("/payments", adminOnly, validateBody(paymentCreateSchema), createPayment);
 router.put("/payments/:id", adminOnly, validateId(), validateBody(paymentUpdateSchema), updatePayment);
 router.delete("/payments/:id", adminOnly, validateId(), deletePayment);
-router.get("/:collaboratorId/payments", getCollaboratorPayments);
+router.get("/:collaboratorId/payments", adminOnly, getCollaboratorPayments);
 
 // Rota global de atribuições
 router.get("/event-assignments/all", adminOnly, getAllEventCollaborators);

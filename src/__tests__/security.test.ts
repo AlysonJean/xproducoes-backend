@@ -23,6 +23,7 @@ jest.mock('../config/prisma', () => ({
     client: { findFirst: jest.fn() },
     booking: { findUnique: jest.fn(), update: jest.fn() },
     appSettings: { findFirst: jest.fn(), upsert: jest.fn() },
+    collaboratorPayment: { findMany: jest.fn() },
     // Adicione outros modelos conforme necessário
   },
 }));
@@ -419,6 +420,48 @@ describe('🛡️ Security Blindagem Tests', () => {
       // 400 (não 401/403) prova que passou pela autenticação/autorização
       // e chegou na regra de negócio do controller.
       expect(res.status).toBe(400);
+    });
+  });
+
+  describe('Pagamentos de colaborador - dados financeiros antes vazavam para qualquer autenticado', () => {
+    afterEach(() => {
+      (prisma.collaboratorPayment.findMany as jest.Mock<any>).mockReset();
+    });
+
+    it('GET /collaborators/:id/payments deve rejeitar (403) token de usuário comum', async () => {
+      const res = await request(app)
+        .get('/api/v1/collaborators/collab-1/payments')
+        .set('Authorization', 'Bearer valid-user-token');
+
+      expect(res.status).toBe(403);
+      expect(prisma.collaboratorPayment.findMany).not.toHaveBeenCalled();
+    });
+
+    it('GET /collaborators/:id/payments deve aceitar (200) token de admin', async () => {
+      (prisma.collaboratorPayment.findMany as jest.Mock<any>).mockResolvedValue([]);
+
+      const res = await request(app)
+        .get('/api/v1/collaborators/collab-1/payments')
+        .set('Authorization', 'Bearer valid-admin-token');
+
+      expect(res.status).toBe(200);
+    });
+
+    it('GET /collaborator-payments (todos os pagamentos) deve rejeitar (403) token de usuário comum', async () => {
+      const res = await request(app)
+        .get('/api/v1/collaborator-payments')
+        .set('Authorization', 'Bearer valid-user-token');
+
+      expect(res.status).toBe(403);
+      expect(prisma.collaboratorPayment.findMany).not.toHaveBeenCalled();
+    });
+
+    it('GET /collaborator-payments/collaborator/:id/stats deve rejeitar (403) token de usuário comum', async () => {
+      const res = await request(app)
+        .get('/api/v1/collaborator-payments/collaborator/collab-1/stats')
+        .set('Authorization', 'Bearer valid-user-token');
+
+      expect(res.status).toBe(403);
     });
   });
 });
