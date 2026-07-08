@@ -456,13 +456,34 @@ export class BookingController {
   confirm = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params as { id: string };
-      
+
       if (!id) {
-        res.status(400).json({ 
+        res.status(400).json({
           success: false,
-          message: "ID da reserva é obrigatório." 
+          message: "ID da reserva é obrigatório."
         });
         return;
+      }
+
+      // Verificar permissões usando clientId (mesmo padrão de update/delete)
+      if (req.userRole !== "ADMIN") {
+        const client = await prisma.client.findFirst({ where: { userId: req.userId } });
+        if (!client) {
+          res.status(403).json({
+            success: false,
+            message: "Acesso negado. Cliente não encontrado."
+          });
+          return;
+        }
+
+        const existingBooking = await bookingService.getBookingById(id);
+        if (existingBooking.clientId !== client.id) {
+          res.status(403).json({
+            success: false,
+            message: "Acesso negado. Esta reserva não pertence a você."
+          });
+          return;
+        }
       }
 
       const booking = await bookingService.confirm(id);
@@ -513,13 +534,34 @@ export class BookingController {
     try {
       const { id } = req.params as { id: string };
       const { reason } = req.body;
-      
+
       if (!id) {
-        res.status(400).json({ 
+        res.status(400).json({
           success: false,
-          message: "ID da reserva é obrigatório." 
+          message: "ID da reserva é obrigatório."
         });
         return;
+      }
+
+      // Verificar permissões usando clientId (mesmo padrão de update/delete)
+      if (req.userRole !== "ADMIN") {
+        const client = await prisma.client.findFirst({ where: { userId: req.userId } });
+        if (!client) {
+          res.status(403).json({
+            success: false,
+            message: "Acesso negado. Cliente não encontrado."
+          });
+          return;
+        }
+
+        const existingBooking = await bookingService.getBookingById(id);
+        if (existingBooking.clientId !== client.id) {
+          res.status(403).json({
+            success: false,
+            message: "Acesso negado. Esta reserva não pertence a você."
+          });
+          return;
+        }
       }
 
       const booking = await bookingService.cancel(id, reason);

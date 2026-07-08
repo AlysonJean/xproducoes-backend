@@ -20,6 +20,8 @@ jest.mock('../config/prisma', () => ({
     sponsorLogo: { create: jest.fn(), findMany: jest.fn() },
     newsletterSubscriber: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
     collaborator: { create: jest.fn() },
+    client: { findFirst: jest.fn() },
+    booking: { findUnique: jest.fn(), update: jest.fn() },
     // Adicione outros modelos conforme necessário
   },
 }));
@@ -242,6 +244,66 @@ describe('🛡️ Security Blindagem Tests', () => {
       expect(res.body.pagination).toEqual(
         expect.objectContaining({ page: 1, limit: 20, total: 1 })
       );
+    });
+  });
+
+  describe('PUT /bookings/:id/confirm e /cancel - IDOR (dono ou admin)', () => {
+    afterEach(() => {
+      (prisma.client.findFirst as jest.Mock<any>).mockReset();
+      (prisma.booking.findUnique as jest.Mock<any>).mockReset();
+      (prisma.booking.update as jest.Mock<any>).mockReset();
+    });
+
+    it('CLIENT não pode confirmar reserva de outro cliente (403)', async () => {
+      (prisma.client.findFirst as jest.Mock<any>).mockResolvedValue({ id: 'client-mine' });
+      (prisma.booking.findUnique as jest.Mock<any>).mockResolvedValue({ id: 'booking-1', clientId: 'client-outro' });
+
+      const res = await request(app)
+        .put('/api/v1/bookings/booking-1/confirm')
+        .set('Authorization', 'Bearer valid-user-token');
+
+      expect(res.status).toBe(403);
+      expect(prisma.booking.update).not.toHaveBeenCalled();
+    });
+
+    it('CLIENT não pode cancelar reserva de outro cliente (403)', async () => {
+      (prisma.client.findFirst as jest.Mock<any>).mockResolvedValue({ id: 'client-mine' });
+      (prisma.booking.findUnique as jest.Mock<any>).mockResolvedValue({ id: 'booking-1', clientId: 'client-outro' });
+
+      const res = await request(app)
+        .put('/api/v1/bookings/booking-1/cancel')
+        .set('Authorization', 'Bearer valid-user-token')
+        .send({ reason: 'teste' });
+
+      expect(res.status).toBe(403);
+      expect(prisma.booking.update).not.toHaveBeenCalled();
+    });
+
+    it('CLIENT pode cancelar a própria reserva (200)', async () => {
+      (prisma.client.findFirst as jest.Mock<any>).mockResolvedValue({ id: 'client-mine' });
+      (prisma.booking.findUnique as jest.Mock<any>).mockResolvedValue({ id: 'booking-1', clientId: 'client-mine' });
+      (prisma.booking.update as jest.Mock<any>).mockResolvedValue({ id: 'booking-1', clientId: 'client-mine', status: 'CANCELLED' });
+
+      const res = await request(app)
+        .put('/api/v1/bookings/booking-1/cancel')
+        .set('Authorization', 'Bearer valid-user-token')
+        .send({ reason: 'não vou precisar mais' });
+
+      expect(res.status).toBe(200);
+      expect(prisma.booking.update).toHaveBeenCalled();
+    });
+
+    it('ADMIN pode confirmar reserva de qualquer cliente (200)', async () => {
+      (prisma.booking.findUnique as jest.Mock<any>).mockResolvedValue({ id: 'booking-1', clientId: 'client-outro' });
+      (prisma.booking.update as jest.Mock<any>).mockResolvedValue({ id: 'booking-1', clientId: 'client-outro', status: 'CONFIRMED' });
+
+      const res = await request(app)
+        .put('/api/v1/bookings/booking-1/confirm')
+        .set('Authorization', 'Bearer valid-admin-token');
+
+      expect(res.status).toBe(200);
+      // Admin não deve nem precisar consultar o próprio registro de client
+      expect(prisma.client.findFirst).not.toHaveBeenCalled();
     });
   });
 });
