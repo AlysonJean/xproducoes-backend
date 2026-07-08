@@ -1,11 +1,13 @@
 import type { Request, Response } from 'express';
 import { createSafeRouter } from "../middlewares/safeRouter.js";
 import * as userController from "../controllers/userController.js";
-import { authenticate, requireAdmin } from "../middlewares/unifiedAuth.js";
+import * as userService from "../services/userService.js";
+import { authenticate, requireAdmin, AuthenticatedRequest } from "../middlewares/unifiedAuth.js";
 import { uploadSingle, processUpload } from "../middlewares/upload.js";
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware.js';
 import { validateBody } from "../config/validation.js";
 import { updateUserSchema, changePasswordSchema } from "../schemas/user.schema.js";
+import { UnauthorizedError, NotFoundError } from "../utils/errors.js";
 
 const userRoutes = createSafeRouter();
 
@@ -44,7 +46,6 @@ userRoutes.post("/change-password", authenticate, validateBody(changePasswordSch
   try {
     const { currentPassword, newPassword } = req.body;
 
-    
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
         success: false,
@@ -52,13 +53,20 @@ userRoutes.post("/change-password", authenticate, validateBody(changePasswordSch
       });
     }
 
-    // Aqui você implementaria a lógica de alteração de senha
-    // Por enquanto, vamos retornar sucesso
+    const authReq = req as AuthenticatedRequest;
+    await userService.changePassword(authReq.userId!, currentPassword, newPassword);
+
     res.json({
       success: true,
       message: "Senha alterada com sucesso"
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return res.status(401).json({ success: false, message: error.message });
+    }
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({ success: false, message: error.message });
+    }
     res.status(500).json({
       success: false,
       message: "Erro interno do servidor"

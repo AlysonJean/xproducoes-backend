@@ -16,7 +16,7 @@ jest.mock('jsonwebtoken', () => {
 // Mock do Prisma para evitar conexões reais com banco
 jest.mock('../config/prisma', () => ({
   prisma: {
-    user: { findUnique: jest.fn(), findMany: jest.fn(), count: jest.fn() },
+    user: { findUnique: jest.fn(), findMany: jest.fn(), count: jest.fn(), update: jest.fn() },
     sponsorLogo: { create: jest.fn(), findMany: jest.fn() },
     newsletterSubscriber: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
     collaborator: { create: jest.fn() },
@@ -84,6 +84,7 @@ jest.mock('../services/uploadService', () => ({
 }));
 
 import request from 'supertest';
+import bcrypt from 'bcrypt';
 
 let app: typeof import('../app').default;
 let prisma: any;
@@ -304,6 +305,55 @@ describe('🛡️ Security Blindagem Tests', () => {
       expect(res.status).toBe(200);
       // Admin não deve nem precisar consultar o próprio registro de client
       expect(prisma.client.findFirst).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /users/change-password - deve realmente trocar a senha', () => {
+    afterEach(() => {
+      (prisma.user.findUnique as jest.Mock<any>).mockReset();
+      (prisma.user.update as jest.Mock<any>).mockReset();
+    });
+
+    it('deve rejeitar (401) quando currentPassword está incorreta, e NUNCA gravar a nova senha', async () => {
+      const realHash = await bcrypt.hash('senha-atual-correta', 10);
+      (prisma.user.findUnique as jest.Mock<any>).mockResolvedValue({
+        id: 'user-id',
+        passwordHash: realHash,
+      });
+
+      const res = await request(app)
+        .post('/api/v1/users/change-password')
+        .set('Authorization', 'Bearer valid-user-token')
+        .send({ currentPassword: 'senha-errada', newPassword: 'NovaSenha123' });
+
+      expect(res.status).toBe(401);
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('deve trocar a senha de verdade (200) quando currentPassword está correta', async () => {
+      const realHash = await bcrypt.hash('senha-atual-correta', 10);
+      (prisma.user.findUnique as jest.Mock<any>).mockResolvedValue({
+        id: 'user-id',
+        passwordHash: realHash,
+      });
+      (prisma.user.update as jest.Mock<any>).mockResolvedValue({ id: 'user-id' });
+
+      const res = await request(app)
+        .post('/api/v1/users/change-password')
+        .set('Authorization', 'Bearer valid-user-token')
+        .send({ currentPassword: 'senha-atual-correta', newPassword: 'NovaSenha123' });
+
+      expect(res.status).toBe(200);
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'user-id' },
+          data: expect.objectContaining({ passwordHash: expect.any(String) }),
+        })
+      );
+      // A nova senha gravada não pode ser a senha antiga nem texto puro
+      const updateCall = (prisma.user.update as jest.Mock<any>).mock.calls[0][0];
+      expect(updateCall.data.passwordHash).not.toBe(realHash);
+      expect(updateCall.data.passwordHash).not.toBe('NovaSenha123');
     });
   });
 });
