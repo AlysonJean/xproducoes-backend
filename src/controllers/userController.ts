@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 
 import * as userService from "../services/userService";
+import * as userRepository from "../repositories/userRepository";
 import {
   userRegisterSchema,
   userLoginSchema,
@@ -60,8 +61,13 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
 
 export async function listUsers(req: Request, res: Response, next: NextFunction) {
   try {
-    const users = await userService.listUsers();
-    return res.json({ success: true, data: users });
+    // Rota restrita a ADMIN (ver requireAdmin em userRoutes.ts). Paginada para
+    // não devolver a base inteira de usuários numa única resposta.
+    const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? "20"), 10) || 20));
+
+    const { data, pagination } = await userRepository.findMany({}, { page, limit });
+    return res.json({ success: true, data, pagination });
   } catch (error: unknown) {
     return next(error);
   }

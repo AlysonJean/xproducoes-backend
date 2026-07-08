@@ -16,7 +16,7 @@ jest.mock('jsonwebtoken', () => {
 // Mock do Prisma para evitar conexões reais com banco
 jest.mock('../config/prisma', () => ({
   prisma: {
-    user: { findUnique: jest.fn() },
+    user: { findUnique: jest.fn(), findMany: jest.fn(), count: jest.fn() },
     sponsorLogo: { create: jest.fn(), findMany: jest.fn() },
     newsletterSubscriber: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
     collaborator: { create: jest.fn() },
@@ -208,6 +208,40 @@ describe('🛡️ Security Blindagem Tests', () => {
         .send({ provider: 'google', accessToken: '' });
 
       expect(res.status).toBe(400);
+    });
+  });
+
+  describe('GET /users - restrição de acesso a admin e paginação', () => {
+    it('deve rejeitar sem token (401)', async () => {
+      const res = await request(app).get('/api/v1/users');
+      expect(res.status).toBe(401);
+    });
+
+    it('deve rejeitar token de usuário comum (403) - antes vazava a lista de todos os usuários', async () => {
+      const res = await request(app)
+        .get('/api/v1/users')
+        .set('Authorization', 'Bearer valid-user-token'); // role CLIENT, mockado no topo do arquivo
+
+      expect(res.status).toBe(403);
+      expect(prisma.user.findMany).not.toHaveBeenCalled();
+    });
+
+    it('deve aceitar token de admin (200) e retornar a lista paginada', async () => {
+      (prisma.user.findMany as jest.Mock<any>).mockResolvedValue([
+        { id: 'u1', name: 'Fulano', email: 'fulano@example.com', role: 'CLIENT' },
+      ]);
+      (prisma.user.count as jest.Mock<any>).mockResolvedValue(1);
+
+      const res = await request(app)
+        .get('/api/v1/users')
+        .set('Authorization', 'Bearer valid-admin-token');
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.pagination).toEqual(
+        expect.objectContaining({ page: 1, limit: 20, total: 1 })
+      );
     });
   });
 });

@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { createSafeRouter } from "../middlewares/safeRouter.js";
 import * as userController from "../controllers/userController.js";
-import { authenticate } from "../middlewares/unifiedAuth.js";
+import { authenticate, requireAdmin } from "../middlewares/unifiedAuth.js";
 import { uploadSingle, processUpload } from "../middlewares/upload.js";
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware.js';
 import { validateBody } from "../config/validation.js";
@@ -66,9 +66,9 @@ userRoutes.post("/change-password", authenticate, validateBody(changePasswordSch
   }
 });
 
-userRoutes.get("/", authenticate, userController.listUsers);
+userRoutes.get("/", authenticate, requireAdmin, userController.listUsers);
 // Alias para compatibilidade REST/testes
-userRoutes.get("/users", authenticate, userController.listUsers);
+userRoutes.get("/users", authenticate, requireAdmin, userController.listUsers);
 
 userRoutes.post("/forgot-password", userController.forgotPassword);
 userRoutes.post("/reset-password", userController.resetPassword);
