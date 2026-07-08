@@ -51,13 +51,15 @@ export const registerSchema = z.object({
 
 export const socialLoginSchema = z.object({
   provider: z.enum(["google", "facebook"]),
-  accessToken: z.string().optional(),
+  // accessToken é obrigatório e deve ser validado com o provedor (Google/Facebook)
+  // no controller. Nunca aceitar identidade a partir de userData enviado pelo
+  // cliente sem essa validação — isso permitia personificar qualquer usuário
+  // apenas conhecendo o e-mail dele (bypass de autenticação).
+  accessToken: z.string().min(1, "Token de acesso é obrigatório"),
   userData: z.object({
     email: z.string().email(),
     name: z.string().optional(),
     id: z.string().optional(),
     picture: z.any().optional()
   }).optional()
-}).refine(data => data.accessToken || (data.userData && data.userData.email), {
-  message: "Token de acesso ou dados de usuário são obrigatórios"
 });

@@ -171,12 +171,42 @@ describe('🛡️ Security Blindagem Tests', () => {
       const res = await request(app)
         .post('/api/v1/collaborators')
         .set('Authorization', 'Bearer valid-admin-token')
-        .send({ 
-          name: 'Collab', 
-          email: 'c@c.com', 
-          role: 'INVALID_ROLE' 
+        .send({
+          name: 'Collab',
+          email: 'c@c.com',
+          role: 'INVALID_ROLE'
         });
-      
+
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('Social Login - Bloqueio do bypass de autenticação via "modo legado"', () => {
+    it('POST /auth/social/google - deve rejeitar (400) quando accessToken não é enviado, mesmo com userData.email de uma conta existente', async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/social/google')
+        .send({ provider: 'google', userData: { email: 'vitima@example.com' } });
+
+      expect(res.status).toBe(400);
+      // Nunca deve consultar o banco por esse e-mail: a requisição tem que ser
+      // barrada na validação do schema, antes de qualquer lógica de login/registro.
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('POST /auth/social/facebook - deve rejeitar (400) quando accessToken não é enviado', async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/social/facebook')
+        .send({ provider: 'facebook', userData: { email: 'vitima2@example.com' } });
+
+      expect(res.status).toBe(400);
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('POST /auth/social/google - deve rejeitar (400) quando accessToken é string vazia', async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/social/google')
+        .send({ provider: 'google', accessToken: '' });
+
       expect(res.status).toBe(400);
     });
   });

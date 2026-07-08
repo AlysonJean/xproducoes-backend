@@ -311,133 +311,94 @@ export class AuthController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const { accessToken, userData } = req.body;
-      
+      const { accessToken } = req.body;
+
       // Detectar provider pela rota
       const isFacebook = req.path.includes('facebook');
       const provider = isFacebook ? 'Facebook' : 'Google';
-      
-      // Validar token com o provider apropriado
-      if (accessToken) {
-        logger.info({ provider }, "Processando login social");
-        
-        const validation: SocialTokenValidation = isFacebook 
-          ? await validateFacebookToken(accessToken)
-          : await validateGoogleToken(accessToken);
-        
-        if (!validation.valid) {
-          logger.warn({ error: validation.error }, `Token ${provider} inválido`);
-          return next(new UnauthorizedError(validation.error || "Token inválido"));
-        }
-        
-        const email = validation.email!;
-        const name = validation.name || email.split('@')[0];
-        const avatarUrl = validation.picture || null;
-        
-        // Vincular ou criar usuário local
-        const { prisma } = await import('../config/prisma.js');
-        let user = await prisma.user.findUnique({ where: { email } });
-        let isNewUser = false;
 
-        if (!user) {
-          isNewUser = true;
-          // Gerar um hash de senha real (bcrypt) para consistência
-          const randomPassword = crypto.randomBytes(32).toString('hex');
-          const passwordHash = await bcrypt.hash(randomPassword, 10);
-          
-          user = await prisma.user.create({
-            data: {
-              name,
-              email,
-              passwordHash,
-              verified: true,
-              avatarUrl,
-              role: 'CLIENT', // Novos usuários via social são clientes por padrão
-            },
-          });
-          
-          // Criar perfil de cliente se for CLIENT
-          try {
-            await prisma.client.create({ data: { userId: user.id } });
-          } catch (e) {
-            logger.warn({ err: e }, 'Falha ao criar perfil de cliente (não crítico)');
-          }
-        } else if (avatarUrl && !user.avatarUrl) {
-          await prisma.user.update({ where: { id: user.id }, data: { avatarUrl } });
-        }
+      // accessToken já é exigido pelo socialLoginSchema (validateBody), mas
+      // mantemos a checagem aqui também como defesa em profundidade: este
+      // endpoint nunca deve autenticar alguém a partir de dados não verificados
+      // enviados pelo próprio cliente (ex.: um e-mail informado sem prova de posse).
+      if (!accessToken || typeof accessToken !== 'string') {
+        return next(new BadRequestError('Token de acesso é obrigatório'));
+      }
 
-        // Login para obter tokens usando o AuthService
-        const result = await this.authService.loginById(user.id);
-        
-        // Definir cookies httpOnly para segurança adicional
-        const { setAuthCookies } = await import('../config/cookies.js');
-        setAuthCookies(res, result.token, result.refreshToken);
+      logger.info({ provider }, "Processando login social");
 
-        // Calcular rota de redirecionamento baseada no role
-        let redirectTo = '/dashboard';
-        switch (user.role) {
-          case 'ADMIN': redirectTo = '/admin/painel'; break;
-          case 'COLLABORATOR': redirectTo = '/colaborador/painel'; break;
-          case 'CLIENT': redirectTo = '/cliente/painel'; break;
-        }
+      const validation: SocialTokenValidation = isFacebook
+        ? await validateFacebookToken(accessToken)
+        : await validateGoogleToken(accessToken);
 
-        // Admin não precisa completar perfil no fluxo de cliente
-        const clientProfile = user.role === 'CLIENT' 
-          ? await prisma.client.findUnique({ where: { userId: user.id } })
-          : null;
-          
-        const shouldCompleteProfile = user.role === 'CLIENT' && (isNewUser || !clientProfile?.phone);
+      if (!validation.valid) {
+        logger.warn({ error: validation.error }, `Token ${provider} inválido`);
+        return next(new UnauthorizedError(validation.error || "Token inválido"));
+      }
 
-        res.status(isNewUser ? 201 : 200).json({
-          ...result,
-          redirectTo,
-          shouldCompleteProfile
+      const email = validation.email!;
+      const name = validation.name || email.split('@')[0];
+      const avatarUrl = validation.picture || null;
+
+      // Vincular ou criar usuário local
+      const { prisma } = await import('../config/prisma.js');
+      let user = await prisma.user.findUnique({ where: { email } });
+      let isNewUser = false;
+
+      if (!user) {
+        isNewUser = true;
+        // Gerar um hash de senha real (bcrypt) para consistência
+        const randomPassword = crypto.randomBytes(32).toString('hex');
+        const passwordHash = await bcrypt.hash(randomPassword, 10);
+
+        user = await prisma.user.create({
+          data: {
+            name,
+            email,
+            passwordHash,
+            verified: true,
+            avatarUrl,
+            role: 'CLIENT', // Novos usuários via social são clientes por padrão
+          },
         });
-        return;
+
+        // Criar perfil de cliente se for CLIENT
+        try {
+          await prisma.client.create({ data: { userId: user.id } });
+        } catch (e) {
+          logger.warn({ err: e }, 'Falha ao criar perfil de cliente (não crítico)');
+        }
+      } else if (avatarUrl && !user.avatarUrl) {
+        await prisma.user.update({ where: { id: user.id }, data: { avatarUrl } });
       }
-    
-    // Fallback: userData enviado diretamente (legado - menos seguro)
-    logger.warn("Login social sem validação de token - modo legado");
-    
 
-
-    const email = (userData.email && typeof userData.email === 'string') ? userData.email : null;
-    // Email validate by Zod
-
-
-    const user = await this.authService.findUserByEmail(email);
-
-    if (user) {
-      // Se existe, fazer login
-      logger.info({ userId: user.id }, "Usuário encontrado, fazendo login por ID");
+      // Login para obter tokens usando o AuthService
       const result = await this.authService.loginById(user.id);
-      res.status(200).json(result);
-    } else {
-      // Se não existe, criar novo utilizador
-      logger.info("Usuário não encontrado, criando novo");
-      const randomPassword = Math.random().toString(36).slice(-8);
-      // Calcular nome seguro
-      let safeName: string;
-      if (userData.name && typeof userData.name === 'string' && userData.name.trim()) {
-        safeName = userData.name.trim();
-      } else if (email.includes('@')) {
-        safeName = email.split('@')[0];
-      } else {
-        safeName = email;
+
+      // Definir cookies httpOnly para segurança adicional
+      const { setAuthCookies } = await import('../config/cookies.js');
+      setAuthCookies(res, result.token, result.refreshToken);
+
+      // Calcular rota de redirecionamento baseada no role
+      let redirectTo = '/dashboard';
+      switch (user.role) {
+        case 'ADMIN': redirectTo = '/admin/painel'; break;
+        case 'COLLABORATOR': redirectTo = '/colaborador/painel'; break;
+        case 'CLIENT': redirectTo = '/cliente/painel'; break;
       }
 
-      const result = await this.authService.register({
-        name: safeName,
-        email: email,
-        password: randomPassword,
-        role: "CLIENT",
+      // Admin não precisa completar perfil no fluxo de cliente
+      const clientProfile = user.role === 'CLIENT'
+        ? await prisma.client.findUnique({ where: { userId: user.id } })
+        : null;
+
+      const shouldCompleteProfile = user.role === 'CLIENT' && (isNewUser || !clientProfile?.phone);
+
+      res.status(isNewUser ? 201 : 200).json({
+        ...result,
+        redirectTo,
+        shouldCompleteProfile
       });
-      logger.info({ result }, "Registro realizado com sucesso");
-
-      // Após registro, fazer login para obter token
-      const loginResult = await this.authService.loginById(result.id);
-      res.status(201).json({ success: true, data: loginResult });
-      }
     } catch (error) {
       logger.error({ err: error }, "Erro no socialLogin");
       next(error);
