@@ -70,9 +70,16 @@ export function configureTelemetry() {
   logger.info('Telemetria configurada');
   
   // Limpar alertas antigos a cada hora
-  setInterval(() => {
+  const telemetryTimer = setInterval(() => {
     metricsCollector.clearOldAlerts();
   }, 60 * 60 * 1000);
+  try {
+    if (telemetryTimer && typeof telemetryTimer.unref === 'function') {
+      telemetryTimer.unref();
+    }
+  } catch (_e) {
+    // ignore
+  }
 }
 
 export const metricsCollector = new MetricsCollector();

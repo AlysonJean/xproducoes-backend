@@ -194,6 +194,6 @@ export const whatsappService = new WhatsappService();
 
 // Inicializa automaticamente APENAS em desenvolvimento para economizar recursos no Render/Produção
 // Em produção, o serviço deve ser iniciado via Admin ou quando houver mensagens pendentes
-if (process.env.NODE_ENV === 'development') {
+if (process.env.NODE_ENV === 'development' && !process.env.JEST_WORKER_ID) {
   whatsappService.initialize();
 }

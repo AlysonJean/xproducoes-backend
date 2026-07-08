@@ -33,7 +33,14 @@ class MetricsCollector {
 
   private constructor() {
     // Limpar métricas antigas a cada 5 minutos
-    setInterval(() => this.cleanup(), 5 * 60 * 1000);
+    const cleanupTimer = setInterval(() => this.cleanup(), 5 * 60 * 1000);
+    try {
+      if (cleanupTimer && typeof cleanupTimer.unref === 'function') {
+        cleanupTimer.unref();
+      }
+    } catch (_e) {
+      // ignore
+    }
   }
 
   static getInstance(): MetricsCollector {
