@@ -394,4 +394,31 @@ describe('🛡️ Security Blindagem Tests', () => {
       expect(prisma.appSettings.upsert).toHaveBeenCalled();
     });
   });
+
+  describe('POST /tv/pair - antes só exigia login, não admin (rota não protegida pelo gate de /admin)', () => {
+    it('deve rejeitar (401) sem token', async () => {
+      const res = await request(app).post('/api/v1/tv/pair').send({});
+      expect(res.status).toBe(401);
+    });
+
+    it('deve rejeitar (403) token de usuário comum - antes qualquer CLIENT podia parear um dispositivo de TV', async () => {
+      const res = await request(app)
+        .post('/api/v1/tv/pair')
+        .set('Authorization', 'Bearer valid-user-token')
+        .send({});
+
+      expect(res.status).toBe(403);
+    });
+
+    it('token de admin deve passar do gate de autorização (chega na validação de negócio, 400 por falta de eventId/settingId)', async () => {
+      const res = await request(app)
+        .post('/api/v1/tv/pair')
+        .set('Authorization', 'Bearer valid-admin-token')
+        .send({});
+
+      // 400 (não 401/403) prova que passou pela autenticação/autorização
+      // e chegou na regra de negócio do controller.
+      expect(res.status).toBe(400);
+    });
+  });
 });
