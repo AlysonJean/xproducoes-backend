@@ -1,10 +1,11 @@
 import { createSafeRouter } from '../middlewares/safeRouter.js';
 import { getAppSettings, updateAppSettings } from '../controllers/settingsController.js';
+import { authenticate, requireAdmin } from '../middlewares/unifiedAuth.js';
 
 const router = createSafeRouter();
 
-// Rotas para configurações da aplicação
+// Leitura pública (branding exibido no site); escrita restrita a admin.
 router.get('/', getAppSettings);
-router.put('/', updateAppSettings);
+router.put('/', authenticate, requireAdmin, updateAppSettings);
 
 export default router;

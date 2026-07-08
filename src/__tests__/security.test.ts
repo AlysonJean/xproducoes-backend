@@ -22,6 +22,7 @@ jest.mock('../config/prisma', () => ({
     collaborator: { create: jest.fn() },
     client: { findFirst: jest.fn() },
     booking: { findUnique: jest.fn(), update: jest.fn() },
+    appSettings: { findFirst: jest.fn(), upsert: jest.fn() },
     // Adicione outros modelos conforme necessário
   },
 }));
@@ -354,6 +355,43 @@ describe('🛡️ Security Blindagem Tests', () => {
       const updateCall = (prisma.user.update as jest.Mock<any>).mock.calls[0][0];
       expect(updateCall.data.passwordHash).not.toBe(realHash);
       expect(updateCall.data.passwordHash).not.toBe('NovaSenha123');
+    });
+  });
+
+  describe('PUT /settings - antes estava totalmente aberto (sem auth nenhuma)', () => {
+    afterEach(() => {
+      (prisma.appSettings.upsert as jest.Mock<any>).mockReset();
+    });
+
+    it('deve rejeitar (401) requisição sem token', async () => {
+      const res = await request(app)
+        .put('/api/v1/settings')
+        .send({ companyName: 'Hackeado' });
+
+      expect(res.status).toBe(401);
+      expect(prisma.appSettings.upsert).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar (403) token de usuário comum', async () => {
+      const res = await request(app)
+        .put('/api/v1/settings')
+        .set('Authorization', 'Bearer valid-user-token')
+        .send({ companyName: 'Hackeado' });
+
+      expect(res.status).toBe(403);
+      expect(prisma.appSettings.upsert).not.toHaveBeenCalled();
+    });
+
+    it('deve aceitar (200) token de admin', async () => {
+      (prisma.appSettings.upsert as jest.Mock<any>).mockResolvedValue({ id: 'default', companyName: 'X Produções e Eventos' });
+
+      const res = await request(app)
+        .put('/api/v1/settings')
+        .set('Authorization', 'Bearer valid-admin-token')
+        .send({ companyName: 'X Produções e Eventos' });
+
+      expect(res.status).toBe(200);
+      expect(prisma.appSettings.upsert).toHaveBeenCalled();
     });
   });
 });
