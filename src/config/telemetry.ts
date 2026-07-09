@@ -1,11 +1,19 @@
 // Configuração de Telemetria para Monitoramento
+import type { Request, Response, NextFunction } from 'express';
 import logger from './logger';
+
+interface SlowQuery {
+  url: string;
+  method: string;
+  duration: number;
+  timestamp?: Date;
+}
 
 export interface MetricsData {
   requests: number;
   errors: number;
   responseTime: number;
-  slowQueries: any[];
+  slowQueries: SlowQuery[];
   uptime: number;
 }
 
@@ -41,7 +49,7 @@ class MetricsCollector {
     this.metrics.errors++;
   }
 
-  addSlowQuery(query: any) {
+  addSlowQuery(query: SlowQuery) {
     this.metrics.slowQueries.push({
       ...query,
       timestamp: new Date(),
@@ -84,7 +92,7 @@ export function configureTelemetry() {
 
 export const metricsCollector = new MetricsCollector();
 
-export const observabilityMiddleware = (req: any, res: any, next: any) => {
+export const observabilityMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
   
   metricsCollector.incrementRequests();

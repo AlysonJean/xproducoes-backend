@@ -1,5 +1,5 @@
 import pkg from 'whatsapp-web.js';
-import type { Client as ClientType } from 'whatsapp-web.js';
+import type { Client as ClientType, ClientOptions } from 'whatsapp-web.js';
 const { Client, LocalAuth } = pkg;
 import qrcode from 'qrcode-terminal';
 import logger from '../config/logger.js';
@@ -11,7 +11,7 @@ class WhatsappService {
   private currentQr: string | null = null;
 
   constructor() {
-    const puppeteerOptions: any = {
+    const puppeteerOptions: NonNullable<ClientOptions['puppeteer']> = {
       args: [
         '--no-sandbox', 
         '--disable-setuid-sandbox', 
@@ -85,7 +85,7 @@ class WhatsappService {
        // this.client.initialize(); 
     });
 
-    this.client.initialize().catch((err: any) => {
+    this.client.initialize().catch((err: unknown) => {
       logger.error('Erro ao inicializar cliente WhatsApp:', err);
     });
   }
@@ -134,7 +134,7 @@ class WhatsappService {
           this.currentQr = null;
           // Após logout, pode ser necessário reinicializar para gerar novo QR
           setTimeout(() => {
-             this.client.initialize().catch((e: any) => logger.error('Erro ao reinicializar pós-logout', e));
+             this.client.initialize().catch((e: unknown) => logger.error('Erro ao reinicializar pós-logout', e));
           }, 1000);
           return true;
       } catch (error) {
@@ -159,7 +159,16 @@ class WhatsappService {
   /**
    * Envia notificação de confirmação de reserva
    */
-  public async sendBookingConfirmation(booking: any) {
+  public async sendBookingConfirmation(booking: {
+    id: string;
+    client?: ({ phone?: string | null; user?: ({ phone?: string | null } & Record<string, unknown>) | null } & Record<string, unknown>) | null;
+    clientContact?: string | null;
+    eventDate: Date | string;
+    clientName?: string | null;
+    eventTitle?: string | null;
+    location?: string | null;
+    totalPrice?: unknown;
+  }) {
     // Tenta pegar telefone do cliente (user ou client profile)
     // BookingService usually provides populated bookings with client->user
     const clientPhone = booking.client?.phone || booking.client?.user?.phone || booking.clientContact;

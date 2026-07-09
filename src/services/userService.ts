@@ -1,5 +1,6 @@
 import { prisma } from "../config/prisma";
-import type { UserRole, Prisma } from "@prisma/client";
+import { UserRole } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
@@ -237,7 +238,8 @@ export async function register(data: RegisterInput) {
   });
   if (existing) throw new ConflictError("Email já está em uso.");
   const hash = await bcrypt.hash(data.password, 10);
-  const role = (data.role as any) || "CLIENT";
+  const validRoles: string[] = Object.values(UserRole);
+  const role: UserRole = data.role && validRoles.includes(data.role) ? (data.role as UserRole) : UserRole.CLIENT;
   const user = await prisma.user.create({
     data: { 
       name: data.name, 
@@ -366,31 +368,34 @@ export async function getProfile(userId: string) {
   return profile;
 }
 
-export type UpdateProfileInput = Prisma.UserUpdateInput;
+export type UpdateProfileInput = Prisma.UserUpdateInput & {
+  password?: string;
+  phone?: string;
+};
 
 export async function updateProfile(
   userId: string,
   data: UpdateProfileInput,
   _file?: Express.Multer.File,
 ) {
-  const updateData: Prisma.UserUpdateInput = { ...data };
+  const updateData: Prisma.UserUpdateInput & { phone?: string } = { ...data };
   // avatarUrl deve vir do middleware do Cloudinary
   if (data.avatarUrl) {
     updateData.avatarUrl = data.avatarUrl;
   }
-  
+
   // Se o campo 'password' vier como extra, gerar hash e atribuir
-  const password = (data as any).password;
+  const password = data.password;
   if (password) {
     updateData.passwordHash = await bcrypt.hash(password, 10);
   }
 
   // Campos relacionados a perfis (Client/Collaborator) não pertencem ao modelo `User`.
   // Extrair `phone` e atualizá-lo no perfil relacionado, removendo-o do payload do `User`.
-  const phone = (data as any).phone;
+  const phone = data.phone;
   if (phone !== undefined) {
     // Remover do payload do User para evitar erro de validação do Prisma
-    delete (updateData as any).phone;
+    delete updateData.phone;
 
     const [client, collaborator] = await Promise.all([
       prisma.client.findUnique({ where: { userId } }),

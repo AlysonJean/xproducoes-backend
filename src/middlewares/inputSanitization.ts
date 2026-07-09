@@ -34,7 +34,7 @@ export function inputSanitizationMiddleware(req: Request, res: Response, next: N
     if (req.query && typeof req.query === 'object') {
       const sanitizedQuery = sanitizeObject(req.query);
       for (const key in sanitizedQuery) {
-        (req.query as any)[key] = sanitizedQuery[key];
+        req.query[key] = sanitizedQuery[key];
       }
     }
 
@@ -42,7 +42,7 @@ export function inputSanitizationMiddleware(req: Request, res: Response, next: N
     if (req.params && typeof req.params === 'object') {
       const sanitizedParams = sanitizeObject(req.params);
       for (const key in sanitizedParams) {
-        (req.params as any)[key] = sanitizedParams[key];
+        req.params[key] = sanitizedParams[key];
       }
     }
 
@@ -176,14 +176,14 @@ export function strictSanitizationMiddleware(req: Request, res: Response, next: 
     if (req.query && typeof req.query === 'object') {
       const sanitizedQuery = strictSanitizeObject(req.query);
       for (const key in sanitizedQuery) {
-        (req.query as any)[key] = sanitizedQuery[key];
+        req.query[key] = sanitizedQuery[key];
       }
     }
 
     if (req.params && typeof req.params === 'object') {
       const sanitizedParams = strictSanitizeObject(req.params);
       for (const key in sanitizedParams) {
-        (req.params as any)[key] = sanitizedParams[key];
+        req.params[key] = sanitizedParams[key];
       }
     }
 
