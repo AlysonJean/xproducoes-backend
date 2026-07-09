@@ -4,6 +4,7 @@ import { prisma } from '../config/prisma';
 import { config as envConfig } from '../config/environment';
 import bcrypt from 'bcrypt';
 import { AppError, BadRequestError } from '../utils/errors';
+import logger from '../config/logger';
 
 const JWT_SECRET = envConfig.jwtSecret;
 
@@ -127,7 +128,18 @@ export async function handleGoogleCallback(params: { code?: string; state?: stri
         avatarUrl,
       },
     });
-    try { await prisma.client.create({ data: { userId: user.id } }); } catch {}
+    try {
+      await prisma.client.create({ data: { userId: user.id } });
+    } catch (err) {
+      // Não relança: a conta de usuário já foi criada com sucesso, e falhar o login
+      // inteiro por causa do perfil de cliente secundário seria pior que segui-lo sem
+      // ele. Mas silenciar totalmente escondia isso — sem log, o próximo sintoma seria
+      // um erro obscuro de "perfil de cliente não encontrado" em algum lugar bem depois.
+      logger.error(
+        { err, userId: user.id, socialProvider: user.socialProvider },
+        'Falha ao criar perfil de Client para novo usuário via login social',
+      );
+    }
   } else {
     // Atualiza avatar se houver um novo e o atual for nulo
     if (avatarUrl && !user.avatarUrl) {
@@ -257,7 +269,18 @@ export async function handleFacebookCallback(params: { code?: string; state?: st
         avatarUrl,
       },
     });
-    try { await prisma.client.create({ data: { userId: user.id } }); } catch {}
+    try {
+      await prisma.client.create({ data: { userId: user.id } });
+    } catch (err) {
+      // Não relança: a conta de usuário já foi criada com sucesso, e falhar o login
+      // inteiro por causa do perfil de cliente secundário seria pior que segui-lo sem
+      // ele. Mas silenciar totalmente escondia isso — sem log, o próximo sintoma seria
+      // um erro obscuro de "perfil de cliente não encontrado" em algum lugar bem depois.
+      logger.error(
+        { err, userId: user.id, socialProvider: user.socialProvider },
+        'Falha ao criar perfil de Client para novo usuário via login social',
+      );
+    }
   } else {
     if (avatarUrl && !user.avatarUrl) {
       await prisma.user.update({ where: { id: user.id }, data: { avatarUrl } });
