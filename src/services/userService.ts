@@ -115,7 +115,9 @@ export async function requestPasswordReset(email: string, ipAddress?: string, us
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
     try {
-      logger.info(`requestPasswordReset called for non-existing email: ${email}`);
+      // Não loga o e-mail em texto puro numa string — mensagens de log livres
+      // não passam pelo redact do logger (só objetos estruturados passam).
+      logger.info({ emailDomain: email.split('@')[1] || 'unknown' }, 'requestPasswordReset called for non-existing email');
     } catch {
       // noop
     }

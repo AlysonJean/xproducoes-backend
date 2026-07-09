@@ -308,8 +308,9 @@ export class BookingController {
         }
       }
 
-      // LOG: Mostra o payload recebido na atualização
-      logger.info({ payload: req.body }, "[BOOKING UPDATE] Payload recebido");
+      // Loga só quais campos foram enviados, nunca os valores (nome, telefone,
+      // endereço do cliente etc. não devem ir para o agregador de logs).
+      logger.info({ id, fields: Object.keys(req.body || {}) }, "[BOOKING UPDATE] Atualização recebida");
 
       const updatedBooking = await bookingService.updateBooking(id, req.body);
       res.json({

@@ -39,9 +39,55 @@ type AppLogger = {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
+// Nomes de campo (case-insensitive) que nunca devem sair em texto puro nos
+// logs — comparados diretamente (senha, tokens, chave interna) ou parcialmente
+// mascarados quando ajudam a correlacionar sem expor o dado inteiro (email,
+// telefone). "body"/"payload" são tratados à parte: mantém as chaves (útil
+// para depuração), mas nunca os valores, já que podem carregar nome,
+// endereço etc. que não estão cobertos pela lista de campos sensíveis.
+const FULLY_REDACTED_KEYS = new Set([
+  "password", "senha", "passwordhash", "currentpassword", "newpassword",
+  "token", "accesstoken", "refreshtoken", "authorization", "cookie",
+  "secret", "apikey", "x-internal-key", "cpf", "cnpj", "creditcard", "cvv",
+]);
+const MASKED_KEYS = new Set(["email", "phone", "telefone", "celular"]);
+const BODY_LIKE_KEYS = new Set(["body", "payload", "reqbody"]);
+
+function maskValue(value: unknown): string {
+  const str = String(value);
+  if (str.length <= 4) return "[REDACTED]";
+  return `${str.slice(0, 2)}***${str.slice(-2)}`;
+}
+
+// Exportado só para teste unitário direto da lógica de redação.
+export function redactSensitive(value: unknown, depth = 0): unknown {
+  if (depth > 6 || value === null || value === undefined) return value;
+  if (value instanceof Error) return value; // preserva serialização nativa do pino
+  if (Array.isArray(value)) return value.map((item) => redactSensitive(item, depth + 1));
+  if (!isRecord(value)) return value;
+
+  const out: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(value)) {
+    const lowerKey = key.toLowerCase();
+    if (FULLY_REDACTED_KEYS.has(lowerKey)) {
+      out[key] = "[REDACTED]";
+    } else if (MASKED_KEYS.has(lowerKey) && (typeof val === "string" || typeof val === "number")) {
+      out[key] = maskValue(val);
+    } else if (BODY_LIKE_KEYS.has(lowerKey) && isRecord(val)) {
+      out[key] = Object.keys(val).reduce<Record<string, unknown>>((acc, k) => {
+        acc[k] = "[REDACTED]";
+        return acc;
+      }, {});
+    } else {
+      out[key] = redactSensitive(val, depth + 1);
+    }
+  }
+  return out;
+}
+
 const normalizePayload = (value: unknown): Record<string, unknown> => {
   if (isRecord(value)) {
-    return value;
+    return redactSensitive(value) as Record<string, unknown>;
   }
 
   if (value instanceof Error) {
