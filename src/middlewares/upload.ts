@@ -7,6 +7,13 @@ import { contentMatchesMimetype } from "../utils/fileSignature";
 
 const uploadService = new UploadService();
 
+function extractMessage(err: unknown): string | undefined {
+  if (err && typeof err === 'object' && 'message' in err && typeof err.message === 'string') {
+    return err.message;
+  }
+  return undefined;
+}
+
 // Middleware para upload de uma única imagem
 export const uploadSingle = (fieldName: string = 'image') => {
   // Sempre usar Cloudinary
@@ -21,14 +28,14 @@ export const uploadSingle = (fieldName: string = 'image') => {
       'content-length': req.headers['content-length']
     }}, '[UploadMiddleware] Request headers:');
     
-    middleware(req, res, (err: any) => {
+    middleware(req, res, (err: unknown) => {
       if (err) {
         logger.error({obj:{
-          name: err.name,
-          message: err.message,
-          code: err.code
+          name: err instanceof Error ? err.name : undefined,
+          message: extractMessage(err),
+          code: err instanceof multer.MulterError ? err.code : undefined
         }}, '[UploadMiddleware] Multer error:');
-        
+
         if (err instanceof multer.MulterError) {
           if (err.code === 'LIMIT_FILE_SIZE') {
             // Alinhado ao limite real configurado em uploadService.getCloudinaryMulterConfig
@@ -38,9 +45,9 @@ export const uploadSingle = (fieldName: string = 'image') => {
           }
           return res.status(400).json({ error: `Erro no upload: ${err.message}` });
         }
-        
+
         // Erro de validação de tipo de arquivo
-        return res.status(400).json({ error: err.message || 'Tipo de arquivo não permitido.' });
+        return res.status(400).json({ error: extractMessage(err) || 'Tipo de arquivo não permitido.' });
       }
       
       logger.info({obj:{
@@ -93,7 +100,7 @@ export const processUpload = async (req: Request, res: Response, next: NextFunct
     } else if (req.files && Array.isArray(req.files)) {
       // Upload de múltiplos arquivos
       const imageUrls: string[] = [];
-      const uploadedFiles: any[] = [];
+      const uploadedFiles: Array<{ url: string; filename: string; mimetype: string; size: number }> = [];
       const fileCount = req.files.length;
 
       for (let i = 0; i < fileCount; i++) {
