@@ -16,7 +16,7 @@ describe("BookingService - cálculo de preço total", () => {
       booking: { create: jest.fn().mockResolvedValue({ id: "b1" }) },
     };
     service = new BookingService();
-    // @ts-ignore
+    // @ts-expect-error - prisma é private em BookingService; injeção só para teste
     service.prisma = mockPrisma;
   });
 

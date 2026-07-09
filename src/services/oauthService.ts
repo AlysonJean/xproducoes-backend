@@ -84,7 +84,6 @@ export async function getGoogleAuthorizationUrl(opts: GoogleAuthorizeOptions) {
   }
 
   // Lazy import para evitar quebrar build em ambientes sem a dependência instalada
-  // @ts-ignore - módulo pode não estar instalado em ambientes de teste
   const mod: OpenIdClientModule | null = await import('openid-client').catch(() => null);
   if (!mod || !mod.Issuer || !mod.generators) {
     throw new AppError('Dependência openid-client ausente. Instale com: npm install openid-client', 500);
@@ -140,7 +139,6 @@ export async function handleGoogleCallback(params: { code?: string; state?: stri
   const expectedNonce = statePayload?.n;
   if (!codeVerifier || !expectedNonce) throw new BadRequestError('STATE inválido');
 
-  // @ts-ignore - módulo pode não estar instalado em ambientes de teste
   const mod: OpenIdClientModule | null = await import('openid-client').catch(() => null);
   if (!mod || !mod.Issuer) {
     throw new AppError('Dependência openid-client ausente. Instale com: npm install openid-client', 500);

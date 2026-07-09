@@ -1,43 +1,6 @@
 import { z } from "zod";
 import { idSchema } from "../utils/sharedSchema";
 
-// ✅ Schemas Zod para validação completa
-// (Preparados para uso futuro em endpoints específicos)
-/* eslint-disable @typescript-eslint/no-unused-vars */
-const clientProfileSchema = z.object({
-  companyName: z.string().max(200).optional(),
-  industry: z.string().max(100).optional(),
-  companySize: z.enum(['1-10', '11-50', '51-200', '201-500', '500+']).optional(),
-  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/).optional(), // E.164 format
-  address: z.object({
-    street: z.string().optional(),
-    city: z.string().optional(),
-    state: z.string().optional(),
-    zipCode: z.string().optional(),
-    country: z.string().optional(),
-  }).optional(),
-  jobTitle: z.string().max(100).optional(),
-  department: z.string().max(100).optional(),
-  budget: z.number().positive().optional(),
-  preferredCategories: z.array(z.string()).optional(),
-  eventTypes: z.array(z.string()).optional(),
-  communicationPrefs: z.object({
-    email: z.boolean().optional(),
-    sms: z.boolean().optional(),
-    whatsapp: z.boolean().optional(),
-  }).optional(),
-}).strict();
-
-const userProfileSchema = z.object({
-  name: z.string().min(1).max(120).optional(),
-  email: z.string().email().optional(),
-  bio: z.string().max(500).optional(),
-  location: z.string().max(200).optional(),
-  avatarUrl: z.string().url().optional(),
-  isActive: z.boolean().optional(),
-}).strict();
-/* eslint-enable @typescript-eslint/no-unused-vars */
-
 const createClientSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   email: z.string().email().optional(),
