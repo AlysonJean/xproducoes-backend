@@ -10,7 +10,7 @@ import logger from "./logger";
 /**
  * Middleware de validação usando Zod
  */
-export const validateBody = (schema: ZodSchema): any => {
+export const validateBody = (schema: ZodSchema) => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
       req.body = schema.parse(req.body);
@@ -18,7 +18,7 @@ export const validateBody = (schema: ZodSchema): any => {
     } catch (error) {
       if (error instanceof ZodError) {
         const errors = error.issues.map(
-          (err: any) => `${err.path.join(".")}: ${err.message}`,
+          (err) => `${err.path.join(".")}: ${err.message}`,
         );
         
         logger.error("Validation error in body: " + JSON.stringify({ errors }));
@@ -36,16 +36,16 @@ export const validateBody = (schema: ZodSchema): any => {
 /**
  * Middleware para validar parâmetros da URL
  */
-export const validateParams = (schema: ZodSchema): any => {
+export const validateParams = (schema: ZodSchema) => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
       const validatedParams = schema.parse(req.params);
-      req.params = validatedParams as any;
+      req.params = validatedParams as unknown as typeof req.params;
       return next();
     } catch (error) {
       if (error instanceof ZodError) {
         const errors = error.issues.map(
-          (err: any) => `${err.path.join(".")}: ${err.message}`,
+          (err) => `${err.path.join(".")}: ${err.message}`,
         );
         
         logger.error("Validation error in params: " + JSON.stringify({ errors }));
@@ -63,16 +63,16 @@ export const validateParams = (schema: ZodSchema): any => {
 /**
  * Middleware para validar query string
  */
-export const validateQuery = (schema: ZodSchema): any => {
+export const validateQuery = (schema: ZodSchema) => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
       const validatedQuery = schema.parse(req.query);
-      req.query = validatedQuery as any;
+      req.query = validatedQuery as unknown as typeof req.query;
       return next();
     } catch (error) {
       if (error instanceof ZodError) {
         const errors = error.issues.map(
-          (err: any) => `${err.path.join(".")}: ${err.message}`,
+          (err) => `${err.path.join(".")}: ${err.message}`,
         );
         
         logger.error("Validation error in query: " + JSON.stringify({ errors }));
@@ -141,11 +141,11 @@ export const validateRequired = (fields: string[]) => {
 /**
  * Utilitário para criar response de erro padronizado
  */
-export const createErrorResponse = (message: string, details?: any) => {
+export const createErrorResponse = (message: string, details?: unknown) => {
   return {
     success: false,
     message,
-    ...(details && { details }),
+    ...(details ? { details } : {}),
     timestamp: new Date().toISOString(),
   };
 };
@@ -153,11 +153,11 @@ export const createErrorResponse = (message: string, details?: any) => {
 /**
  * Utilitário para criar response de sucesso padronizado
  */
-export const createSuccessResponse = (data?: any, message?: string) => {
+export const createSuccessResponse = (data?: unknown, message?: string) => {
   return {
     success: true,
-    ...(message && { message }),
-    ...(data && { data }),
+    ...(message ? { message } : {}),
+    ...(data ? { data } : {}),
     timestamp: new Date().toISOString(),
   };
 };
