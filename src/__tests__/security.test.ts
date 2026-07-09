@@ -765,7 +765,7 @@ describe('🛡️ Security Blindagem Tests', () => {
 
     it('POST /auth/refresh aceita um refresh token válido e emite novos tokens', async () => {
       (prisma.user.findUnique as jest.Mock<any>).mockResolvedValue({
-        id: 'user-id', name: 'Fulano', email: 'fulano@example.com', role: 'CLIENT',
+        id: 'user-id', name: 'Fulano', email: 'fulano@example.com', role: 'CLIENT', isActive: true,
       });
 
       const res = await request(app)
@@ -779,7 +779,7 @@ describe('🛡️ Security Blindagem Tests', () => {
 
     it('rotação: o mesmo refresh token não pode ser usado uma segunda vez (reuse detection)', async () => {
       (prisma.user.findUnique as jest.Mock<any>).mockResolvedValue({
-        id: 'user-id', name: 'Fulano', email: 'fulano@example.com', role: 'CLIENT',
+        id: 'user-id', name: 'Fulano', email: 'fulano@example.com', role: 'CLIENT', isActive: true,
       });
 
       const first = await request(app)

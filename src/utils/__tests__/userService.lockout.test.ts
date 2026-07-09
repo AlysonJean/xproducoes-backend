@@ -35,6 +35,7 @@ describe('userService.login - bloqueio de conta após tentativas falhas (cacheSe
       passwordHash: 'hash',
       role: 'CLIENT',
       verified: true,
+      isActive: true,
     });
     bcrypt.compare.mockResolvedValue(false);
 
@@ -56,6 +57,7 @@ describe('userService.login - bloqueio de conta após tentativas falhas (cacheSe
       passwordHash: 'hash',
       role: 'CLIENT',
       verified: true,
+      isActive: true,
     }));
     bcrypt.compare.mockResolvedValue(false);
 
@@ -76,6 +78,7 @@ describe('userService.login - bloqueio de conta após tentativas falhas (cacheSe
       passwordHash: 'hash',
       role: 'CLIENT',
       verified: true,
+      isActive: true,
     });
 
     bcrypt.compare.mockResolvedValue(false);

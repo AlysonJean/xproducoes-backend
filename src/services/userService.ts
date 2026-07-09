@@ -55,9 +55,14 @@ export async function findAllClients() {
   });
 }
 
-// Deletar usuário por ID
+// Desativar usuário por ID (soft-delete). Preserva o registro para manter a integridade
+// referencial com reservas, pagamentos, avaliações etc.; login e refresh de token passam
+// a ser recusados para contas inativas (ver login() e getProfile() abaixo).
 export async function deleteUser(userId: string | number) {
-  return prisma.user.delete({ where: { id: String(userId) } });
+  return prisma.user.update({
+    where: { id: String(userId) },
+    data: { isActive: false },
+  });
 }
 
 // Buscar usuário por ID
@@ -279,6 +284,11 @@ export async function login(data: LoginInput) {
     await checkAndRecordFailedLogin(data.email);
     throw new UnauthorizedError("Credenciais inválidas");
   }
+  // Conta desativada (soft-delete) — senha correta não deve conceder sessão.
+  // Não conta como tentativa falha: a credencial está certa, a conta é que está bloqueada.
+  if (!user.isActive) {
+    throw new UnauthorizedError("Conta desativada. Entre em contato com o suporte.");
+  }
   // Exigir verificação de e-mail se habilitado por ambiente; ADMINs são dispensados
   if (process.env.REQUIRE_EMAIL_VERIFICATION === 'true' && !user.verified && user.role !== 'ADMIN') {
     const err = new Error('E-mail não verificado') as Error & { code?: string };
@@ -341,12 +351,19 @@ export async function getProfile(userId: string) {
       role: true,
       avatarUrl: true,
       isVip: true,
+      isActive: true,
       createdAt: true,
       googleCalendarEmail: true,
     },
   });
   if (!user) throw new NotFoundError("Usuário não encontrado");
-  return user;
+  // Conta desativada (soft-delete): usada tanto por GET /me quanto pelo fluxo de refresh
+  // de token (authController.refresh chama getProfile) — isso garante que uma conta
+  // desativada perde a sessão na próxima renovação de token (no máximo em 15min, quando
+  // o access token expira), mesmo sem revogar o refresh token em si.
+  if (!user.isActive) throw new UnauthorizedError("Conta desativada. Entre em contato com o suporte.");
+  const { isActive: _isActive, ...profile } = user;
+  return profile;
 }
 
 export type UpdateProfileInput = Prisma.UserUpdateInput;
