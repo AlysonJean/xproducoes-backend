@@ -8,6 +8,7 @@ jest.mock('jsonwebtoken', () => {
     verify: jest.fn((token: string) => {
       if (token === 'valid-admin-token') return { userId: 'admin-id', role: 'ADMIN' };
       if (token === 'valid-user-token') return { userId: 'user-id', role: 'CLIENT' };
+      if (token === 'valid-collaborator-token') return { userId: 'collaborator-id', role: 'COLLABORATOR' };
       throw new Error('Invalid token');
     }),
   };
@@ -26,6 +27,7 @@ jest.mock('../config/prisma', () => ({
     collaboratorPayment: { findMany: jest.fn() },
     review: { findUnique: jest.fn() },
     service: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), delete: jest.fn() },
+    eventCollaborator: { findMany: jest.fn() },
     // Adicione outros modelos conforme necessário
   },
 }));
@@ -553,6 +555,61 @@ describe('🛡️ Security Blindagem Tests', () => {
 
       expect(res.status).toBe(201);
       expect(prisma.service.create).toHaveBeenCalled();
+    });
+  });
+
+  describe('Dados operacionais de colaborador (events/availabilities/stats) - antes visíveis a qualquer CLIENT', () => {
+    // beforeEach (não só afterEach): uma chamada assíncrona "fire-and-forget" deixada
+    // pendente por um teste anterior (bookingService.notifyCollaborators, disparado sem
+    // await no fluxo de confirm) pode resolver entre um teste e outro e incrementar essa
+    // mesma mock — reseta antes de cada teste aqui para não depender da ordem de execução.
+    beforeEach(() => {
+      (prisma.eventCollaborator.findMany as jest.Mock<any>).mockReset();
+    });
+    afterEach(() => {
+      (prisma.eventCollaborator.findMany as jest.Mock<any>).mockReset();
+    });
+
+    it('GET /collaborators/:id/events deve rejeitar (403) token de CLIENT', async () => {
+      const res = await request(app)
+        .get('/api/v1/collaborators/collab-1/events')
+        .set('Authorization', 'Bearer valid-user-token');
+
+      expect(res.status).toBe(403);
+      expect(prisma.eventCollaborator.findMany).not.toHaveBeenCalled();
+    });
+
+    it('GET /collaborators/:id/events deve aceitar token de COLLABORATOR (não deve quebrar coordenação de equipe)', async () => {
+      (prisma.eventCollaborator.findMany as jest.Mock<any>).mockResolvedValue([]);
+
+      const res = await request(app)
+        .get('/api/v1/collaborators/collab-1/events')
+        .set('Authorization', 'Bearer valid-collaborator-token');
+
+      expect(res.status).toBe(200);
+    });
+
+    it('GET /collaborators/:id/stats deve rejeitar (403) token de CLIENT', async () => {
+      const res = await request(app)
+        .get('/api/v1/collaborators/collab-1/stats')
+        .set('Authorization', 'Bearer valid-user-token');
+
+      expect(res.status).toBe(403);
+    });
+
+    // Nota: GET /collaborators/availabilities (sem :id) não é testado aqui porque
+    // a rota /:id (registrada antes, linha 81 de collaboratorRoutes.ts) intercepta
+    // esse path primeiro ("availabilities" é lido como um ID de colaborador) —
+    // um bug de ordenação de rotas pré-existente e não relacionado a esta correção.
+    // O requireAdminOrCollaborator foi adicionado mesmo assim, para quando esse
+    // bug de ordenação for corrigido à parte.
+
+    it('GET /collaborators/events/:eventId/collaborators deve rejeitar (403) token de CLIENT', async () => {
+      const res = await request(app)
+        .get('/api/v1/collaborators/events/event-1/collaborators')
+        .set('Authorization', 'Bearer valid-user-token');
+
+      expect(res.status).toBe(403);
     });
   });
 });

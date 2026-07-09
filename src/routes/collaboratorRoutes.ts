@@ -82,13 +82,13 @@ router.get("/:id", validateId(), getCollaboratorById);
 router.put("/:id", adminOnly, validateId(), validateBody(collaboratorUpdateSchema), updateCollaborator);
 router.delete("/:id", adminOnly, validateId(), deleteCollaborator);
 
-// Rotas de estatísticas
-router.get("/:id/stats", getCollaboratorStats);
-router.get("/:collaboratorId/events", getCollaboratorEvents);
+// Rotas de estatísticas (dados operacionais internos: staff apenas, não CLIENT)
+router.get("/:id/stats", requireAdminOrCollaborator, getCollaboratorStats);
+router.get("/:collaboratorId/events", requireAdminOrCollaborator, getCollaboratorEvents);
 
 // Rotas de disponibilidades (CRUD genérico)
 router.post("/availabilities", adminOnly, createAvailability);
-router.get("/events/:eventId/collaborators", getEventCollaborators); // validateId('eventId')?
+router.get("/events/:eventId/collaborators", requireAdminOrCollaborator, getEventCollaborators); // validateId('eventId')?
 router.post("/event-assignments", adminOnly, validateBody(eventAssignmentSchema), assignCollaboratorToEvent);
 router.put("/event-assignments/:id", adminOnly, validateId(), validateBody(eventAssignmentUpdateSchema), updateEventCollaborator);
 router.delete(
@@ -98,11 +98,11 @@ router.delete(
 );
 
 // Rotas de disponibilidades
-router.get("/availabilities", getAllAvailabilities);
+router.get("/availabilities", requireAdminOrCollaborator, getAllAvailabilities);
 router.post("/availabilities", adminOnly, validateBody(availabilityCreateSchema), createAvailability);
 router.put("/availabilities/:id", adminOnly, validateId(), validateBody(availabilityUpdateSchema), updateAvailability);
 router.delete("/availabilities/:id", adminOnly, validateId(), deleteAvailability);
-router.get("/:collaboratorId/availabilities", getCollaboratorAvailabilities);
+router.get("/:collaboratorId/availabilities", requireAdminOrCollaborator, getCollaboratorAvailabilities);
 
 // Rotas de Pagamentos
 router.get("/payments/all", adminOnly, getAllPayments);
