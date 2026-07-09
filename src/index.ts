@@ -13,8 +13,13 @@ import { initializeQueues, closeQueues } from "./config/jobQueue";
 import { startSocialScheduler } from "./cron/socialScheduler";
 import { startReminderScheduler } from "./cron/sendReminders";
 import { initializeRateLimiters } from "./middlewares/adaptiveRateLimiter";
+import { registerGlobalCrashHandlers } from "./config/crashHandlers";
 
-
+// Registrado o mais cedo possível: uma exceção não tratada ou uma Promise rejeitada sem
+// .catch em qualquer lugar do app (inclusive durante a configuração do servidor abaixo)
+// agora é logada, reportada ao Sentry e encerra o processo de forma explícita, em vez de
+// derrubar o processo silenciosamente sem nenhum sinal para o operador.
+registerGlobalCrashHandlers();
 
 const PORT = Number(process.env.PORT) || 3001;
 
