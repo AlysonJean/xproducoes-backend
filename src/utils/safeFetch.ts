@@ -46,8 +46,8 @@ export async function safeFetch(inputUrl: string, options: SafeFetchOptions = {}
 				if (ip.kind() === 'ipv4') {
 					const cidrs = ['10.0.0.0/8','127.0.0.0/8','169.254.0.0/16','172.16.0.0/12','192.168.0.0/16'];
 					for (const c of cidrs) {
-						const [range, bits] = ipaddr.parseCIDR(c) as any;
-						if ((ip as any).match([range, bits])) return true;
+						const [range, bits] = ipaddr.parseCIDR(c);
+						if (ip.match([range, bits])) return true;
 					}
 				}
 				if (ip.kind() === 'ipv6') {
@@ -55,8 +55,8 @@ export async function safeFetch(inputUrl: string, options: SafeFetchOptions = {}
 					if (ip.toNormalizedString() === '::1') return true;
 					const cidrs6 = ['fe80::/10','fc00::/7'];
 					for (const c of cidrs6) {
-						const [range, bits] = ipaddr.parseCIDR(c) as any;
-						if ((ip as any).match([range, bits])) return true;
+						const [range, bits] = ipaddr.parseCIDR(c);
+						if (ip.match([range, bits])) return true;
 					}
 				}
 			} catch {
@@ -80,38 +80,37 @@ export async function safeFetch(inputUrl: string, options: SafeFetchOptions = {}
 
 		for (let i = 0; i <= maxRedirects; i++) {
 				// Merge headers safely: default accept plus any provided init.headers
-				const defaultHeaders: any = { accept: '*/*' };
+				const defaultHeaders: Record<string, string> = { accept: '*/*' };
 				const providedInit = options.init || {};
-				let providedHeaders: any = {};
+				let providedHeaders: Record<string, string> = {};
 					if (providedInit.headers) {
 						// headers can be Headers, array or plain object
-						const h = providedInit.headers as any;
-						if (typeof h === 'object' && typeof h.forEach === 'function') {
+						const h = providedInit.headers;
+						if (typeof h === 'object' && typeof (h as Headers).forEach === 'function') {
 							// Headers-like
 							try {
-								// @ts-ignore
-								h.forEach((value: any, key: any) => (providedHeaders[key] = value));
+								(h as Headers).forEach((value, key) => (providedHeaders[key] = value));
 							} catch {
 								// fallback to entries
 								try {
-									for (const [k, v] of h.entries()) providedHeaders[k] = v;
+									for (const [k, v] of (h as Headers).entries()) providedHeaders[k] = v;
 								} catch {
 									// give up, leave providedHeaders empty
 								}
 							}
 						} else if (Array.isArray(h)) {
-							for (const [k, v] of h) providedHeaders[k] = v as any;
+							for (const [k, v] of h) providedHeaders[k] = v;
 						} else {
-							providedHeaders = h as any;
+							providedHeaders = h as Record<string, string>;
 						}
 					}
 				const mergedHeaders = { ...defaultHeaders, ...providedHeaders };
 
 				// Normalize providedInit: avoid null body
-				const normalizedInit: any = { ...providedInit };
+				const normalizedInit: RequestInit = { ...providedInit };
 				if (normalizedInit.body === null) normalizedInit.body = undefined;
 
-				const resp = await fetch(currentUrl.toString(), { signal: controller.signal, redirect: 'manual' as any, headers: mergedHeaders, ...normalizedInit });
+				const resp = await fetch(currentUrl.toString(), { signal: controller.signal, redirect: 'manual', headers: mergedHeaders, ...normalizedInit });
 			if (resp.status >= 300 && resp.status < 400) {
 				const loc = resp.headers.get('location');
 				if (!loc) throw new Error('Redirect without location');
