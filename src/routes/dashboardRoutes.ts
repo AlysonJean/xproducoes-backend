@@ -2,7 +2,7 @@
 
 import { createSafeRouter } from "../middlewares/safeRouter";
 import { DashboardController } from "../controllers/dashboardController";
-import { authenticate, requireAdmin } from "../middlewares/unifiedAuth";
+import { authenticateWithDB, requireAdmin } from "../middlewares/unifiedAuth";
 import { cacheMiddleware } from "../middlewares/cacheMiddleware";
 import { dashboardRateLimit } from "../middlewares/rateLimitMiddleware";
 
@@ -10,7 +10,8 @@ const dashboardRoutes = createSafeRouter();
 const dashboardController = new DashboardController();
 
 // Todas as rotas do dashboard requerem login de admin + rate limit
-dashboardRoutes.use(authenticate, requireAdmin, dashboardRateLimit);
+// authenticateWithDB revalida isActive/role no banco a cada requisição.
+dashboardRoutes.use(authenticateWithDB, requireAdmin, dashboardRateLimit);
 
 // Rotas com cache aplicado (ETAPA 2 - Performance)
 dashboardRoutes.get("/", cacheMiddleware, dashboardController.getStats);

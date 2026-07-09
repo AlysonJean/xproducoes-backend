@@ -1,12 +1,13 @@
 import { createSafeRouter } from "../middlewares/safeRouter";
 import { enterpriseMonitoringController } from "../controllers/enterpriseMonitoringController";
-import { authenticate, requireAdmin } from "../middlewares/unifiedAuth";
+import { authenticateWithDB, requireAdmin } from "../middlewares/unifiedAuth";
 
 const router = createSafeRouter();
 
 // ===== PROTEÇÃO DE ROTAS =====
 // Todas as rotas de monitoramento requerem autenticação de admin
-router.use(authenticate);
+// authenticateWithDB revalida isActive/role no banco a cada requisição.
+router.use(authenticateWithDB);
 router.use(requireAdmin);
 
 // ===== DASHBOARD EXECUTIVO =====

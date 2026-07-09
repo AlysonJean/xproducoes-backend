@@ -1,7 +1,7 @@
 // Caminho: backend/src/routes/adminRoutes.ts
 
 import { createSafeRouter } from "../middlewares/safeRouter";
-import { authenticate, requireAdmin } from "../middlewares/unifiedAuth";
+import { authenticateWithDB, requireAdmin } from "../middlewares/unifiedAuth";
 import { AdminController } from "../controllers/adminController";
 import { UploadService } from "../services/uploadService";
 import { ContactController } from "../controllers/contactController";
@@ -14,7 +14,10 @@ const adminController = new AdminController();
 const contactController = new ContactController();
 const uploadService = new UploadService();
 
-adminRoutes.use(authenticate, requireAdmin);
+// authenticateWithDB (não apenas o JWT) revalida isActive/role no banco a cada
+// requisição — um admin desativado/rebaixado perde acesso imediatamente, em
+// vez de continuar com o token antigo válido por até 7 dias (vida do refresh).
+adminRoutes.use(authenticateWithDB, requireAdmin);
 import socialRoutes from './socialRoutes';
 // Rotas de Social Wall (admin)
 adminRoutes.use('/social', socialRoutes);

@@ -161,42 +161,61 @@ describe('🛡️ Security Blindagem Tests', () => {
   });
 
   describe('Protected Routes - Authentication & Authorization', () => {
+    // POST /admin/sponsors passa primeiro pelo gate de adminRoutes.ts (o prefixo
+    // /admin/sponsors também bate no mount de /admin — mesma sobreposição de rota
+    // já vista em socialRoutes), que agora usa authenticateWithDB e por isso
+    // precisa de um usuário ativo mockado no banco para deixar passar o token.
+    afterEach(() => {
+      (prisma.user.findUnique as jest.Mock<any>).mockReset();
+    });
+
     it('POST /admin/sponsors - deve rejeitar sem token (401)', async () => {
       const res = await request(app)
         .post('/api/v1/admin/sponsors')
         .send({ name: 'Sponsor X' });
-      
+
       expect(res.status).toBe(401);
     });
 
     it('POST /admin/sponsors - deve rejeitar token de usuário comum (403)', async () => {
+      (prisma.user.findUnique as jest.Mock<any>).mockResolvedValue({
+        id: 'user-id', email: 'user@example.com', role: 'CLIENT', isActive: true,
+      });
+
       const res = await request(app)
         .post('/api/v1/admin/sponsors')
         .set('Authorization', 'Bearer valid-user-token') // Mockado para role CLIENT
         .send({ name: 'Sponsor X' });
-      
+
       expect(res.status).toBe(403);
     });
 
     it('POST /admin/sponsors - deve rejeitar body inválido mesmo com admin (400)', async () => {
+      (prisma.user.findUnique as jest.Mock<any>).mockResolvedValue({
+        id: 'admin-id', email: 'admin@example.com', role: 'ADMIN', isActive: true,
+      });
+
       const res = await request(app)
         .post('/api/v1/admin/sponsors')
         .set('Authorization', 'Bearer valid-admin-token')
         .send({}); // Sem name
-      
+
       expect(res.status).toBe(400);
     });
 
     it('POST /admin/sponsors - deve aceitar requisição válida de admin (200/201)', async () => {
+      (prisma.user.findUnique as jest.Mock<any>).mockResolvedValue({
+        id: 'admin-id', email: 'admin@example.com', role: 'ADMIN', isActive: true,
+      });
       (prisma.sponsorLogo.create as jest.Mock<any>).mockResolvedValue({ id: '1', name: 'Sponsor Valid' });
-      
+
       // O mock do multer já injeta req.file, enviamos o name como JSON
       const res = await request(app)
         .post('/api/v1/admin/sponsors')
         .set('Authorization', 'Bearer valid-admin-token')
         .set('Content-Type', 'application/json')
         .send({ name: 'Sponsor Valid' });
-      
+
       expect(res.status).toBe(200);
     });
   });
@@ -773,6 +792,77 @@ describe('🛡️ Security Blindagem Tests', () => {
         .send({ refreshToken: 'valid-refresh-token-rotation-test' });
 
       expect(second.status).toBe(401);
+    });
+  });
+
+  describe('Rotas admin agora revalidam isActive no banco (authenticateWithDB) — token válido não bastava mais', () => {
+    afterEach(() => {
+      (prisma.user.findUnique as jest.Mock<any>).mockReset();
+    });
+
+    it('GET /admin/clients rejeita (401) admin com isActive=false no banco, mesmo com JWT válido', async () => {
+      (prisma.user.findUnique as jest.Mock<any>).mockResolvedValue({
+        id: 'admin-id', email: 'admin@example.com', role: 'ADMIN', isActive: false,
+      });
+
+      const res = await request(app)
+        .get('/api/v1/admin/clients')
+        .set('Authorization', 'Bearer valid-admin-token');
+
+      expect(res.status).toBe(401);
+      expect(res.body.code).toBe('USER_INACTIVE');
+    });
+
+    it('GET /dashboard rejeita (401) admin desativado no banco', async () => {
+      (prisma.user.findUnique as jest.Mock<any>).mockResolvedValue({
+        id: 'admin-id', email: 'admin@example.com', role: 'ADMIN', isActive: false,
+      });
+
+      const res = await request(app)
+        .get('/api/v1/dashboard')
+        .set('Authorization', 'Bearer valid-admin-token');
+
+      expect(res.status).toBe(401);
+      expect(res.body.code).toBe('USER_INACTIVE');
+    });
+
+    it('GET /whatsapp/status rejeita (401) admin desativado no banco', async () => {
+      (prisma.user.findUnique as jest.Mock<any>).mockResolvedValue({
+        id: 'admin-id', email: 'admin@example.com', role: 'ADMIN', isActive: false,
+      });
+
+      const res = await request(app)
+        .get('/api/v1/whatsapp/status')
+        .set('Authorization', 'Bearer valid-admin-token');
+
+      expect(res.status).toBe(401);
+      expect(res.body.code).toBe('USER_INACTIVE');
+    });
+
+    it('GET /monitoring/dashboard rejeita (401) admin desativado no banco', async () => {
+      (prisma.user.findUnique as jest.Mock<any>).mockResolvedValue({
+        id: 'admin-id', email: 'admin@example.com', role: 'ADMIN', isActive: false,
+      });
+
+      const res = await request(app)
+        .get('/api/v1/monitoring/dashboard')
+        .set('Authorization', 'Bearer valid-admin-token');
+
+      expect(res.status).toBe(401);
+      expect(res.body.code).toBe('USER_INACTIVE');
+    });
+
+    it('admin com isActive=true continua passando do gate de autenticação (não recebe 401 USER_INACTIVE)', async () => {
+      (prisma.user.findUnique as jest.Mock<any>).mockResolvedValue({
+        id: 'admin-id', email: 'admin@example.com', role: 'ADMIN', isActive: true,
+      });
+
+      const res = await request(app)
+        .get('/api/v1/whatsapp/status')
+        .set('Authorization', 'Bearer valid-admin-token');
+
+      expect(res.body.code).not.toBe('USER_INACTIVE');
+      expect(res.status).not.toBe(401);
     });
   });
 });
