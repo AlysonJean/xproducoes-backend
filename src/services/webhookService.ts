@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import type { Prisma } from '@prisma/client';
 import { safeFetch } from '../utils/safeFetch';
 import { prisma } from '../config/prisma';
 import logger from '../config/logger';
@@ -7,19 +8,19 @@ class WebhookService {
   private prisma = prisma;
   private webhookUrl = process.env.BOOKING_CONFIRM_WEBHOOK || '';
 
-  async dispatchBookingConfirmed(booking: any) {
+  async dispatchBookingConfirmed(booking: { id: string } & Record<string, unknown>) {
     if (!this.webhookUrl) return;
 
-    const payload = { event: 'booking_confirmed', booking };
+    const payload = { event: 'booking_confirmed', booking } as Prisma.InputJsonValue;
     const id = crypto.randomUUID();
 
     try {
-      await (this.prisma as any).webhookLog.create({
+      await this.prisma.webhookLog.create({
         data: {
           id,
           url: this.webhookUrl,
           event: 'booking_confirmed',
-          payload: payload as any,
+          payload,
           status: 'SENT',
           bookingId: booking.id
         }
@@ -33,7 +34,7 @@ class WebhookService {
     void this.sendWithRetries(id, payload, 1);
   }
 
-  private async sendWithRetries(logId: string, payload: any, attempt: number) {
+  private async sendWithRetries(logId: string, payload: Prisma.InputJsonValue, attempt: number) {
     const maxAttempts = 3;
     const backoffMs = Math.min(Math.pow(2, attempt) * 1000, 30 * 1000); // Max 30s cap
 
@@ -49,7 +50,7 @@ class WebhookService {
       const text = await res.text();
 
       try {
-        await (this.prisma as any).webhookLog.update({
+        await this.prisma.webhookLog.update({
           where: { id: logId },
           data: {
             responseCode: res.status,
@@ -69,7 +70,7 @@ class WebhookService {
     } catch (err) {
     logger.warn('Failed to call webhook: ' + String(err));
       try {
-        await (this.prisma as any).webhookLog.update({
+        await this.prisma.webhookLog.update({
           where: { id: logId },
           data: {
             status: 'FAILED',

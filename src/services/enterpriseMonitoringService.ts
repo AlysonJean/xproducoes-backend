@@ -16,7 +16,7 @@ interface IntegrationHealth {
   responseTime: number;
   lastCheck: Date;
   errorMessage?: string;
-  metadata?: any;
+  metadata?: unknown;
 }
 
 interface SystemHealth {
@@ -24,17 +24,29 @@ interface SystemHealth {
     usage: number;
     cores: number;
     model: string;
+    loadAverage?: number;
   };
   memory: {
     total: number;
     used: number;
     free: number;
     usage: number;
+    swapUsed?: number;
+    swapTotal?: number;
   };
   disk: {
     usage: number;
+    total?: number;
+    bg?: string;
+  };
+  os?: {
+    platform: string;
+    distro: string;
+    release: string;
+    hostname: string;
   };
   uptime: number;
+  environment?: string;
 }
 
 interface Alert {
@@ -204,7 +216,7 @@ class EnterpriseMonitoringService {
   }
 
   // ===== DASHBOARD DATA =====
-  async getExecutiveDashboard(): Promise<any> {
+  async getExecutiveDashboard() {
     const integrations = await this.getIntegrationsOverview();
     const systemHealth = await this.getSystemHealth();
     const activeAlerts = await this.getActiveAlerts();
@@ -247,7 +259,7 @@ class EnterpriseMonitoringService {
     return results;
   }
 
-  async getHealthSummary(): Promise<any> {
+  async getHealthSummary() {
     const integrations = await this.getIntegrationsOverview();
     const activeAlerts = await this.getActiveAlerts();
     
@@ -303,7 +315,7 @@ class EnterpriseMonitoringService {
         },
         uptime: os.uptime(),
         environment: process.env.NODE_ENV || 'development'
-      } as any;
+      };
     } catch (error) {
       logger.error('Erro ao coletar métricas avançadas:', error);
       // Fallback para os nativo se falhar
@@ -333,7 +345,7 @@ class EnterpriseMonitoringService {
   }
 
   // ===== PERFORMANCE METRICS =====
-  async getPerformanceMetrics(): Promise<any> {
+  async getPerformanceMetrics() {
     const integrations = await this.getIntegrationsOverview();
     const avgResponseTime = integrations.reduce((acc, curr) => acc + curr.responseTime, 0) / integrations.length;
 
@@ -351,7 +363,7 @@ class EnterpriseMonitoringService {
   }
 
   // ===== RESOURCE USAGE =====
-  async getResourceUsage(): Promise<any> {
+  async getResourceUsage() {
     const systemHealth = await this.getSystemHealth();
     const processMemory = process.memoryUsage();
 
