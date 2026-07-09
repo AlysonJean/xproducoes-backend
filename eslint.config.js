@@ -43,8 +43,13 @@ const config = async () => {
         '@typescript-eslint': tsPlugin,
       },
       rules: {
-        '@typescript-eslint/no-explicit-any': 'off',
-        '@typescript-eslint/no-unused-vars': ['error', { 
+        // Habilitação progressiva (Fase 4): 'warn', não 'error' — o script de lint do
+        // backend não usa --max-warnings, então isso dá visibilidade real (231
+        // ocorrências hoje, concentradas em bookingService.ts e oauthService.ts) sem
+        // quebrar o CI recém-adicionado. Suba para 'error' à medida que os arquivos
+        // forem corrigidos.
+        '@typescript-eslint/no-explicit-any': 'warn',
+        '@typescript-eslint/no-unused-vars': ['error', {
           'argsIgnorePattern': '^_',
           'varsIgnorePattern': '^_',
           'caughtErrorsIgnorePattern': '^_'
