@@ -5,8 +5,9 @@
 
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
-import { Express } from 'express';
+import { Express, Request, Response, NextFunction } from 'express';
 import { openAPISchema } from '../docs/openapi.js';
+import { isValidInternalKey } from '../utils/internalApiKey.js';
 
 const options: swaggerJsdoc.Options = {
   definition: {
@@ -272,12 +273,29 @@ Os tokens são enviados automaticamente via **httpOnly cookies** para maior segu
 const swaggerSpec = swaggerJsdoc(options);
 
 /**
+ * Em produção, a documentação revela rotas internas, DTOs e o esquema de
+ * auth para qualquer visitante — exige a mesma X-Internal-Key usada pelos
+ * endpoints /internal/*. Em dev/test continua aberta, como sempre foi.
+ */
+function guardInProduction(req: Request, res: Response, next: NextFunction): void {
+  if (process.env.NODE_ENV !== 'production') {
+    return next();
+  }
+  if (!isValidInternalKey(req)) {
+    res.status(401).json({ success: false, message: 'Unauthorized' });
+    return;
+  }
+  return next();
+}
+
+/**
  * Configura Swagger UI no Express
  */
 export function setupSwagger(app: Express): void {
   // Servir documentação Swagger com spec original (backward compatibility)
   app.use(
     '/api/docs',
+    guardInProduction,
     swaggerUi.serve,
     swaggerUi.setup(swaggerSpec, {
       customCss: '.swagger-ui .topbar { display: none }',
@@ -287,7 +305,7 @@ export function setupSwagger(app: Express): void {
   );
 
   // Endpoint JSON da especificação OpenAPI (original)
-  app.get('/api/docs.json', (req, res) => {
+  app.get('/api/docs.json', guardInProduction, (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(swaggerSpec);
   });
@@ -295,6 +313,7 @@ export function setupSwagger(app: Express): void {
   // ✅ NEW: Servir documentação com OpenAPI 3.1 schema (2026 standard)
   app.use(
     '/api/docs/v2',
+    guardInProduction,
     swaggerUi.serve,
     swaggerUi.setup(openAPISchema as any, {
       customCss: '.swagger-ui .topbar { display: none }',
@@ -316,7 +335,7 @@ export function setupSwagger(app: Express): void {
   );
 
   // ✅ NEW: Expose OpenAPI schema as JSON endpoint
-  app.get('/api/v1/openapi.json', (req, res) => {
+  app.get('/api/v1/openapi.json', guardInProduction, (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(openAPISchema);
   });

@@ -19,7 +19,7 @@ import { csrfTokenGenerator, csrfTokenValidator, getCsrfToken } from "./middlewa
 import { createApiRateLimiter, createAuthRateLimiter, createUploadRateLimiter, createCsrfRateLimiter } from "./middlewares/adaptiveRateLimiter.js";
 import { inputSanitizationMiddleware } from "./middlewares/inputSanitization.js";
 import { monitoringMiddleware, prometheusMetricsEndpoint, getDashboardSummary } from "./monitoring/advancedMetrics.js";
-import crypto from "node:crypto";
+import { isValidInternalKey } from "./utils/internalApiKey.js";
 
 dotenv.config();
 
@@ -152,16 +152,6 @@ app.get("/ready", readinessCheck);
 app.get("/metrics", metricsEndpoint);
 
 // Advanced Prometheus/Grafana metrics endpoint (with authentication)
-function isValidInternalKey(req: express.Request): boolean {
-  const apiKey = req.get('X-Internal-Key');
-  const expected = process.env.INTERNAL_API_KEY;
-  if (!apiKey || !expected) return false;
-  const a = Buffer.from(apiKey);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
-}
-
 app.get("/internal/metrics", (req, res) => {
   if (!isValidInternalKey(req)) {
     return res.status(401).json({ error: 'Unauthorized' });

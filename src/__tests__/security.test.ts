@@ -865,4 +865,42 @@ describe('🛡️ Security Blindagem Tests', () => {
       expect(res.status).not.toBe(401);
     });
   });
+
+  describe('Swagger fechado em produção - antes expunha rotas/DTOs internos publicamente', () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalInternalKey = process.env.INTERNAL_API_KEY;
+
+    afterEach(() => {
+      process.env.NODE_ENV = originalNodeEnv;
+      process.env.INTERNAL_API_KEY = originalInternalKey;
+    });
+
+    it('em produção, GET /api/docs.json rejeita (401) sem X-Internal-Key', async () => {
+      process.env.NODE_ENV = 'production';
+      process.env.INTERNAL_API_KEY = 'test-internal-key';
+
+      const res = await request(app).get('/api/docs.json');
+
+      expect(res.status).toBe(401);
+    });
+
+    it('em produção, GET /api/docs.json aceita com X-Internal-Key correta', async () => {
+      process.env.NODE_ENV = 'production';
+      process.env.INTERNAL_API_KEY = 'test-internal-key';
+
+      const res = await request(app)
+        .get('/api/docs.json')
+        .set('X-Internal-Key', 'test-internal-key');
+
+      expect(res.status).not.toBe(401);
+    });
+
+    it('fora de produção, GET /api/docs.json continua aberto sem chave (comportamento de dev preservado)', async () => {
+      process.env.NODE_ENV = 'test';
+
+      const res = await request(app).get('/api/docs.json');
+
+      expect(res.status).not.toBe(401);
+    });
+  });
 });
