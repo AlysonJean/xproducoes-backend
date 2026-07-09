@@ -31,6 +31,33 @@ type ErrorWithStatus = Error & {
  * - Integrate with monitoring endpoints
  */
 
+/**
+ * Decide se um evento deve ser enviado ao Sentry ou descartado.
+ *
+ * Extraído do `beforeSend` do Sentry.init (que não pode ser testado diretamente
+ * isoladamente) para permitir teste unitário puro. Antes desta correção, este filtro:
+ *   1. descartava TODO erro cuja mensagem contivesse "ECONNREFUSED" — inclusive uma
+ *      queda real do banco/Redis/serviço dependente, exatamente o tipo de erro crítico
+ *      que o monitoramento deveria escalar, não silenciar;
+ *   2. descartava aleatoriamente 70% dos erros de banco de dados — durante um incidente
+ *      real (quando os erros aumentam), isso reduz a visibilidade em vez de aumentá-la.
+ * Ambos foram removidos. O filtro de baixo valor (ENOENT/404) foi mantido.
+ */
+export function shouldSendSentryEvent(
+  event: Sentry.ErrorEvent,
+  hint: Sentry.EventHint,
+): Sentry.ErrorEvent | null {
+  const error = hint.originalException;
+
+  if (error instanceof Error) {
+    if (error.message.includes('ENOENT') || error.message.includes('404')) {
+      return null;
+    }
+  }
+
+  return event;
+}
+
 export function initSentry(app: Express) {
   const isDev = process.env.NODE_ENV === 'development';
   const dsn = process.env.SENTRY_DSN;
@@ -62,28 +89,9 @@ export function initSentry(app: Express) {
       Sentry.expressIntegration(),
     ],
 
-    // Error filtering & sampling
-    beforeSend: (event, hint) => {
-      const error = hint.originalException;
-
-      // Don't send 404s or known non-critical errors
-      if (error instanceof Error) {
-        if (
-          error.message.includes('ENOENT') ||
-          error.message.includes('404') ||
-          error.message.includes('ECONNREFUSED')
-        ) {
-          return null;
-        }
-      }
-
-      // Sample database errors (reduce noise)
-      if (event?.contexts?.database?.duration) {
-        if (Math.random() > 0.3) return null; // Only send 30% of DB errors
-      }
-
-      return event;
-    },
+    // Error filtering — ver shouldSendSentryEvent() acima para o porquê e o que
+    // deliberadamente NÃO é mais filtrado (ECONNREFUSED e amostragem de erros de banco).
+    beforeSend: shouldSendSentryEvent,
 
     // Ignore specific errors
     ignoreErrors: [
