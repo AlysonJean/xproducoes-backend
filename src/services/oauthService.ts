@@ -8,6 +8,60 @@ import logger from '../config/logger';
 
 const JWT_SECRET = envConfig.jwtSecret;
 
+// Contrato mínimo usado deste pacote (importado dinamicamente pois é opcional -
+// pode não estar instalado em todos os ambientes, ex. testes)
+interface OpenIdTokenClaims {
+  sub?: string;
+  email?: string;
+  email_verified?: boolean;
+  name?: string;
+  picture?: string;
+  nonce?: string;
+}
+
+interface OpenIdTokenSet {
+  claims: () => OpenIdTokenClaims;
+}
+
+interface OpenIdClientInstance {
+  authorizationUrl: (params: Record<string, unknown>) => string;
+  callback: (
+    redirectUri: string,
+    params: Record<string, unknown>,
+    checks: Record<string, unknown>,
+  ) => Promise<OpenIdTokenSet>;
+}
+
+interface OpenIdClientModule {
+  Issuer?: {
+    discover: (issuer: string) => Promise<{
+      Client: new (metadata: Record<string, unknown>) => OpenIdClientInstance;
+    }>;
+  };
+  generators?: {
+    codeVerifier: () => string;
+    codeChallenge: (verifier: string) => string;
+  };
+}
+
+interface StateJwtPayload {
+  v: string;
+  n: string;
+}
+
+interface FacebookTokenResponse {
+  access_token?: string;
+  error?: { message?: string };
+}
+
+interface FacebookProfileResponse {
+  id?: string;
+  name?: string;
+  email?: string;
+  picture?: { data?: { url?: string } };
+  error?: { message?: string };
+}
+
 function base64url(input: Buffer) {
   return input.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
@@ -31,12 +85,12 @@ export async function getGoogleAuthorizationUrl(opts: GoogleAuthorizeOptions) {
 
   // Lazy import para evitar quebrar build em ambientes sem a dependência instalada
   // @ts-ignore - módulo pode não estar instalado em ambientes de teste
-  const mod = await import('openid-client').catch(() => null as any);
-  if (!mod || !mod.Issuer) {
+  const mod: OpenIdClientModule | null = await import('openid-client').catch(() => null);
+  if (!mod || !mod.Issuer || !mod.generators) {
     throw new AppError('Dependência openid-client ausente. Instale com: npm install openid-client', 500);
   }
-  const Issuer = (mod as any).Issuer as any;
-  const generators = (mod as any).generators as any;
+  const Issuer = mod.Issuer;
+  const generators = mod.generators;
 
   const googleIssuer = await Issuer.discover('https://accounts.google.com');
   const client = new googleIssuer.Client({
@@ -75,22 +129,23 @@ export async function handleGoogleCallback(params: { code?: string; state?: stri
     throw new BadRequestError('Google OAuth não configurado. Defina GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET.');
   }
 
-  let payload: any;
+  let payload: string | jwt.JwtPayload;
   try {
     payload = jwt.verify(state, JWT_SECRET);
   } catch {
     throw new BadRequestError('STATE inválido');
   }
-  const codeVerifier = payload?.v as string;
-  const expectedNonce = payload?.n as string;
+  const statePayload = typeof payload === 'object' ? (payload as jwt.JwtPayload & StateJwtPayload) : null;
+  const codeVerifier = statePayload?.v;
+  const expectedNonce = statePayload?.n;
   if (!codeVerifier || !expectedNonce) throw new BadRequestError('STATE inválido');
 
   // @ts-ignore - módulo pode não estar instalado em ambientes de teste
-  const mod = await import('openid-client').catch(() => null as any);
+  const mod: OpenIdClientModule | null = await import('openid-client').catch(() => null);
   if (!mod || !mod.Issuer) {
     throw new AppError('Dependência openid-client ausente. Instale com: npm install openid-client', 500);
   }
-  const Issuer = (mod as any).Issuer as any;
+  const Issuer = mod.Issuer;
 
   const googleIssuer = await Issuer.discover('https://accounts.google.com');
   const client = new googleIssuer.Client({
@@ -104,25 +159,25 @@ export async function handleGoogleCallback(params: { code?: string; state?: stri
   const claims = tokenSet.claims();
 
   // Validações básicas de segurança
-  if (!claims || (claims as any).nonce && (claims as any).nonce !== expectedNonce) {
+  if (!claims || claims.nonce && claims.nonce !== expectedNonce) {
     throw new BadRequestError('Nonce inválido');
   }
-  const email = (claims as any).email as string || '';
-  const emailVerified = !!(claims as any).email_verified;
+  const email = claims.email || '';
+  const emailVerified = !!claims.email_verified;
   if (!email) throw new BadRequestError('Email não disponível pelo provedor');
 
   // Vincular ou criar usuário local
   let isNewUser = false;
   let user = await prisma.user.findUnique({ where: { email } });
-  const avatarUrl = (claims as any).picture as string || null;
+  const avatarUrl = claims.picture || null;
 
-  const googleSubjectId = ((claims as any).sub as string) || null;
+  const googleSubjectId = claims.sub || null;
 
   if (!user) {
     isNewUser = true;
     user = await prisma.user.create({
       data: {
-        name: ((claims as any).name as string) || email.split('@')[0],
+        name: claims.name || email.split('@')[0],
         email,
         passwordHash: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10),
         verified: emailVerified || true,
@@ -210,7 +265,7 @@ export async function getFacebookAuthorizationUrl(opts: FacebookAuthorizeOptions
     scope: scope.join(','),
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
-  } as any);
+  });
   const url = `https://www.facebook.com/v19.0/dialog/oauth?${params.toString()}`;
   return { url };
 }
@@ -225,10 +280,11 @@ export async function handleFacebookCallback(params: { code?: string; state?: st
     throw new BadRequestError('Facebook OAuth não configurado. Defina FACEBOOK_CLIENT_ID e FACEBOOK_CLIENT_SECRET.');
   }
 
-  let payload: any;
+  let payload: string | jwt.JwtPayload;
   try { payload = jwt.verify(state, JWT_SECRET); } catch { throw new BadRequestError('STATE inválido'); }
-  const codeVerifier = payload?.v as string;
-  const expectedNonce = payload?.n as string;
+  const statePayload = typeof payload === 'object' ? (payload as jwt.JwtPayload & StateJwtPayload) : null;
+  const codeVerifier = statePayload?.v;
+  const expectedNonce = statePayload?.n;
   if (!codeVerifier || !expectedNonce) throw new BadRequestError('STATE inválido');
 
   // Troca de código por access_token
@@ -238,24 +294,24 @@ export async function handleFacebookCallback(params: { code?: string; state?: st
     redirect_uri: redirectUri,
     code,
     code_verifier: codeVerifier,
-  } as any);
+  });
   const tokenRes = await (await import('../utils/safeFetch')).safeFetch('https://graph.facebook.com/v19.0/oauth/access_token', {
     allowedHosts: new Set(['graph.facebook.com']),
     init: { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: tokenParams.toString() }
   });
-  const tokenJson: any = await tokenRes.json();
+  const tokenJson: FacebookTokenResponse = await tokenRes.json();
   if (!tokenRes.ok || !tokenJson.access_token) {
     throw new AppError(`Falha ao obter access_token do Facebook: ${tokenJson?.error?.message || tokenRes.statusText}`, 502);
   }
-  const accessToken = tokenJson.access_token as string;
+  const accessToken = tokenJson.access_token;
 
   // Buscar perfil básico
   const meRes = await (await import('../utils/safeFetch')).safeFetch(`https://graph.facebook.com/v19.0/me?fields=id,name,email,picture.type(large)&access_token=${encodeURIComponent(accessToken)}`, { allowedHosts: new Set(['graph.facebook.com']) });
-  const me: any = await meRes.json();
+  const me: FacebookProfileResponse = await meRes.json();
   if (!meRes.ok || !me?.id) {
     throw new AppError(`Falha ao obter perfil do Facebook: ${me?.error?.message || meRes.statusText}`, 502);
   }
-  const email = (me.email as string) || '';
+  const email = me.email || '';
   if (!email) throw new BadRequestError('Email não disponível pelo provedor');
 
   // Vincular ou criar usuário local
@@ -263,13 +319,13 @@ export async function handleFacebookCallback(params: { code?: string; state?: st
   let user = await prisma.user.findUnique({ where: { email } });
   const avatarUrl = me.picture?.data?.url || null;
 
-  const facebookUserId = (me.id as string) || null;
+  const facebookUserId = me.id || null;
 
   if (!user) {
     isNewUser = true;
     user = await prisma.user.create({
       data: {
-        name: (me.name as string) || email.split('@')[0],
+        name: me.name || email.split('@')[0],
         email,
         passwordHash: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10),
         verified: true,
