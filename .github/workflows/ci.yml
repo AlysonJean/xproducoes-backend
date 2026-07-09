@@ -1,0 +1,61 @@
+name: CI
+
+# Gate real (Fase 3): antes desta mudança, deploy.yml disparava um deploy no Render em
+# TODO push para main, sem rodar teste, typecheck ou lint algum — um build quebrado ia
+# direto para produção. Este workflow roda lint + typecheck + a suíte de testes completa
+# em todo push/PR, e o deploy (job separado, abaixo) só roda se o job `test` passar
+# (needs: test) — nenhum destes passos usa `|| true` ou `continue-on-error`, então uma
+# falha real em qualquer um deles bloqueia o deploy de verdade.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Lint, typecheck e testes
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      # Placeholders só para satisfazer validação de schema/config em CI — nenhum destes
+      # é um segredo real nem conecta a um banco de verdade (todos os testes mockam prisma).
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_placeholder
+      JWT_SECRET: ci-only-placeholder-not-a-real-secret-0123456789ABCDEF
+      ENCRYPTION_KEY: ci-only-placeholder-not-a-real-secret-0123456789ABCDEF
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Gerar Prisma Client
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Testes
+        run: npm test
+
+  deploy:
+    name: Deploy to Render
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render Deploy
+        run: |
+          curl -X POST "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/deploys" \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}'
