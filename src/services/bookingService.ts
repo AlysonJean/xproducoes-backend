@@ -29,6 +29,150 @@ export interface ConfirmCollaboratorInput {
   fixedRate?: number;
 }
 
+// Configuração de includes para queries otimizadas de Booking (compartilhada pela classe abaixo).
+// Extraída para o escopo do módulo + `satisfies` para preservar os literais `true` dos campos de
+// `select` (necessário para o Prisma.BookingGetPayload abaixo inferir os campos corretamente).
+const bookingIncludeConfig = {
+  client: {
+    select: {
+      id: true,
+      phone: true,
+      companyName: true,
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true
+        }
+      }
+    }
+  },
+  // Inclui resumo de avaliação para controlar UI de "Deixar Avaliação"
+  review: {
+    select: {
+      id: true,
+      rating: true,
+      reported: true,
+      createdAt: true,
+    }
+  },
+  creator: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true
+    }
+  },
+  assignee: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true
+    }
+  },
+  kit: {
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      price: true,
+      imageUrl: true,
+      items: {
+        select: {
+          equipment: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              pricePerHour: true,
+              imageUrl: true,
+              category: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  equipments: {
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      pricePerHour: true,
+      imageUrl: true,
+      status: true,
+      category: {
+        select: {
+          id: true,
+          name: true
+        }
+      }
+    }
+  },
+  attachments: {
+    select: {
+      id: true,
+      url: true,
+      filename: true,
+      mimeType: true,
+      createdAt: true
+    }
+  },
+  services: {
+    select: {
+      id: true,
+      name: true,
+      price: true,
+      imageUrl: true,
+      duration: true
+    }
+  },
+  items: {
+    select: {
+      id: true,
+      description: true,
+      quantity: true,
+      unitPrice: true,
+      discount: true,
+      totalPrice: true,
+      itemType: true,
+      equipmentId: true,
+      serviceId: true,
+      kitId: true
+    }
+  },
+  chats: {
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      updatedAt: true
+    }
+  },
+  tasks: {
+    orderBy: { createdAt: 'asc' as const }
+  },
+  expenses: {
+    include: {
+      collaborator: {
+        select: { id: true, name: true, avatarUrl: true }
+      }
+    }
+  }
+} satisfies Prisma.BookingInclude;
+
+// Shape de Booking com os relacionamentos de `bookingIncludeConfig` já carregados — usado nos
+// métodos privados que recebem uma booking já buscada (sync de calendário, notificações etc.)
+type BookingWithIncludes = Prisma.BookingGetPayload<{ include: typeof bookingIncludeConfig }>;
+
 export class BookingService {
   /**
    * Retorna receita total agrupada por mês e ano (para gráfico)
@@ -74,153 +218,18 @@ export class BookingService {
   }
   private prisma = prisma;
 
-  // Configuração de includes para queries otimizadas
-  private readonly bookingInclude = {
-    client: {
-      select: {
-        id: true,
-        phone: true,
-        companyName: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            avatarUrl: true
-          }
-        }
-      }
-    },
-    // Inclui resumo de avaliação para controlar UI de "Deixar Avaliação"
-    review: {
-      select: {
-        id: true,
-        rating: true,
-        reported: true,
-        createdAt: true,
-      }
-    },
-    creator: {
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true
-      }
-    },
-    assignee: {
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true
-      }
-    },
-    kit: {
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        price: true,
-        imageUrl: true,
-        items: {
-          select: {
-            equipment: {
-              select: {
-                id: true,
-                name: true,
-                description: true,
-                pricePerHour: true,
-                imageUrl: true,
-                category: {
-                  select: {
-                    id: true,
-                    name: true
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    equipments: {
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        pricePerHour: true,
-        imageUrl: true,
-        status: true,
-        category: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
-      }
-    },
-    attachments: {
-      select: {
-        id: true,
-        url: true,
-        filename: true,
-        mimeType: true,
-        createdAt: true
-      }
-    },
-    services: {
-      select: {
-        id: true,
-        name: true,
-        price: true,
-        imageUrl: true,
-        duration: true
-      }
-    },
-    items: {
-      select: {
-        id: true,
-        description: true,
-        quantity: true,
-        unitPrice: true,
-        discount: true,
-        totalPrice: true,
-        itemType: true,
-        equipmentId: true,
-        serviceId: true,
-        kitId: true
-      }
-    },
-    chats: {
-      select: {
-        id: true,
-        name: true,
-        type: true,
-        updatedAt: true
-      }
-    },
-    tasks: {
-      orderBy: { createdAt: 'asc' as const }
-    },
-    expenses: {
-      include: {
-        collaborator: {
-          select: { id: true, name: true, avatarUrl: true }
-        }
-      }
-    }
-  };
+  // Configuração de includes para queries otimizadas (ver bookingIncludeConfig no topo do módulo)
+  private readonly bookingInclude = bookingIncludeConfig;
 
   /**
    * Cria uma nova reserva
    */
-  async createBooking(data: BookingCreateInput, creatorId: string, idempotencyKey?: string): Promise<any> {
+  async createBooking(data: BookingCreateInput, creatorId: string, idempotencyKey?: string) {
     try {
       // BACK-003: Check idempotency key first to avoid duplicate work
       if (idempotencyKey) {
         const existing = await this.prisma.booking.findFirst({
-          where: ({ idempotencyKey } as any),
+          where: { idempotencyKey },
           include: this.bookingInclude
         });
         if (existing) return existing;
@@ -247,7 +256,7 @@ export class BookingService {
         this.prisma.user.findUnique({ where: { id: creatorId } }),
         data.kitId ? this.prisma.kit.findUnique({ where: { id: data.kitId } }) : null,
         data.equipmentIds?.length ? this.prisma.equipment.findMany({ where: { id: { in: data.equipmentIds } } }) : [],
-        (data as any).serviceIds?.length ? this.prisma.service.findMany({ where: { id: { in: (data as any).serviceIds } } }) : [],
+        data.serviceIds?.length ? this.prisma.service.findMany({ where: { id: { in: data.serviceIds } } }) : [],
       ]);
 
       if (!creator) {
@@ -261,8 +270,8 @@ export class BookingService {
 
       if (!totalPrice) {
         const kitsPrice = kit?.price ? Number(kit.price) * duration : 0;
-        const equipmentsPrice = (equipments as any[]).reduce((sum: number, eq: any) => sum + Number(eq.pricePerHour), 0) * duration;
-        const servicesPrice = (services as any[]).reduce((sum: number, s: any) => sum + Number(s.price), 0);
+        const equipmentsPrice = equipments.reduce((sum, eq) => sum + Number(eq.pricePerHour), 0) * duration;
+        const servicesPrice = services.reduce((sum, s) => sum + Number(s.price), 0);
         totalPrice = kitsPrice + equipmentsPrice + servicesPrice;
       }
 
@@ -311,7 +320,7 @@ export class BookingService {
       // Gerar ID semântico (Ex: XP-JOAO-20260210-1430-8K2)
       const bookingId = generateSemanticBookingId(data.clientName || "CLIENTE");
 
-      const createData: any = {
+      const createData: Prisma.BookingUncheckedCreateInput = {
         id: bookingId,
         eventDate: eventDate,
         eventEndDate: eventEndDate,
@@ -348,16 +357,16 @@ export class BookingService {
         // Campos admin-only e logísticos
         serviceValue: data.serviceValue,
         paymentProofUrl: data.paymentProofUrl,
-        setupTime: (data as any).setupTime ? new Date((data as any).setupTime) : undefined,
-        pickupTime: (data as any).pickupTime ? new Date((data as any).pickupTime) : undefined,
+        setupTime: data.setupTime ? new Date(data.setupTime) : undefined,
+        pickupTime: data.pickupTime ? new Date(data.pickupTime) : undefined,
         items: data.items ? {
-          create: data.items.map((item: any) => ({
+          create: data.items.map((item) => ({
             description: item.description,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             discount: item.discount,
             totalPrice: item.totalPrice,
-            itemType: item.itemType as any,
+            itemType: item.itemType,
             equipmentId: item.equipmentId,
             serviceId: item.serviceId,
             kitId: item.kitId
@@ -366,26 +375,26 @@ export class BookingService {
         equipments: data.equipmentIds ? {
           connect: data.equipmentIds.map((id: string) => ({ id }))
         } : undefined,
-        services: (data as any).serviceIds ? {
-          connect: (data as any).serviceIds.map((id: string) => ({ id }))
+        services: data.serviceIds ? {
+          connect: data.serviceIds.map((id: string) => ({ id }))
         } : undefined
       };
 
       // BACK-001: Wrap booking creation in a transaction
-      let booking: any;
+      let booking;
       try {
-        booking = await this.prisma.$transaction(async (tx: any) => {
+        booking = await this.prisma.$transaction(async (tx) => {
           return tx.booking.create({
             data: createData,
             include: this.bookingInclude
           });
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         // Prisma: código P2002 -> violação de unicidade
-        if (err?.code === 'P2002' && idempotencyKey) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002' && idempotencyKey) {
           logger.info(`Idempotency unique constraint hit for key ${idempotencyKey}, fetching existing record`);
           const existing = await this.prisma.booking.findFirst({
-            where: ({ idempotencyKey } as any),
+            where: { idempotencyKey },
             include: this.bookingInclude
           });
           if (existing) return existing;
@@ -417,7 +426,7 @@ export class BookingService {
   /**
    * Busca uma reserva por ID
    */
-  async getBookingById(id: string): Promise<any> {
+  async getBookingById(id: string) {
     try {
       const includeWithPayments = {
         ...this.bookingInclude,
@@ -450,7 +459,7 @@ export class BookingService {
             }
           }
         }
-      } as any;
+      };
 
       const booking = await this.prisma.booking.findUnique({
         where: { id },
@@ -473,7 +482,7 @@ export class BookingService {
   /**
    * Busca todas as reservas com filtros
    */
-  async getAllBookings(filters: BookingFilters = {}): Promise<any[]> {
+  async getAllBookings(filters: BookingFilters = {}) {
     try {
       const where: Prisma.BookingWhereInput = {};
 
@@ -573,7 +582,7 @@ export class BookingService {
   /**
    * Busca reservas por cliente
    */
-  async getBookingsByClient(clientId: string): Promise<any[]> {
+  async getBookingsByClient(clientId: string) {
     try {
       return await this.getAllBookings({ clientId });
     } catch (error) {
@@ -584,7 +593,7 @@ export class BookingService {
   /**
    * Atualiza uma reserva
    */
-  async updateBooking(id: string, data: BookingUpdateInput & BookingUpdateExtras): Promise<any> {
+  async updateBooking(id: string, data: BookingUpdateInput & BookingUpdateExtras) {
     try {
       // Valida se booking existe (throws se não existir)
       await this.getBookingById(id);
@@ -616,29 +625,29 @@ export class BookingService {
       if (data.eventDuration) updateData.eventDuration = data.eventDuration;
 
       // Atualizar campos admin-only
-      if (data.serviceValue !== undefined) (updateData as any).serviceValue = data.serviceValue;
-      if (data.paymentProofUrl !== undefined) (updateData as any).paymentProofUrl = data.paymentProofUrl;
-      
+      if (data.serviceValue !== undefined) updateData.serviceValue = data.serviceValue;
+      if (data.paymentProofUrl !== undefined) updateData.paymentProofUrl = data.paymentProofUrl;
+
       // Crew Experience fields
-      if (data.technicalRider !== undefined) (updateData as any).technicalRider = data.technicalRider;
-      if (data.technicalRiderUrl !== undefined) (updateData as any).technicalRiderUrl = data.technicalRiderUrl;
-      if (data.locationUrl !== undefined) (updateData as any).locationUrl = data.locationUrl;
-      if ((data as any).venueContactName !== undefined) (updateData as any).venueContactName = (data as any).venueContactName;
-      if ((data as any).venueContactPhone !== undefined) (updateData as any).venueContactPhone = (data as any).venueContactPhone;
+      if (data.technicalRider !== undefined) updateData.technicalRider = data.technicalRider;
+      if (data.technicalRiderUrl !== undefined) updateData.technicalRiderUrl = data.technicalRiderUrl;
+      if (data.locationUrl !== undefined) updateData.locationUrl = data.locationUrl;
+      if (data.venueContactName !== undefined) updateData.venueContactName = data.venueContactName;
+      if (data.venueContactPhone !== undefined) updateData.venueContactPhone = data.venueContactPhone;
 
       // Atualizar itens (substituição total para simplicidade no orçamento)
       if (data.items) {
         // Primeiro remove os antigos
         await this.prisma.bookingItem.deleteMany({ where: { bookingId: id } });
         // Cria os novos
-        (updateData as any).items = {
-          create: data.items.map((item: any) => ({
+        updateData.items = {
+          create: data.items.map((item) => ({
             description: item.description,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             discount: item.discount,
             totalPrice: item.totalPrice,
-            itemType: item.itemType as any,
+            itemType: item.itemType,
             equipmentId: item.equipmentId,
             serviceId: item.serviceId,
             kitId: item.kitId
@@ -668,7 +677,7 @@ export class BookingService {
   /**
    * Atualiza o status de uma reserva
    */
-  async updateBookingStatus(id: string, status: BookingStatus): Promise<any> {
+  async updateBookingStatus(id: string, status: BookingStatus) {
     try {
       // Valida se a reserva existe
       await this.getBookingById(id);
@@ -691,28 +700,28 @@ export class BookingService {
         try {
           const EmailService = (await import('./emailService.js')).default;
           const clientUser = updatedBooking.client?.user;
-          const clientEmail = clientUser?.email || updatedBooking.clientEmail || (updatedBooking as any).clientContact;
+          const clientEmail = clientUser?.email || updatedBooking.clientEmail || updatedBooking.clientContact;
           const clientName = clientUser?.name || updatedBooking.clientName || '';
-          
+
           if (clientEmail) {
             void EmailService.sendBookingApproved({ name: clientName, email: clientEmail }, updatedBooking);
           }
-        } catch (e: any) {
+        } catch (e: unknown) {
           logger.warn({ error: e }, 'Erro ao enviar email de aprovação via updateBookingStatus');
         }
 
         // WhatsApp Notification
-        void whatsappService.sendBookingConfirmation(updatedBooking).catch((e: any) => {
+        void whatsappService.sendBookingConfirmation(updatedBooking).catch((e: unknown) => {
             logger.warn({ error: e }, 'Erro ao enviar notificação WhatsApp');
         });
 
         // Notify Collaborators (WhatsApp + Google Calendar)
-        void this.notifyCollaborators(updatedBooking).catch((e: any) => {
+        void this.notifyCollaborators(updatedBooking).catch((e: unknown) => {
             logger.warn({ error: e }, 'Erro ao notificar colaboradores');
         });
 
         // Sync Admin Calendars (Master Agenda)
-        void this.syncAdminCalendars(updatedBooking).catch((e: any) => {
+        void this.syncAdminCalendars(updatedBooking).catch((e: unknown) => {
             logger.warn({ error: e }, 'Erro ao sincronizar agendas dos admins');
         });
 
@@ -753,7 +762,7 @@ export class BookingService {
       if (booking.creator.role === 'ADMIN' || booking.creator.role === 'MANAGER') {
         participantIds.add(booking.creatorId);
       }
-      booking.eventCollaborators.forEach((ec: any) => participantIds.add(ec.collaborator.userId));
+      booking.eventCollaborators.forEach((ec) => participantIds.add(ec.collaborator.userId));
 
       if (!chat) {
         chat = await this.prisma.chat.create({
@@ -785,7 +794,7 @@ export class BookingService {
   /**
    * Atualiza o status de entrega de uma reserva
    */
-  async updateDeliveryStatus(id: string, deliveryStatus: DeliveryStatus): Promise<any> {
+  async updateDeliveryStatus(id: string, deliveryStatus: DeliveryStatus) {
     try {
       // Valida se a reserva existe
       await this.getBookingById(id);
@@ -863,7 +872,7 @@ export class BookingService {
   /**
    * Confirma uma reserva
    */
-  async confirm(id: string): Promise<any> {
+  async confirm(id: string) {
     return await this.updateBookingStatus(id, BookingStatus.CONFIRMED);
   }
 
@@ -910,7 +919,7 @@ export class BookingService {
   /**
    * Cancela uma reserva
    */
-  async cancel(id: string, reason?: string): Promise<any> {
+  async cancel(id: string, reason?: string) {
     try {
       await this.getBookingById(id);
 
@@ -935,10 +944,12 @@ export class BookingService {
   /**
    * Sincroniza reserva com Google Calendar (Admin principal)
    */
-  async syncGoogleCalendar(booking: any) {
+  async syncGoogleCalendar(booking: BookingWithIncludes) {
     try {
-      if (!booking.creator.googleRefreshToken) return;
-
+      // Nota: `creator` (via bookingInclude) não seleciona googleRefreshToken (evita expor o
+      // token OAuth cifrado em qualquer resposta que reutilize este include) - a checagem real
+      // de conexão com o Google Calendar é feita dentro de googleCalendarService.createEvent,
+      // que busca o próprio usuário e faz no-op silencioso (com log) se não houver token.
       const eventData = {
         title: `Evento: ${booking.eventTitle || 'X Produções'}`,
         description: `Cliente: ${booking.clientName}\nLocal: ${booking.location}\nValor: R$ ${booking.totalPrice}`,
@@ -957,7 +968,7 @@ export class BookingService {
   /**
    * Notifica colaboradores escalados
    */
-  private async notifyCollaborators(booking: any) {
+  private async notifyCollaborators(booking: BookingWithIncludes) {
     try {
       const collabs = await this.prisma.eventCollaborator.findMany({
         where: { bookingId: booking.id },
@@ -965,7 +976,8 @@ export class BookingService {
       });
 
       for (const ec of collabs) {
-        const phone = ec.collaborator.phone || (ec.collaborator.user as any).phone;
+        // Nota: User não tem campo phone no schema (só Collaborator) - só existe uma fonte real de telefone aqui
+        const phone = ec.collaborator.phone;
         if (phone) {
              const message = `Olá ${ec.collaborator.user.name}, você foi escalado para o evento "${booking.eventTitle}" em ${new Date(booking.eventDate).toLocaleDateString('pt-BR')}.
 
@@ -983,7 +995,7 @@ Confirme sua presença no painel.`;
   /**
    * Sincroniza a reserva com a agenda de todos os admins conectados
    */
-  private async syncAdminCalendars(booking: any) {
+  private async syncAdminCalendars(booking: BookingWithIncludes) {
     try {
         const admins = await this.prisma.user.findMany({
             where: {
@@ -997,7 +1009,7 @@ Confirme sua presença no painel.`;
         const eventData = {
             title: `[X] ${booking.eventTitle || 'Evento'} - ${booking.client?.user?.name || 'Cliente'}`,
             description: `Evento Confirmado\nCliente: ${booking.client?.user?.name}\nLocal: ${booking.location}\nValor: R$ ${booking.totalPrice}\n\nGestão: ${process.env.FRONTEND_URL}/admin/reservas/${booking.id}`,
-            location: booking.location,
+            location: booking.location || '',
             startDate: booking.eventDate,
             endDate: booking.eventEndDate || new Date(booking.eventDate.getTime() + 4 * 3600 * 1000)
         };
@@ -1018,7 +1030,7 @@ Confirme sua presença no painel.`;
   /**
    * Busca reservas próximas de um cliente
    */
-  async getUpcoming(clientId: string): Promise<any[]> {
+  async getUpcoming(clientId: string) {
     try {
       const now = new Date();
       const bookings = await this.prisma.booking.findMany({
@@ -1041,7 +1053,7 @@ Confirme sua presença no painel.`;
   /**
    * Busca histórico de reservas de um cliente
    */
-  async getHistory(clientId: string): Promise<any[]> {
+  async getHistory(clientId: string) {
     try {
       const now = new Date();
       const bookings = await this.prisma.booking.findMany({
@@ -1066,7 +1078,7 @@ Confirme sua presença no painel.`;
   /**
    * Busca eventos do calendário
    */
-  async getCalendar(month?: number, year?: number): Promise<any[]> {
+  async getCalendar(month?: number, year?: number) {
     try {
       let dateFilter = {};
       if (month && year) {
@@ -1102,7 +1114,7 @@ Confirme sua presença no painel.`;
         orderBy: { eventDate: "asc" }
       });
 
-      return bookings.map((booking: any) => {
+      return bookings.map((booking) => {
         const eventDate = booking.eventDate;
         const eventEndDate = booking.eventEndDate;
         const durationHours = eventDate && eventEndDate
@@ -1129,15 +1141,16 @@ Confirme sua presença no painel.`;
         const equipments = Array.isArray(booking.equipments) ? booking.equipments : [];
         const kits = booking.kit ? [booking.kit] : [];
         const collaborators = Array.isArray(booking.eventCollaborators)
-          ? booking.eventCollaborators.map((ec: any) => ({
+          ? booking.eventCollaborators.map((ec) => ({
               collaboratorId: ec.collaboratorId,
               role: ec.role,
               collaborator: ec.collaborator
                 ? {
+                    // Nota: Collaborator não tem name/email/avatar próprios no schema (só via User)
                     id: ec.collaborator.id,
-                    name: ec.collaborator.user?.name || ec.collaborator.name,
-                    email: ec.collaborator.user?.email || ec.collaborator.email,
-                    avatar: ec.collaborator.user?.avatarUrl || ec.collaborator.avatar,
+                    name: ec.collaborator.user?.name,
+                    email: ec.collaborator.user?.email,
+                    avatar: ec.collaborator.user?.avatarUrl,
                   }
                 : undefined,
             }))
@@ -1168,7 +1181,7 @@ Confirme sua presença no painel.`;
   /**
    * Busca estatísticas do dashboard
    */
-  async getDashboardStats(): Promise<any> {
+  async getDashboardStats() {
     try {
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);

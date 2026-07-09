@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { BookingService } from '../../services/bookingService';
 
 jest.mock('../../config/prisma', () => {
@@ -50,11 +51,13 @@ describe('BookingService idempotency', () => {
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'creator-1', name: 'Creator' });
     (prisma.client.upsert as jest.Mock).mockResolvedValue({ id: 'client-1' });
 
-    // Simulate prisma.create throwing unique constraint error
+    // Simulate prisma.create throwing unique constraint error (instância real, já que o serviço
+    // narra o erro via `instanceof Prisma.PrismaClientKnownRequestError`, não duck-typing em `.code`)
     (prisma.booking.create as jest.Mock).mockImplementation(() => {
-      const err: any = new Error('Unique constraint');
-      err.code = 'P2002';
-      throw err;
+      throw new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+        code: 'P2002',
+        clientVersion: 'test',
+      });
     });
 
     const existing = { id: 'existing-1', idempotencyKey };
