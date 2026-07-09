@@ -43,6 +43,12 @@ export const config = {
   },
 };
 
+// Exportado só para teste unitário direto da lógica (sem precisar recarregar o módulo /
+// mockar process.exit): decide se Redis é obrigatório e está ausente, dado um env arbitrário.
+export function isRedisRequiredButMissing(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.NODE_ENV === 'production' && !env.REDIS_URL && !env.UPSTASH_REDIS_REST_URL;
+}
+
 // Verificações rápidas de variáveis críticas (falhar em produção apenas para essenciais)
 function validateCritical() {
   const missing: string[] = [];
@@ -58,6 +64,15 @@ function validateCritical() {
     if (!config.ssl.certPath || !config.ssl.keyPath) {
       criticalMissing.push('SSL_CERT_PATH and SSL_KEY_PATH (required for HTTPS in production)');
     }
+  }
+
+  // Redis é obrigatório em produção: o bloqueio de conta por tentativas falhas de login
+  // (userService) e a blacklist de JWT (jwtBlacklistService) usam cacheService, que sem
+  // Redis cai silenciosamente para um Map em memória local — em produção, com múltiplas
+  // instâncias, isso permite burlar o lockout (basta acertar outra instância) e faz com que
+  // um token colocado na blacklist em uma instância continue válido nas demais.
+  if (isRedisRequiredButMissing()) {
+    criticalMissing.push('REDIS_URL (obrigatório em produção para lockout de login e blacklist de JWT)');
   }
 
   // Outras variáveis são recomendadas mas não críticas

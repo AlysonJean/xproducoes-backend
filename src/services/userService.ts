@@ -6,39 +6,44 @@ import jwt from "jsonwebtoken";
 import { config as envConfig } from "../config/environment";
 import logger from "../config/logger";
 import { queueEmail } from "../config/jobQueue";
+import { cacheService } from "./cacheService";
 import { AppError, BadRequestError, ConflictError, NotFoundError, UnauthorizedError } from "../utils/errors";
 
 // Use centralized, cryptographically generated secret from environment config
 const config = { jwtSecret: envConfig.jwtSecret };
 
-// ---------- Account lockout (in-memory for dev; Redis should be used in prod) ----------
-// Key: normalized email → { attempts, lockedUntil }
-const failedLoginMap = new Map<string, { attempts: number; lockedUntil: number }>();
+// ---------- Account lockout (backed by cacheService: Redis in prod, in-memory fallback in dev/test) ----------
+// Redis is required in production (enforced at boot in config/environment.ts) so lockout state
+// is shared across all instances — an in-memory-only map would let an attacker bypass lockout
+// simply by hitting a different server instance.
+const LOCKOUT_CACHE_PREFIX = "login-lockout:";
 const MAX_FAILED_ATTEMPTS = 5;
-const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const LOCKOUT_DURATION_SEC = 15 * 60; // 15 minutes
 
-function checkAndRecordFailedLogin(email: string): void {
-  const key = email.toLowerCase();
-  const record = failedLoginMap.get(key) ?? { attempts: 0, lockedUntil: 0 };
+type LockoutRecord = { attempts: number; lockedUntil: number };
+
+async function checkAndRecordFailedLogin(email: string): Promise<void> {
+  const key = `${LOCKOUT_CACHE_PREFIX}${email.toLowerCase()}`;
+  const record = (await cacheService.get<LockoutRecord>(key)) ?? { attempts: 0, lockedUntil: 0 };
   record.attempts += 1;
   if (record.attempts >= MAX_FAILED_ATTEMPTS) {
-    record.lockedUntil = Date.now() + LOCKOUT_DURATION_MS;
+    record.lockedUntil = Date.now() + LOCKOUT_DURATION_SEC * 1000;
     record.attempts = 0; // reset counter after lock
   }
-  failedLoginMap.set(key, record);
+  await cacheService.set(key, record, LOCKOUT_DURATION_SEC);
 }
 
-function assertNotLocked(email: string): void {
-  const key = email.toLowerCase();
-  const record = failedLoginMap.get(key);
+async function assertNotLocked(email: string): Promise<void> {
+  const key = `${LOCKOUT_CACHE_PREFIX}${email.toLowerCase()}`;
+  const record = await cacheService.get<LockoutRecord>(key);
   if (record && record.lockedUntil > Date.now()) {
     const retryAfterSec = Math.ceil((record.lockedUntil - Date.now()) / 1000);
     throw new AppError(`Conta temporariamente bloqueada. Tente novamente em ${retryAfterSec}s.`, 429, true, "TOO_MANY_REQUESTS");
   }
 }
 
-function clearFailedLogins(email: string): void {
-  failedLoginMap.delete(email.toLowerCase());
+async function clearFailedLogins(email: string): Promise<void> {
+  await cacheService.delete(`${LOCKOUT_CACHE_PREFIX}${email.toLowerCase()}`);
 }
 // -----------------------------------------------------------------------------------------
 
@@ -262,16 +267,16 @@ export async function register(data: RegisterInput) {
 }
 
 export async function login(data: LoginInput) {
-  assertNotLocked(data.email);
+  await assertNotLocked(data.email);
 
   const user = await prisma.user.findUnique({ where: { email: data.email } });
   if (!user) {
-    checkAndRecordFailedLogin(data.email);
+    await checkAndRecordFailedLogin(data.email);
     throw new UnauthorizedError("Credenciais inválidas");
   }
   const valid = await bcrypt.compare(data.password, user.passwordHash);
   if (!valid) {
-    checkAndRecordFailedLogin(data.email);
+    await checkAndRecordFailedLogin(data.email);
     throw new UnauthorizedError("Credenciais inválidas");
   }
   // Exigir verificação de e-mail se habilitado por ambiente; ADMINs são dispensados
@@ -282,7 +287,7 @@ export async function login(data: LoginInput) {
   }
 
   // Login bem-sucedido — limpar contador de tentativas
-  clearFailedLogins(data.email);
+  await clearFailedLogins(data.email);
   const token = jwt.sign(
     { userId: user.id, role: user.role, type: "access" },
     config.jwtSecret,
