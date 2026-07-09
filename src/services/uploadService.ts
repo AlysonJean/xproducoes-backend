@@ -180,7 +180,7 @@ export class UploadService {
    */
   async uploadFromUrl(url: string, folder: string = "social", fileName?: string): Promise<string> {
       try {
-          const options: any = {
+          const options: UploadApiOptions = {
               folder: `x-producoes/${folder}`,
               resource_type: 'auto',
               use_filename: true,
@@ -190,18 +190,19 @@ export class UploadService {
           };
 
           logger.info({ obj: { url, folder } }, '[UploadService] Starting URL upload');
-          
+
           const result = await cloudinary.uploader.upload(url, options);
-          
+
           if (!result.secure_url) {
               throw new AppError('No secure_url received from Cloudinary', 502, true, 'CLOUDINARY_MISSING_SECURE_URL');
           }
 
           logger.info({ obj: result.secure_url }, '[UploadService] URL upload successful');
           return result.secure_url;
-      } catch (error: any) {
-          logger.error({ obj: { error: error.message, url } }, '[UploadService] URL upload failed');
-            throw new AppError(`Failed to upload from URL: ${error.message}`, 502, true, 'CLOUDINARY_URL_UPLOAD_FAILED');
+      } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          logger.error({ obj: { error: message, url } }, '[UploadService] URL upload failed');
+            throw new AppError(`Failed to upload from URL: ${message}`, 502, true, 'CLOUDINARY_URL_UPLOAD_FAILED');
       }
   }
 
@@ -257,10 +258,10 @@ export class UploadService {
       await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
       
       logger.info({obj: { publicId, resourceType }}, '[UploadService] File deleted successfully');
-    } catch (error: any) {
-      logger.error({obj: { 
-        imageUrl, 
-        error: error.message 
+    } catch (error: unknown) {
+      logger.error({obj: {
+        imageUrl,
+        error: error instanceof Error ? error.message : String(error)
       }}, '[UploadService] Error deleting file from Cloudinary');
       // Don't throw - deletion failure shouldn't block database deletion
     }
