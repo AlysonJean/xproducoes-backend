@@ -24,6 +24,7 @@ jest.mock('../config/prisma', () => ({
     booking: { findUnique: jest.fn(), update: jest.fn() },
     appSettings: { findFirst: jest.fn(), upsert: jest.fn() },
     collaboratorPayment: { findMany: jest.fn() },
+    review: { findUnique: jest.fn() },
     // Adicione outros modelos conforme necessário
   },
 }));
@@ -462,6 +463,44 @@ describe('🛡️ Security Blindagem Tests', () => {
         .set('Authorization', 'Bearer valid-user-token');
 
       expect(res.status).toBe(403);
+    });
+  });
+
+  describe('PUT/DELETE /reviews/:id - IDOR (antes qualquer autenticado editava/apagava avaliação de outrem)', () => {
+    afterEach(() => {
+      (prisma.review.findUnique as jest.Mock<any>).mockReset();
+    });
+
+    it('PUT /reviews/:id deve rejeitar (403) quando a avaliação pertence a outro usuário', async () => {
+      (prisma.review.findUnique as jest.Mock<any>).mockResolvedValue({ reviewerId: 'outro-user-id' });
+
+      const res = await request(app)
+        .put('/api/v1/reviews/review-1')
+        .set('Authorization', 'Bearer valid-user-token') // userId: 'user-id'
+        .send({ comment: 'editado por invasor' });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('DELETE /reviews/:id deve rejeitar (403) quando a avaliação pertence a outro usuário', async () => {
+      (prisma.review.findUnique as jest.Mock<any>).mockResolvedValue({ reviewerId: 'outro-user-id' });
+
+      const res = await request(app)
+        .delete('/api/v1/reviews/review-1')
+        .set('Authorization', 'Bearer valid-user-token');
+
+      expect(res.status).toBe(403);
+    });
+
+    it('ADMIN pode editar avaliação de qualquer usuário (não recebe 403)', async () => {
+      (prisma.review.findUnique as jest.Mock<any>).mockResolvedValue({ reviewerId: 'outro-user-id' });
+
+      const res = await request(app)
+        .put('/api/v1/reviews/review-1')
+        .set('Authorization', 'Bearer valid-admin-token')
+        .send({ comment: 'ajuste administrativo' });
+
+      expect(res.status).not.toBe(403);
     });
   });
 });

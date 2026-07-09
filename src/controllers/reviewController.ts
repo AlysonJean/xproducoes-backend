@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import * as reviewService from "../services/reviewService";
 import { reviewCreateSchema } from "../validators/reviewSchema";
 import { Prisma } from "@prisma/client";
+import { prisma } from "../config/prisma";
 
 export class ReviewController {
   async getPublicReviews(req: Request, res: Response, next: NextFunction) {
@@ -73,6 +74,17 @@ export class ReviewController {
   async update(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params as { id: string };
+
+      if (req.userRole !== 'ADMIN') {
+        const existing = await prisma.review.findUnique({ where: { id }, select: { reviewerId: true } });
+        if (!existing) {
+          return res.status(404).json({ success: false, message: 'Avaliação não encontrada' });
+        }
+        if (existing.reviewerId !== req.userId) {
+          return res.status(403).json({ success: false, message: 'Acesso negado. Esta avaliação não pertence a você.' });
+        }
+      }
+
       const review = await reviewService.update(id, req.body);
       return res.status(200).json({ success: true, data: review });
     } catch (error) {
@@ -86,6 +98,17 @@ export class ReviewController {
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params as { id: string };
+
+      if (req.userRole !== 'ADMIN') {
+        const existing = await prisma.review.findUnique({ where: { id }, select: { reviewerId: true } });
+        if (!existing) {
+          return res.status(404).json({ success: false, message: 'Avaliação não encontrada' });
+        }
+        if (existing.reviewerId !== req.userId) {
+          return res.status(403).json({ success: false, message: 'Acesso negado. Esta avaliação não pertence a você.' });
+        }
+      }
+
       await reviewService.deleteReview(id);
       return res.status(200).json({ success: true, message: 'Avaliação removida com sucesso' });
     } catch (error) {
