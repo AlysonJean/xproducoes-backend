@@ -282,14 +282,14 @@ export async function login(data: LoginInput) {
   // Login bem-sucedido — limpar contador de tentativas
   clearFailedLogins(data.email);
   const token = jwt.sign(
-    { userId: user.id, role: user.role },
+    { userId: user.id, role: user.role, type: "access" },
     config.jwtSecret,
     { expiresIn: "15m" }, // Access token com 15 minutos
   );
 
   // Gerar refresh token com expiração maior
   const refreshToken = jwt.sign(
-    { userId: user.id, role: user.role },
+    { userId: user.id, role: user.role, type: "refresh" },
     config.jwtSecret,
     { expiresIn: "3d" }, // Refresh token com 3 dias
   );

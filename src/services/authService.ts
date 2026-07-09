@@ -104,8 +104,8 @@ export class AuthService {
   async loginById(userId: string) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundError('Usuário não encontrado');
-    const token = jwt.sign({ userId: user.id, role: user.role }, envConfig.jwtSecret, { expiresIn: '15m' });
-    const refreshToken = jwt.sign({ userId: user.id, role: user.role }, envConfig.jwtSecret, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user.id, role: user.role, type: 'access' }, envConfig.jwtSecret, { expiresIn: '15m' });
+    const refreshToken = jwt.sign({ userId: user.id, role: user.role, type: 'refresh' }, envConfig.jwtSecret, { expiresIn: '7d' });
     return {
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
       token,

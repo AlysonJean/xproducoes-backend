@@ -27,6 +27,7 @@ interface JWTPayload {
   userId: string;
   role: string;
   email?: string;
+  type?: "access" | "refresh";
   iat?: number;
   exp?: number;
   jti?: string;
@@ -117,6 +118,20 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
         success: false,
         message: "Token inválido ou malformado",
         code: "INVALID_TOKEN",
+      });
+    }
+
+    // 4b. Um refresh token nunca deve funcionar como token de acesso — só o
+    // endpoint /refresh aceita type:'refresh'. Tokens emitidos antes desse
+    // campo existir (sem `type`) também são rejeitados aqui.
+    if (decoded.type !== "access") {
+      securityMonitor.recordInvalidToken(ip, userAgent, endpoint, {
+        reason: "wrong_token_type",
+      });
+      return res.status(401).json({
+        success: false,
+        message: "Tipo de token inválido para esta operação",
+        code: "INVALID_TOKEN_TYPE",
       });
     }
 
@@ -218,6 +233,14 @@ export async function authenticateWithDB(
       });
     }
 
+    if (decoded.type !== "access") {
+      return res.status(401).json({
+        success: false,
+        message: "Tipo de token inválido para esta operação",
+        code: "INVALID_TOKEN_TYPE",
+      });
+    }
+
     // Verifica se usuário ainda está ativo no banco
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
@@ -295,7 +318,7 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
   try {
     const decoded = jwt.verify(token, config.jwtSecret) as JWTPayload;
     const blacklisted = await isTokenBlacklisted(token);
-    if (blacklisted) {
+    if (blacklisted || decoded.type !== "access") {
       return next();
     }
     req.userId = decoded.userId;

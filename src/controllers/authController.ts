@@ -556,7 +556,14 @@ export class AuthController {
         return next(new UnauthorizedError('Refresh token invalidado'));
       }
 
-      const decoded = jwt.verify(refreshToken, config.jwtSecret) as { userId: string; role: string };
+      const decoded = jwt.verify(refreshToken, config.jwtSecret) as { userId: string; role: string; type?: string };
+
+      // Um access token nunca pode ser usado para renovar sessão — só o refresh
+      // token, marcado com type:'refresh' na emissão, é aceito aqui.
+      if (decoded.type !== 'refresh') {
+        clearAuthCookies(res);
+        return next(new UnauthorizedError('Token inválido para renovação de sessão'));
+      }
 
       const user = await this.authService.getProfile(decoded.userId);
       if (!user) {
@@ -564,16 +571,21 @@ export class AuthController {
       }
 
       const newToken = jwt.sign(
-        { userId: user.id, role: user.role },
+        { userId: user.id, role: user.role, type: 'access' },
         config.jwtSecret,
         { expiresIn: '15m' }
       );
 
       const newRefreshToken = jwt.sign(
-        { userId: user.id, role: user.role },
+        { userId: user.id, role: user.role, type: 'refresh' },
         config.jwtSecret,
         { expiresIn: '7d' }
       );
+
+      // Rotação: o refresh token consumido não pode ser reutilizado. Se alguém
+      // tentar reapresentá-lo depois (ex.: token roubado), a checagem de
+      // blacklist no topo desta função vai barrar — isso é a detecção de reuso.
+      await blacklistToken(refreshToken);
 
       setAuthCookies(res, newToken, newRefreshToken);
 

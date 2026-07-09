@@ -146,8 +146,8 @@ export async function handleGoogleCallback(params: { code?: string; state?: stri
   const shouldCompleteProfile = isNewUser || !clientProfile?.phone;
 
   // Emitir JWT da aplicação
-  const appToken = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '15m' });
-  const refreshToken = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+  const appToken = jwt.sign({ userId: user.id, role: user.role, type: 'access' }, JWT_SECRET, { expiresIn: '15m' });
+  const refreshToken = jwt.sign({ userId: user.id, role: user.role, type: 'refresh' }, JWT_SECRET, { expiresIn: '7d' });
 
   return {
     user: { 
@@ -270,8 +270,8 @@ export async function handleFacebookCallback(params: { code?: string; state?: st
   const clientProfile = await prisma.client.findUnique({ where: { userId: user.id } });
   const shouldCompleteProfile = isNewUser || !clientProfile?.phone;
 
-  const appToken = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '15m' });
-  const refreshToken = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+  const appToken = jwt.sign({ userId: user.id, role: user.role, type: 'access' }, JWT_SECRET, { expiresIn: '15m' });
+  const refreshToken = jwt.sign({ userId: user.id, role: user.role, type: 'refresh' }, JWT_SECRET, { expiresIn: '7d' });
 
   return { 
     user: { 

@@ -1,14 +1,40 @@
 import { beforeAll, describe, expect, it, jest } from '@jest/globals';
 
+// O rate limiter adaptativo de /api/v1/auth/* (app.ts) permite só 5 requisições
+// a cada 15 min, sem exceção para NODE_ENV=test — com dezenas de testes batendo
+// nesse prefixo ao longo deste arquivo, ele dispara e derruba testes não
+// relacionados a rate limiting com 429. Neutralizado aqui (passthrough) porque
+// não é o que esta suíte está testando; o comportamento real em produção não é
+// afetado (isso só troca o middleware usado durante os testes deste arquivo).
+jest.mock('../middlewares/adaptiveRateLimiter', () => {
+  const passthrough = (_req: any, _res: any, next: any) => next();
+  return {
+    createApiRateLimiter: () => passthrough,
+    createAuthRateLimiter: () => passthrough,
+    createUploadRateLimiter: () => passthrough,
+    createCsrfRateLimiter: () => passthrough,
+  };
+});
+
 // Mock do JWT para evitar dependência de env vars reais
 jest.mock('jsonwebtoken', () => {
   const actual = jest.requireActual('jsonwebtoken') as Record<string, unknown>;
   return {
     ...actual,
     verify: jest.fn((token: string) => {
-      if (token === 'valid-admin-token') return { userId: 'admin-id', role: 'ADMIN' };
-      if (token === 'valid-user-token') return { userId: 'user-id', role: 'CLIENT' };
-      if (token === 'valid-collaborator-token') return { userId: 'collaborator-id', role: 'COLLABORATOR' };
+      if (token === 'valid-admin-token') return { userId: 'admin-id', role: 'ADMIN', type: 'access' };
+      if (token === 'valid-user-token') return { userId: 'user-id', role: 'CLIENT', type: 'access' };
+      if (token === 'valid-collaborator-token') return { userId: 'collaborator-id', role: 'COLLABORATOR', type: 'access' };
+      // Token de refresh válido (sem role de acesso) — usado para provar que
+      // authenticate rejeita refresh tokens usados como access token.
+      if (token === 'valid-refresh-token') return { userId: 'user-id', role: 'CLIENT', type: 'refresh' };
+      // Token distinto só para o teste de rotação, para não colidir com o
+      // blacklist real (em memória, persistente entre testes) deixado por
+      // 'valid-refresh-token' em outro teste deste mesmo arquivo.
+      if (token === 'valid-refresh-token-rotation-test') return { userId: 'user-id', role: 'CLIENT', type: 'refresh' };
+      // Token "legado", emitido antes do campo `type` existir — deve ser
+      // rejeitado por authenticate (não tem como saber se é access ou refresh).
+      if (token === 'legacy-token-without-type') return { userId: 'user-id', role: 'CLIENT' };
       throw new Error('Invalid token');
     }),
   };
@@ -684,6 +710,69 @@ describe('🛡️ Security Blindagem Tests', () => {
 
       expect(res.status).toBe(503);
       expect(res.body.success).toBe(false);
+    });
+  });
+
+  describe('Tipo de token (access/refresh) e rotação do refresh - antes eram intercambiáveis', () => {
+    afterEach(() => {
+      (prisma.user.findUnique as jest.Mock<any>).mockReset();
+    });
+
+    it('GET /auth/me rejeita (401) um refresh token usado como access token', async () => {
+      const res = await request(app)
+        .get('/api/v1/auth/me')
+        .set('Authorization', 'Bearer valid-refresh-token');
+
+      expect(res.status).toBe(401);
+      expect(res.body.code).toBe('INVALID_TOKEN_TYPE');
+    });
+
+    it('GET /auth/me rejeita (401) um token "legado" sem o campo type (força novo login)', async () => {
+      const res = await request(app)
+        .get('/api/v1/auth/me')
+        .set('Authorization', 'Bearer legacy-token-without-type');
+
+      expect(res.status).toBe(401);
+      expect(res.body.code).toBe('INVALID_TOKEN_TYPE');
+    });
+
+    it('POST /auth/refresh rejeita um access token apresentado como refresh token', async () => {
+      const res = await request(app)
+        .post('/api/v1/auth/refresh')
+        .send({ refreshToken: 'valid-admin-token' }); // type:'access', não 'refresh'
+
+      expect(res.status).toBe(401);
+    });
+
+    it('POST /auth/refresh aceita um refresh token válido e emite novos tokens', async () => {
+      (prisma.user.findUnique as jest.Mock<any>).mockResolvedValue({
+        id: 'user-id', name: 'Fulano', email: 'fulano@example.com', role: 'CLIENT',
+      });
+
+      const res = await request(app)
+        .post('/api/v1/auth/refresh')
+        .send({ refreshToken: 'valid-refresh-token' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.accessToken).toBeTruthy();
+      expect(res.body.data.refreshToken).toBeTruthy();
+    });
+
+    it('rotação: o mesmo refresh token não pode ser usado uma segunda vez (reuse detection)', async () => {
+      (prisma.user.findUnique as jest.Mock<any>).mockResolvedValue({
+        id: 'user-id', name: 'Fulano', email: 'fulano@example.com', role: 'CLIENT',
+      });
+
+      const first = await request(app)
+        .post('/api/v1/auth/refresh')
+        .send({ refreshToken: 'valid-refresh-token-rotation-test' });
+      expect(first.status).toBe(200);
+
+      const second = await request(app)
+        .post('/api/v1/auth/refresh')
+        .send({ refreshToken: 'valid-refresh-token-rotation-test' });
+
+      expect(second.status).toBe(401);
     });
   });
 });
