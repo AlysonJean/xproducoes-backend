@@ -903,4 +903,18 @@ describe('🛡️ Security Blindagem Tests', () => {
       expect(res.status).not.toBe(401);
     });
   });
+
+  describe('searchRateLimit agora está de fato aplicado às rotas de busca (antes existia mas não era usado em nenhuma)', () => {
+    it('GET /equipment/search carrega o rate limiter (cabeçalho RateLimit-Limit presente)', async () => {
+      const res = await request(app).get('/api/v1/equipment/search?q=camera');
+      expect(res.headers['ratelimit-limit']).toBeDefined();
+    });
+
+    it('GET /collaborators/search carrega o rate limiter (cabeçalho RateLimit-Limit presente)', async () => {
+      const res = await request(app)
+        .get('/api/v1/collaborators/search')
+        .set('Authorization', 'Bearer valid-admin-token');
+      expect(res.headers['ratelimit-limit']).toBeDefined();
+    });
+  });
 });

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import multer from "multer";
 import { UploadService } from '../services/uploadService';
 import logger from "../config/logger";
+import { contentMatchesMimetype } from "../utils/fileSignature";
 
 
 const uploadService = new UploadService();
@@ -30,7 +31,10 @@ export const uploadSingle = (fieldName: string = 'image') => {
         
         if (err instanceof multer.MulterError) {
           if (err.code === 'LIMIT_FILE_SIZE') {
-            return res.status(400).json({ error: 'Arquivo muito grande. Máximo: 5MB.' });
+            // Alinhado ao limite real configurado em uploadService.getCloudinaryMulterConfig
+            // (50MB) — a mensagem dizia 5MB, o que não correspondia ao limite
+            // de fato aplicado pelo multer.
+            return res.status(400).json({ error: 'Arquivo muito grande. Máximo: 50MB.' });
           }
           return res.status(400).json({ error: `Erro no upload: ${err.message}` });
         }
@@ -66,8 +70,17 @@ export const uploadAvatar = uploadSingle('avatar');
 export const processUpload = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { folder, fileName } = req.body;
-    
+
     if (req.file) {
+      // O mimetype vem do Content-Type enviado pelo cliente — forjável. Confere
+      // a assinatura binária real antes de aceitar (o buffer só existe aqui,
+      // depois que o multer termina de processar — não dá para checar isso
+      // dentro do fileFilter, o buffer ainda não existe nesse ponto).
+      if (!contentMatchesMimetype(req.file.buffer, req.file.mimetype, req.file.originalname)) {
+        logger.warn({obj: { mimetype: req.file.mimetype, originalname: req.file.originalname }}, '[UploadMiddleware] Conteúdo do arquivo não bate com o mimetype declarado');
+        return res.status(400).json({ error: 'O conteúdo do arquivo não corresponde ao tipo declarado.' });
+      }
+
       // Upload de arquivo único
       const url = await uploadService.uploadFile(req.file, folder, fileName);
       req.body.imageUrl = url;
@@ -82,13 +95,19 @@ export const processUpload = async (req: Request, res: Response, next: NextFunct
       const imageUrls: string[] = [];
       const uploadedFiles: any[] = [];
       const fileCount = req.files.length;
-      
+
       for (let i = 0; i < fileCount; i++) {
         const file = req.files[i];
+
+        if (!contentMatchesMimetype(file.buffer, file.mimetype, file.originalname)) {
+          logger.warn({obj: { mimetype: file.mimetype, originalname: file.originalname }}, '[UploadMiddleware] Conteúdo do arquivo não bate com o mimetype declarado');
+          return res.status(400).json({ error: `O conteúdo do arquivo "${file.originalname}" não corresponde ao tipo declarado.` });
+        }
+
         // Se for múltiplos arquivos, adicionar índice ao nome para manter SEO mas único
         const currentFileName = fileName ? `${fileName}-${i + 1}` : undefined;
         const url = await uploadService.uploadFile(file, folder, currentFileName);
-        
+
         imageUrls.push(url);
         uploadedFiles.push({
           url,

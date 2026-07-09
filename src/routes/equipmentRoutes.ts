@@ -3,7 +3,7 @@ import { EquipmentController } from "../controllers/equipmentController";
 import { authenticate, optionalAuth, adminOnly } from "../middlewares/unifiedAuth";
 import { cacheMiddleware } from "../middlewares/cacheMiddleware";
 import { uploadSingle, processUpload } from "../middlewares/upload";
-import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
+import { uploadRateLimit, searchRateLimit } from '../middlewares/rateLimitMiddleware';
 import { validateBody, validateId } from "../config/validation";
 import { equipmentCreateSchema, equipmentUpdateSchema } from "../schemas/equipment.schema";
 
@@ -12,7 +12,7 @@ const equipmentController = new EquipmentController();
 
 // --- Rotas Públicas (com cache otimizado) ---
 // Rota de busca sem cache para garantir status de disponibilidade em tempo real na Home
-equipmentRoutes.get("/search", optionalAuth, equipmentController.search);
+equipmentRoutes.get("/search", searchRateLimit, optionalAuth, equipmentController.search);
 equipmentRoutes.get("/category/:categoryId", optionalAuth, cacheMiddleware, equipmentController.getByCategory);
 equipmentRoutes.get("/", optionalAuth, cacheMiddleware, equipmentController.findAll);
 equipmentRoutes.get("/:id/availability", validateId(), cacheMiddleware, equipmentController.getAvailability);

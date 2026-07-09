@@ -36,6 +36,7 @@ import {
 } from "../controllers/collaboratorController";
 import { sendInvite } from '../controllers/inviteController';
 import { authenticate, requireAdminOrCollaborator, adminOnly } from "../middlewares/unifiedAuth";
+import { searchRateLimit } from "../middlewares/rateLimitMiddleware";
 import { validateBody, validateId } from "../config/validation";
 import { 
   collaboratorCreateSchema, 
@@ -59,7 +60,7 @@ router.post("/", adminOnly, validateBody(collaboratorCreateSchema), createCollab
 // Rota para enviar convite por email
 router.post('/invite', adminOnly, validateBody(inviteCreateSchema), sendInvite);
 router.get("/", getAllCollaborators);
-router.get("/search", searchCollaborators);
+router.get("/search", searchRateLimit, searchCollaborators);
 router.get("/available", getAvailableCollaborators);
 
 // --- Rotas /me/ (DEVEM vir antes de /:id) ---

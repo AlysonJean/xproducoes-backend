@@ -113,7 +113,11 @@ app.use(cookieParser());
 // ✅ CSRF TOKEN GENERATION (antes de rotas, depois de cookies)
 app.use(csrfTokenGenerator);
 
-// Body parser
+// Body parser. Nota: MAX_FILE_SIZE aqui só limita o tamanho do corpo JSON/
+// urlencoded — uploads multipart (imagens/vídeos) passam pelo multer e
+// seguem o limite de 50MB definido em uploadService.getCloudinaryMulterConfig,
+// não este valor. O nome da env var é enganoso, mas mantido como está para
+// não quebrar configuração já definida em produção.
 app.use(express.json({ limit: process.env.MAX_FILE_SIZE || "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
