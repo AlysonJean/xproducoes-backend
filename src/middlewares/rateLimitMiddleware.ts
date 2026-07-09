@@ -7,9 +7,9 @@ import logger from "../config/logger";
  * Isso permite rate limiting mais preciso por usuário
  */
 const userKeyGenerator = (req: Request): string => {
-  const userId = (req as any).userId;
+  const userId = req.userId;
   try {
-    const ipKey = ipKeyGenerator(req as any);
+    const ipKey = ipKeyGenerator(req.ip || '');
     return userId ? `user:${userId}` : `ip:${ipKey}`;
   } catch {
     return userId ? `user:${userId}` : `ip:${req.ip}`;
@@ -27,7 +27,7 @@ export const userRateLimit = rateLimit({
   legacyHeaders: false,
   keyGenerator: userKeyGenerator,
   handler: (req: Request, res: Response) => {
-    const userId = (req as any).userId;
+    const userId = req.userId;
     logger.warn({
       userId,
       ip: req.ip,
@@ -50,7 +50,7 @@ export const userWriteRateLimit = rateLimit({
   legacyHeaders: false,
   keyGenerator: userKeyGenerator,
   handler: (req: Request, res: Response) => {
-    const userId = (req as any).userId;
+    const userId = req.userId;
     logger.warn({
       userId,
       ip: req.ip,
@@ -69,7 +69,7 @@ export const userWriteRateLimit = rateLimit({
  * Mais restritivo para IPs, mais permissivo para usuários autenticados
  */
 export const adaptiveRateLimit = (req: Request, res: Response, next: NextFunction) => {
-  const userId = (req as any).userId;
+  const userId = req.userId;
   if (userId) {
     return userRateLimit(req, res, next);
   }
@@ -134,8 +134,7 @@ export const passwordResetRateLimit = rateLimit({
     // use express-rate-limit's helper to correctly handle IPv6 formats
     // (e.g. ::ffff:127.0.0.1)
     try {
-      // ipKeyGenerator expects a Request-like object
-      const ipKey = ipKeyGenerator(req as any);
+      const ipKey = ipKeyGenerator(req.ip || '');
       return (req.body && req.body.email) ? req.body.email : ipKey;
     } catch {
       return req.body?.email || (req.ip as string);
@@ -156,7 +155,7 @@ export const passwordResetRateLimit = rateLimit({
 
 export const dynamicRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: (req: any) => {
+  max: (req: Request) => {
     if (req && req.headers && req.headers.authorization) return 200;
     return 50;
   },
@@ -190,7 +189,7 @@ export const paymentRateLimit = rateLimit({
   handler: (req: Request, res: Response) => {
     logger.warn({
       ip: req.ip,
-      userId: (req as any).userId,
+      userId: req.userId,
       userAgent: req.headers['user-agent'],
       path: req.path,
     }, '[RATE LIMIT] Tentativas de pagamento excedidas');

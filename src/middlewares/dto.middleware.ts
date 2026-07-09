@@ -7,7 +7,7 @@ import { Prisma } from "@prisma/client";
  */
 
 // Função para transformar objetos recursivamente
-function transformPrismaData(obj: any): any {
+function transformPrismaData(obj: unknown): unknown {
   if (obj === null || obj === undefined) {
     return obj;
   }
@@ -24,7 +24,7 @@ function transformPrismaData(obj: any): any {
 
   // Se é um objeto, transforma recursivamente
   if (typeof obj === "object") {
-    const transformed: any = {};
+    const transformed: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
       transformed[key] = transformPrismaData(value);
     }
@@ -47,7 +47,7 @@ export const dtoTransformerMiddleware = (
   const originalJson = res.json;
 
   // Sobrescreve res.json com nossa transformação
-  res.json = function (body: any) {
+  res.json = function (body: unknown) {
     // Transforma os dados antes de enviar
     const transformedBody = transformPrismaData(body);
 
@@ -70,7 +70,7 @@ export const transformForFrontend = <T>(data: T): T => {
  * Função específica para transformar preços
  * Garante que preços são sempre numbers válidos
  */
-export const transformPrices = (obj: any): any => {
+export const transformPrices = (obj: unknown): unknown => {
   const transformed = transformPrismaData(obj);
 
   // Campos conhecidos de preço que precisam ser validados
@@ -82,21 +82,22 @@ export const transformPrices = (obj: any): any => {
     "hourlyRate",
   ];
 
-  function validatePriceFields(data: any): any {
+  function validatePriceFields(data: unknown): unknown {
     if (data && typeof data === "object") {
+      const record = data as Record<string, unknown>;
       for (const field of priceFields) {
-        if (data[field] !== undefined) {
-          const value = Number(data[field]);
-          data[field] = isNaN(value) ? 0 : value;
+        if (record[field] !== undefined) {
+          const value = Number(record[field]);
+          record[field] = isNaN(value) ? 0 : value;
         }
       }
 
       // Recursivamente valida arrays e objetos aninhados
-      for (const [key, value] of Object.entries(data)) {
+      for (const [key, value] of Object.entries(record)) {
         if (Array.isArray(value)) {
-          data[key] = value.map(validatePriceFields);
+          record[key] = value.map(validatePriceFields);
         } else if (value && typeof value === "object") {
-          data[key] = validatePriceFields(value);
+          record[key] = validatePriceFields(value);
         }
       }
     }

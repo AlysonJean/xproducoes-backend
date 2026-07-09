@@ -1,13 +1,13 @@
 import multer from "multer";
 import cloudinary from "../config/cloudinary";
 import logger from "../config/logger";
-import type { UploadApiErrorResponse, UploadApiResponse } from "cloudinary";
+import type { UploadApiErrorResponse, UploadApiResponse, UploadApiOptions } from "cloudinary";
 import type { Request } from "express";
 import { JSDOM } from 'jsdom';
 import createDOMPurify from 'dompurify';
 import { AppError } from "../utils/errors";
 
-const dompurify = createDOMPurify(new JSDOM('').window as any);
+const dompurify = createDOMPurify(new JSDOM('').window);
 
 
 export class UploadService {
@@ -86,7 +86,7 @@ export class UploadService {
       }}, '[UploadService] File info:');
 
       // Base options
-      const baseOptions: any = {
+      const baseOptions: UploadApiOptions = {
         folder: `x-producoes/${folder}`,
         resource_type: 'auto', // Auto-detect image or video
         use_filename: true,
@@ -96,13 +96,13 @@ export class UploadService {
       };
 
       // Para SVG: não aplicar transformações que forcem rasterização ou conversão
-      const svgOptions: any = {
+      const svgOptions: UploadApiOptions = {
         ...baseOptions,
         format: 'svg',
       };
 
       // Para imagens raster: aplicar otimizações seguras
-      const rasterOptions: any = {
+      const rasterOptions: UploadApiOptions = {
         ...baseOptions,
         transformation: [
           { width: 1200, height: 1200, crop: 'limit' },
@@ -112,7 +112,7 @@ export class UploadService {
       };
 
       // Para vídeos
-      const videoOptions: any = {
+      const videoOptions: UploadApiOptions = {
         ...baseOptions,
         resource_type: 'video',
         transformation: [
