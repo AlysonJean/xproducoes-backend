@@ -612,4 +612,55 @@ describe('🛡️ Security Blindagem Tests', () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('Pagamentos por reserva - IDOR (antes qualquer autenticado via bookingId de outrem)', () => {
+    afterEach(() => {
+      (prisma.client.findFirst as jest.Mock<any>).mockReset();
+      (prisma.booking.findUnique as jest.Mock<any>).mockReset();
+    });
+
+    it('GET /payments/booking/:bookingId deve rejeitar (403) quando a reserva não pertence ao cliente', async () => {
+      (prisma.client.findFirst as jest.Mock<any>).mockResolvedValue({ id: 'client-mine' });
+      (prisma.booking.findUnique as jest.Mock<any>).mockResolvedValue({ clientId: 'client-outro' });
+
+      const res = await request(app)
+        .get('/api/v1/payments/booking/booking-1')
+        .set('Authorization', 'Bearer valid-user-token');
+
+      expect(res.status).toBe(403);
+    });
+
+    it('GET /payments/booking/:bookingId deve aceitar quando a reserva pertence ao cliente', async () => {
+      (prisma.client.findFirst as jest.Mock<any>).mockResolvedValue({ id: 'client-mine' });
+      (prisma.booking.findUnique as jest.Mock<any>).mockResolvedValue({ clientId: 'client-mine' });
+
+      const res = await request(app)
+        .get('/api/v1/payments/booking/booking-1')
+        .set('Authorization', 'Bearer valid-user-token');
+
+      expect(res.status).toBe(200);
+    });
+
+    it('POST /payments/create-intent/:bookingId deve rejeitar (403) quando a reserva não pertence ao cliente', async () => {
+      (prisma.client.findFirst as jest.Mock<any>).mockResolvedValue({ id: 'client-mine' });
+      (prisma.booking.findUnique as jest.Mock<any>).mockResolvedValue({ clientId: 'client-outro' });
+
+      const res = await request(app)
+        .post('/api/v1/payments/create-intent/booking-1')
+        .set('Authorization', 'Bearer valid-user-token');
+
+      expect(res.status).toBe(403);
+    });
+
+    it('ADMIN não precisa ter registro de client para acessar pagamento de qualquer reserva', async () => {
+      (prisma.booking.findUnique as jest.Mock<any>).mockResolvedValue({ clientId: 'client-outro' });
+
+      const res = await request(app)
+        .get('/api/v1/payments/booking/booking-1')
+        .set('Authorization', 'Bearer valid-admin-token');
+
+      expect(res.status).toBe(200);
+      expect(prisma.client.findFirst).not.toHaveBeenCalled();
+    });
+  });
 });

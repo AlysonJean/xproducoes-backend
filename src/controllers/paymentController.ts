@@ -1,5 +1,21 @@
 import { Request, Response, NextFunction } from "express";
 import * as paymentService from "../services/paymentService";
+import { prisma } from "../config/prisma";
+import { ForbiddenError } from "../utils/errors";
+
+async function assertOwnsBooking(req: Request, bookingId: string): Promise<void> {
+  if (req.userRole === "ADMIN") return;
+
+  const client = await prisma.client.findFirst({ where: { userId: req.userId } });
+  if (!client) {
+    throw new ForbiddenError("Acesso negado. Cliente não encontrado.");
+  }
+
+  const booking = await prisma.booking.findUnique({ where: { id: bookingId }, select: { clientId: true } });
+  if (!booking || booking.clientId !== client.id) {
+    throw new ForbiddenError("Acesso negado. Esta reserva não pertence a você.");
+  }
+}
 
 export class PaymentController {
   createCheckoutSession = async (
@@ -14,6 +30,7 @@ export class PaymentController {
           .status(400)
           .json({ success: false, message: "O ID da reserva é obrigatório." });
       }
+      await assertOwnsBooking(req, bookingId);
       const session = await paymentService.createCheckoutSession(
         bookingId,
         req.userId!,
@@ -44,10 +61,12 @@ export class PaymentController {
   ) => {
     try {
       const { bookingId } = req.params as { bookingId: string };
-      
+
       if (!bookingId) {
         return res.status(400).json({ success: false, message: "ID da reserva é obrigatório." });
       }
+
+      await assertOwnsBooking(req, bookingId);
 
       const paymentIntent = await paymentService.createPaymentIntent(bookingId);
       return res.json({ success: true, data: paymentIntent });
@@ -115,10 +134,12 @@ export class PaymentController {
   ) => {
     try {
       const { bookingId } = req.params as { bookingId: string };
-      
+
       if (!bookingId) {
         return res.status(400).json({ success: false, message: "ID da reserva é obrigatório." });
       }
+
+      await assertOwnsBooking(req, bookingId);
 
       const payment = await paymentService.getByBooking(bookingId);
       return res.json({ success: true, data: payment });
