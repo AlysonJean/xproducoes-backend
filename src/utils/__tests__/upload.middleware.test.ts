@@ -29,7 +29,9 @@ describe('uploadSingle', () => {
     const next = jest.fn();
     middleware(req, res, next);
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Arquivo muito grande. Máximo: 5MB.' });
+    // Alinhado ao limite real (50MB) configurado em uploadService.getCloudinaryMulterConfig.
+    // A mensagem antiga dizia 5MB, o que não correspondia ao limite de fato aplicado.
+    expect(res.json).toHaveBeenCalledWith({ error: 'Arquivo muito grande. Máximo: 50MB.' });
     UploadService.prototype.getCloudinaryMulterConfig.mockRestore();
   });
 
