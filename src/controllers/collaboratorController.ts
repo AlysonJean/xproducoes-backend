@@ -156,7 +156,7 @@ export class CollaboratorController {
         );
         logger.info({ collaboratorId: collaborator.id }, 'Notificação de escalação enviada com sucesso');
       }
-    } catch (emailError: any) {
+    } catch (emailError: unknown) {
       logger.error({ err: emailError }, 'Falha ao enviar notificação de escalação (atribuição concluída)');
     }
 

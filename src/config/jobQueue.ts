@@ -207,8 +207,8 @@ async function initializeWorkers(connection: import('ioredis').default): Promise
         const instagramService = (await import('../services/social/InstagramService')).default;
         const count = await instagramService.fetchRecentMedia(job.data.settingId);
         return { processed: true, newPosts: count };
-      } catch (error: any) {
-        logger.error({ error: error.message, settingId: job.data.settingId }, 'Social sync failed');
+      } catch (error: unknown) {
+        logger.error({ error: error instanceof Error ? error.message : String(error), settingId: job.data.settingId }, 'Social sync failed');
         throw error;
       }
     },

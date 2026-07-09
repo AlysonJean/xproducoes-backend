@@ -56,7 +56,7 @@ export class CartService {
     return this.getOrCreateCart(userId);
   }
 
-  async checkout(data: any) {
+  async checkout(data: Record<string, unknown>) {
     // Mantém simulação por ora; fluxo de checkout real é gerido por Booking
     return {
       id: `booking_${Date.now()}`,

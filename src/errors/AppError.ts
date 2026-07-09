@@ -13,7 +13,7 @@ export class AppError extends Error {
     public code: string,
     public message: string,
     public statusCode: number = 500,
-    public details?: Record<string, any>
+    public details?: Record<string, unknown>
   ) {
     super(message);
     Object.setPrototypeOf(this, AppError.prototype);
@@ -21,7 +21,7 @@ export class AppError extends Error {
 }
 
 export class ValidationError extends AppError {
-  constructor(message: string, details?: Record<string, any>) {
+  constructor(message: string, details?: Record<string, unknown>) {
     super('VALIDATION_ERROR', message, 400, details);
     Object.setPrototypeOf(this, ValidationError.prototype);
   }
@@ -50,14 +50,14 @@ export class ForbiddenError extends AppError {
 }
 
 export class ConflictError extends AppError {
-  constructor(message: string, details?: Record<string, any>) {
+  constructor(message: string, details?: Record<string, unknown>) {
     super('CONFLICT', message, 409, details);
     Object.setPrototypeOf(this, ConflictError.prototype);
   }
 }
 
 export class InternalServerError extends AppError {
-  constructor(message: string = 'Erro interno do servidor', details?: Record<string, any>) {
+  constructor(message: string = 'Erro interno do servidor', details?: Record<string, unknown>) {
     super('INTERNAL_SERVER_ERROR', message, 500, details);
     Object.setPrototypeOf(this, InternalServerError.prototype);
   }
@@ -72,6 +72,6 @@ export class BadGatewayError extends AppError {
 }
 
 // Type guard
-export const isAppError = (error: any): error is AppError => {
+export const isAppError = (error: unknown): error is AppError => {
   return error instanceof AppError;
 };

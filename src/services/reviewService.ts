@@ -41,7 +41,7 @@ export async function create(data: {
   bookingId: string;
   reviewerId: string;
   // collaboratorId intencionalmente não suportado para reviews de serviço do cliente
-}): Promise<any> {
+}) {
   // 1) Verificar se o booking existe e está concluído
   const booking = await prisma.booking.findUnique({
     where: { id: data.bookingId },

@@ -80,7 +80,13 @@ export class GoogleCalendarService {
   }
 
   // Cria um evento no calendário do usuário
-  async createEvent(userId: string, eventData: any) {
+  async createEvent(userId: string, eventData: {
+    title?: string;
+    description?: string;
+    location?: string;
+    startDate: Date | string;
+    endDate: Date | string;
+  }) {
     try {
       const user = await prisma.user.findUnique({ 
         where: { id: userId },

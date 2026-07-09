@@ -153,7 +153,7 @@ export function monitoringMiddleware() {
 
     // Capture original res.json
     const originalJson = res.json.bind(res);
-    res.json = function (data: any) {
+    res.json = function (data: unknown) {
       const responseTimeMs = Date.now() - startTime;
 
       // Record metrics

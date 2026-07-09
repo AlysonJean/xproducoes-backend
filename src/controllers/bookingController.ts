@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { BookingService } from "../services/bookingService";
+import { BookingService, ConfirmCollaboratorInput } from "../services/bookingService";
 import { prisma } from "../config/prisma";
 import { BookingStatus, DeliveryStatus } from "@prisma/client";
 import logger from "../config/logger";
@@ -515,7 +515,7 @@ export class BookingController {
     }
     try {
       const { id } = req.params as { id: string };
-      const { totalPrice, collaborators } = req.body as { totalPrice?: number; collaborators?: Array<any> };
+      const { totalPrice, collaborators } = req.body as { totalPrice?: number; collaborators?: ConfirmCollaboratorInput[] };
       if (!id) {
         res.status(400).json({ success: false, message: 'ID da reserva é obrigatório.' });
         return;

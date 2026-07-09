@@ -1,4 +1,4 @@
-import { Prisma, BookingStatus, DeliveryStatus } from "@prisma/client";
+import { Prisma, BookingStatus, DeliveryStatus, CollaboratorRole } from "@prisma/client";
 import { BookingCreateInput, BookingUpdateInput, BookingFilters } from "../validators/bookingSchema.js";
 import { 
   BookingValidationError, 
@@ -19,6 +19,15 @@ type BookingUpdateExtras = {
   venueContactName?: string | null;
   venueContactPhone?: string | null;
 };
+
+export interface ConfirmCollaboratorInput {
+  collaboratorId: string;
+  role?: CollaboratorRole;
+  functionId?: string;
+  startTime?: string;
+  endTime?: string;
+  fixedRate?: number;
+}
 
 export class BookingService {
   /**
@@ -861,16 +870,16 @@ export class BookingService {
   /**
    * Confirma uma reserva com detalhes (atribuição de equipe e ajuste de valor)
    */
-  async confirmWithDetails(id: string, data: { totalPrice?: number; collaborators?: any[] }): Promise<any> {
+  async confirmWithDetails(id: string, data: { totalPrice?: number; collaborators?: ConfirmCollaboratorInput[] }) {
     try {
       // Atualizar a reserva com novo valor e status
-      const updateData: any = { status: BookingStatus.CONFIRMED };
+      const updateData: Prisma.BookingUncheckedUpdateInput = { status: BookingStatus.CONFIRMED };
       if (data.totalPrice) updateData.totalPrice = data.totalPrice;
 
       if (data.collaborators && data.collaborators.length > 0) {
         updateData.eventCollaborators = {
            deleteMany: {}, // Limpa anteriores para novo set
-           create: data.collaborators.map((c: any) => ({
+           create: data.collaborators.map((c) => ({
               collaboratorId: c.collaboratorId,
               role: c.role || 'OTHER',
               functionId: c.functionId,

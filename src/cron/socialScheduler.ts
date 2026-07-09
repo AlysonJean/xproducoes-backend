@@ -54,8 +54,8 @@ export const startSocialScheduler = () => {
                     logger.info({ settingId: setting.id }, '[SocialScheduler] Syncing wall');
                     const count = await instagramService.fetchRecentMedia(setting.id);
                     logger.info({ settingId: setting.id, newPosts: count }, '[SocialScheduler] Sync complete');
-                } catch (err: any) {
-                    logger.error({ settingId: setting.id, error: err.message }, '[SocialScheduler] Sync failed for wall');
+                } catch (err: unknown) {
+                    logger.error({ settingId: setting.id, error: err instanceof Error ? err.message : String(err) }, '[SocialScheduler] Sync failed for wall');
                 }
             }
 
