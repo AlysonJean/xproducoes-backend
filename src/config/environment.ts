@@ -25,7 +25,13 @@ export const config = {
   // Usado para cifrar tokens OAuth em repouso (ex.: User.googleRefreshToken) — ver
   // src/utils/tokenEncryption.ts. Mesmo padrão de required() do JWT_SECRET: obrigatório
   // em produção (falha o boot), efêmero em dev/test para não exigir setup extra.
-  encryptionKey: required('ENCRYPTION_KEY', process.env.ENCRYPTION_KEY),
+  encryptionKey: (() => {
+    const key = process.env.ENCRYPTION_KEY || process.env.JWT_SECRET;
+    if (!process.env.ENCRYPTION_KEY && process.env.JWT_SECRET) {
+      logger.warn('ENCRYPTION_KEY não definida no ambiente. Usando JWT_SECRET como fallback de encriptação.');
+    }
+    return required('ENCRYPTION_KEY', key);
+  })(),
   cloudinary: {
     cloudName: process.env.CLOUDINARY_CLOUD_NAME || undefined,
     apiKey: process.env.CLOUDINARY_API_KEY || undefined,
