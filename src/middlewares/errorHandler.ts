@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import logger from "../config/logger.js";
 import { ZodError } from "zod";
-import { AppError } from "../utils/errors.js";
+import { AppError, ValidationError } from "../utils/errors.js";
 import { securityMonitor } from "../config/securityMonitor.js";
 
 export function errorHandler(
@@ -17,7 +17,7 @@ export function errorHandler(
       stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
       path: req.path,
       method: req.method,
-      requestId: (req as any).requestId,
+      requestId: req.requestId,
     });
   } else {
     logger.error({
@@ -43,17 +43,17 @@ export function errorHandler(
     const ip = req.ip || (typeof forwardedFor === 'string' ? forwardedFor : undefined) || req.socket?.remoteAddress || 'unknown';
     const userAgent = req.headers?.['user-agent'] || 'unknown';
 
-    if ((err as any).statusCode === 401) {
-      securityMonitor.recordInvalidToken(ip, userAgent, req.path, { message: (err as any).message });
-    } else if ((err as any).statusCode === 403) {
-      securityMonitor.recordSuspiciousActivity(ip, userAgent, req.path, { message: (err as any).message, type: 'forbidden_access' });
+    if (err.statusCode === 401) {
+      securityMonitor.recordInvalidToken(ip, userAgent, req.path, { message: err.message });
+    } else if (err.statusCode === 403) {
+      securityMonitor.recordSuspiciousActivity(ip, userAgent, req.path, { message: err.message, type: 'forbidden_access' });
     }
 
     return res.status(err.statusCode).json({
       success: false,
       message: err.message,
       code: err.code,
-      ...(err.constructor.name === 'ValidationError' && { details: (err as any).details })
+      ...(err instanceof ValidationError && { details: err.details })
     });
   }
 

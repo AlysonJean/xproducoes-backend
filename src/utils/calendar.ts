@@ -9,7 +9,7 @@ export function generateGoogleCalendarLink(booking: {
   venue?: { street?: string; city?: string } | string; // Suporta objeto ou string antiga
   equipments?: ({ equipment: { name: string } } | { name: string })[];
   status?: string;
-  totalPrice?: any;
+  totalPrice?: unknown;
 }): string {
   const start = new Date(booking.eventDate);
   const duration = 4; // horas padrão
@@ -28,7 +28,7 @@ export function generateGoogleCalendarLink(booking: {
   }
 
   const equipNames = (booking.equipments || [])
-    .map((e) => (e as any).equipment?.name || (e as any).name || '')
+    .map((e) => ('equipment' in e ? e.equipment?.name : e.name) || '')
     .filter(Boolean)
     .join(', ');
 

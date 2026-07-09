@@ -14,6 +14,16 @@ import logger from '../config/logger.js';
 import { AppError } from '../utils/errors.js';
 import { allowedOrigins } from '../config/cors.js';
 
+interface ErrorLike {
+  statusCode?: number;
+  status?: number;
+  code?: string;
+  name?: string;
+  message?: string;
+  stack?: string;
+  issues?: unknown;
+}
+
 // Prisma error codes reference:
 // P2002: Unique constraint
 // P2025: Record not found
@@ -24,7 +34,7 @@ const PRISMA_ERROR_MAP: Record<string, { status: number; message: string }> = {
   P2003: { status: 400, message: 'Referência inválida' },
 };
 
-function getStatusCode(err: any): number {
+function getStatusCode(err: ErrorLike): number {
   // Custom AppError
   if (err.statusCode) return err.statusCode;
   if (err.status) return err.status;
@@ -47,7 +57,7 @@ function getStatusCode(err: any): number {
   return 500;
 }
 
-function getErrorMessage(err: any, statusCode: number, isProduction: boolean): string {
+function getErrorMessage(err: ErrorLike, statusCode: number, isProduction: boolean): string {
   // Custom AppError — always return the message
   if (err instanceof AppError) return err.message;
 
@@ -74,11 +84,11 @@ function getErrorMessage(err: any, statusCode: number, isProduction: boolean): s
   return err.message || 'Erro interno do servidor';
 }
 
-export function globalErrorHandler(err: any, req: Request, res: Response, _next: NextFunction): void {
+export function globalErrorHandler(err: ErrorLike, req: Request, res: Response, _next: NextFunction): void {
   const statusCode = getStatusCode(err);
   const isProduction = process.env.NODE_ENV === 'production';
   const message = getErrorMessage(err, statusCode, isProduction);
-  const requestId = (req as any).requestId;
+  const requestId = req.requestId;
 
   // Log based on severity
   const logPayload = {
@@ -98,7 +108,7 @@ export function globalErrorHandler(err: any, req: Request, res: Response, _next:
   }
 
   // Build response
-  const response: Record<string, any> = {
+  const response: Record<string, unknown> = {
     success: false,
     error: message,
     ...(err.code ? { code: err.code } : {}),

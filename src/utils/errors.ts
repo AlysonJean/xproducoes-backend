@@ -50,9 +50,9 @@ export class ConflictError extends AppError {
 }
 
 export class ValidationError extends AppError {
-  public details?: any;
-  
-  constructor(message = 'Erro de validação', details?: any) {
+  public details?: unknown;
+
+  constructor(message = 'Erro de validação', details?: unknown) {
     super(message, 422);
     this.details = details;
   }
