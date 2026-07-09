@@ -22,19 +22,19 @@ type AsyncRequestHandler = (req: Request, res: Response, next: NextFunction) => 
  * });
  */
 
-function isAsyncFunction(fn: any): fn is AsyncRequestHandler {
-  return fn.constructor.name === 'AsyncFunction' || 
-         (typeof fn === 'function' && fn.toString().includes('__awaiter'));
+function isAsyncFunction(fn: unknown): fn is AsyncRequestHandler {
+  return typeof fn === 'function' &&
+    (fn.constructor.name === 'AsyncFunction' || fn.toString().includes('__awaiter'));
 }
 
-function wrapHandler(handler: any): any {
+function wrapHandler(handler: unknown): unknown {
   if (typeof handler === 'function' && isAsyncFunction(handler)) {
-    return asyncHandler(handler as AsyncRequestHandler);
+    return asyncHandler(handler);
   }
   return handler;
 }
 
-function wrapHandlers(handlers: any[]): any[] {
+function wrapHandlers(handlers: unknown[]): unknown[] {
   return handlers.map(wrapHandler);
 }
 
@@ -45,10 +45,10 @@ export function createSafeRouter(options?: Parameters<typeof Router>[0]): Router
   const methods = ['get', 'post', 'put', 'patch', 'delete'] as const;
 
   for (const method of methods) {
-    const original = (router as any)[method].bind(router);
-    (router as any)[method] = (path: any, ...handlers: any[]) => {
-      return original(path, ...wrapHandlers(handlers));
-    };
+    const original = router[method].bind(router);
+    router[method] = ((path: unknown, ...handlers: unknown[]) => {
+      return original(path as string, ...(wrapHandlers(handlers) as Parameters<typeof original>[1][]));
+    }) as typeof router[typeof method];
   }
 
   return router;
