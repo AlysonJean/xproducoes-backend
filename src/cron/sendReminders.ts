@@ -6,6 +6,13 @@ import emailService from '../services/emailService';
 import { generateGoogleCalendarLink } from '../utils/calendar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { cacheService } from '../services/cacheService';
+
+const LOCK_KEY = 'send-reminders';
+// Deve cobrir o tempo máximo esperado de uma execução — se o processo travar/crashar no
+// meio do job sem chegar ao finally (releaseLock), o lock expira sozinho depois disso e a
+// próxima instância consegue rodar de novo, em vez de ficar bloqueado para sempre.
+const LOCK_TTL_SECONDS = 10 * 60;
 
 export const startReminderScheduler = () => {
   if (process.env.ENABLE_CRON_JOBS !== 'true') {
@@ -16,8 +23,17 @@ export const startReminderScheduler = () => {
 
   // Run every hour at minute 0
   cron.schedule('0 * * * *', async () => {
+    // Lock distribuído (Redis em produção): evita que duas instâncias rodando ao mesmo
+    // tempo (ex.: durante um rolling deploy) enviem o mesmo lembrete em duplicidade para
+    // o cliente — um `isRunning` local ao processo não protegeria contra isso.
+    const acquired = await cacheService.acquireLock(LOCK_KEY, LOCK_TTL_SECONDS);
+    if (!acquired) {
+      logger.info('[ReminderScheduler] Outra instância já está processando este ciclo. Pulando.');
+      return;
+    }
+
     logger.info('[ReminderScheduler] Checking for upcoming bookings...');
-    
+
     // Window: between 23h and 25h from now (targeting ~24h before)
     const now = new Date();
     const startWindow = new Date(now.getTime() + 23 * 60 * 60 * 1000);
@@ -108,6 +124,8 @@ export const startReminderScheduler = () => {
         // Log simplified error structure to avoid massive dumps
         const msg = error instanceof Error ? error.message : 'Unknown error';
         logger.error({ error: msg }, '[ReminderScheduler] Job failed');
+    } finally {
+        await cacheService.releaseLock(LOCK_KEY);
     }
   });
 };

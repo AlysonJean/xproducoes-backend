@@ -171,6 +171,49 @@ export class CacheService {
   }
 
   /**
+   * ✅ DISTRIBUTED LOCK (Redis SET NX EX em produção; guarda em memória em dev/test)
+   *
+   * Usado pelos cron jobs (sendReminders, socialScheduler) para evitar que a mesma
+   * execução rode em paralelo em mais de uma instância — por exemplo durante uma
+   * janela de rolling deploy com a instância antiga e a nova ativas ao mesmo tempo, ou
+   * qualquer escala horizontal futura. Um `isRunning` local (booleano em memória do
+   * processo) não protege contra isso: cada instância tem sua própria variável.
+   *
+   * Retorna true se o lock foi adquirido (o chamador deve prosseguir), false se já
+   * está em uso por outra execução (o chamador deve pular este ciclo).
+   */
+  async acquireLock(key: string, ttlSeconds: number): Promise<boolean> {
+    const lockKey = `cron:lock:${key}`;
+    try {
+      if (this.isRedisAvailable()) {
+        const result = await this.redis!.set(lockKey, '1', 'EX', ttlSeconds, 'NX');
+        return result === 'OK';
+      }
+
+      // Fallback em memória: só usado em dev/test (Redis é obrigatório em produção —
+      // ver config/environment.ts), onde há um único processo, então checar-e-setar
+      // aqui é seguro (JS é single-threaded, não há corrida real dentro do processo).
+      this.cleanup();
+      const existing = this.memoryStore.get(lockKey);
+      if (existing && Date.now() <= existing.expires) {
+        return false;
+      }
+      this.memoryStore.set(lockKey, { data: '1', expires: Date.now() + ttlSeconds * 1000 });
+      return true;
+    } catch (error) {
+      logger.error(`❌ Erro ao adquirir lock ${key}: ${String(error)}`);
+      return false;
+    }
+  }
+
+  /**
+   * ✅ RELEASE DISTRIBUTED LOCK
+   */
+  async releaseLock(key: string): Promise<void> {
+    await this.delete(`cron:lock:${key}`);
+  }
+
+  /**
    * ✅ DELETE CACHE KEY
    */
   async delete(key: string): Promise<boolean> {
