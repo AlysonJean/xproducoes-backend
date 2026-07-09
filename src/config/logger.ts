@@ -166,7 +166,10 @@ const logger: AppLogger = {
   // Métodos adicionais do Pino
   fatal: bindMethod(pinoLogger.fatal, bindMethod(pinoLogger.error, fallbackLogMethod(console.error))),
   trace: bindMethod(pinoLogger.trace, bindMethod(pinoLogger.debug, bindMethod(pinoLogger.info, fallbackLogMethod(console.debug)))),
-  child: pinoLogger.child ? pinoLogger.child.bind(pinoLogger) : (() => logger as any),
+  // Fallback defensivo: pino sempre expõe .child em runtime, mas o tipo genérico
+  // de retorno (Logger<ChildCustomLevels, boolean>) não pode ser satisfeito por
+  // um objeto que não é uma instância real de pino.Logger — cast pontual necessário.
+  child: pinoLogger.child ? pinoLogger.child.bind(pinoLogger) : ((() => logger) as unknown as typeof pinoLogger.child),
   level: pinoLogger.level,
 };
 

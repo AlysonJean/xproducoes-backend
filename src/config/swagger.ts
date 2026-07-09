@@ -315,7 +315,7 @@ export function setupSwagger(app: Express): void {
     '/api/docs/v2',
     guardInProduction,
     swaggerUi.serve,
-    swaggerUi.setup(openAPISchema as any, {
+    swaggerUi.setup(openAPISchema, {
       customCss: '.swagger-ui .topbar { display: none }',
       customSiteTitle: 'X Produções API Docs (v2)',
       customfavIcon: '/favicon.ico',
