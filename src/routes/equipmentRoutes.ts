@@ -1,6 +1,6 @@
 import { createSafeRouter } from "../middlewares/safeRouter";
 import { EquipmentController } from "../controllers/equipmentController";
-import { authenticate, optionalAuth } from "../middlewares/unifiedAuth";
+import { authenticate, optionalAuth, adminOnly } from "../middlewares/unifiedAuth";
 import { cacheMiddleware } from "../middlewares/cacheMiddleware";
 import { uploadSingle, processUpload } from "../middlewares/upload";
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware';
@@ -22,6 +22,7 @@ equipmentRoutes.get("/:id", validateId(), cacheMiddleware, equipmentController.f
 equipmentRoutes.post(
   "/",
   authenticate,
+  adminOnly,
   uploadRateLimit, uploadSingle("image"),
   processUpload,
   validateBody(equipmentCreateSchema),
@@ -30,13 +31,14 @@ equipmentRoutes.post(
 equipmentRoutes.put(
   "/:id",
   authenticate,
+  adminOnly,
   validateId(),
   uploadRateLimit, uploadSingle("image"),
   processUpload,
   validateBody(equipmentUpdateSchema),
   equipmentController.update,
 );
-equipmentRoutes.delete("/:id", authenticate, validateId(), equipmentController.delete);
-equipmentRoutes.post("/:id/duplicate", authenticate, validateId(), equipmentController.duplicate);
+equipmentRoutes.delete("/:id", authenticate, adminOnly, validateId(), equipmentController.delete);
+equipmentRoutes.post("/:id/duplicate", authenticate, adminOnly, validateId(), equipmentController.duplicate);
 
 export default equipmentRoutes;

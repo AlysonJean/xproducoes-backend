@@ -25,6 +25,7 @@ jest.mock('../config/prisma', () => ({
     appSettings: { findFirst: jest.fn(), upsert: jest.fn() },
     collaboratorPayment: { findMany: jest.fn() },
     review: { findUnique: jest.fn() },
+    service: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), delete: jest.fn() },
     // Adicione outros modelos conforme necessário
   },
 }));
@@ -501,6 +502,57 @@ describe('🛡️ Security Blindagem Tests', () => {
         .send({ comment: 'ajuste administrativo' });
 
       expect(res.status).not.toBe(403);
+    });
+  });
+
+  describe('Serviços (catálogo) - create/update/delete abertos a qualquer autenticado', () => {
+    afterEach(() => {
+      (prisma.service.create as jest.Mock<any>).mockReset();
+      (prisma.service.update as jest.Mock<any>).mockReset();
+      (prisma.service.delete as jest.Mock<any>).mockReset();
+      (prisma.service.findUnique as jest.Mock<any>).mockReset();
+    });
+
+    it('POST /services deve rejeitar (403) token de usuário comum', async () => {
+      const res = await request(app)
+        .post('/api/v1/services')
+        .set('Authorization', 'Bearer valid-user-token')
+        .send({ name: 'Serviço Fake', description: 'Descrição fake', price: 100 });
+
+      expect(res.status).toBe(403);
+      expect(prisma.service.create).not.toHaveBeenCalled();
+    });
+
+    it('PUT /services/:id deve rejeitar (403) token de usuário comum', async () => {
+      const res = await request(app)
+        .put('/api/v1/services/service-1')
+        .set('Authorization', 'Bearer valid-user-token')
+        .send({ name: 'Alterado por invasor' });
+
+      expect(res.status).toBe(403);
+      expect(prisma.service.update).not.toHaveBeenCalled();
+    });
+
+    it('DELETE /services/:id deve rejeitar (403) token de usuário comum', async () => {
+      const res = await request(app)
+        .delete('/api/v1/services/service-1')
+        .set('Authorization', 'Bearer valid-user-token');
+
+      expect(res.status).toBe(403);
+      expect(prisma.service.delete).not.toHaveBeenCalled();
+    });
+
+    it('POST /services deve aceitar (201) token de admin', async () => {
+      (prisma.service.findUnique as jest.Mock<any>).mockResolvedValue(null);
+      (prisma.service.create as jest.Mock<any>).mockResolvedValue({ id: 'service-1', name: 'Serviço Fake' });
+
+      const res = await request(app)
+        .post('/api/v1/services')
+        .set('Authorization', 'Bearer valid-admin-token')
+        .send({ name: 'Serviço Fake', description: 'Descrição fake', price: 100 });
+
+      expect(res.status).toBe(201);
+      expect(prisma.service.create).toHaveBeenCalled();
     });
   });
 });
