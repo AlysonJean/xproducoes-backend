@@ -8,6 +8,8 @@ import { uploadRateLimit } from '../middlewares/rateLimitMiddleware.js';
 import { validateBody } from "../config/validation.js";
 import { updateUserSchema, changePasswordSchema } from "../schemas/user.schema.js";
 import { UnauthorizedError, NotFoundError } from "../utils/errors.js";
+import { exportUserData, eraseUserData } from "../services/lgpdService.js";
+import logger from "../config/logger.js";
 
 const userRoutes = createSafeRouter();
 
@@ -71,6 +73,40 @@ userRoutes.post("/change-password", authenticate, validateBody(changePasswordSch
       success: false,
       message: "Erro interno do servidor"
     });
+  }
+});
+
+// LGPD: exportação e exclusão reais dos próprios dados (autoatendimento — antes só havia
+// um texto na página de LGPD pedindo para mandar email).
+userRoutes.get("/me/data-export", authenticate, async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const data = await exportUserData(authReq.userId!);
+    res.setHeader("Content-Disposition", "attachment; filename=meus-dados.json");
+    res.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({ success: false, message: error.message });
+    }
+    logger.error({ err: error }, "Erro ao exportar dados do usuário (LGPD)");
+    res.status(500).json({ success: false, message: "Erro interno do servidor" });
+  }
+});
+
+userRoutes.post("/me/request-deletion", authenticate, async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    await eraseUserData(authReq.userId!);
+    res.json({
+      success: true,
+      message: "Seus dados pessoais foram removidos. Sua sessão será encerrada.",
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({ success: false, message: error.message });
+    }
+    logger.error({ err: error }, "Erro ao processar solicitação de exclusão de dados (LGPD)");
+    res.status(500).json({ success: false, message: "Erro interno do servidor" });
   }
 });
 

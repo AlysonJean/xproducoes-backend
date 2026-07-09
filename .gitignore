@@ -47,6 +47,10 @@ test-results/
 # Backups (store externally)
 backups/
 *.sql
+# ...mas NÃO os arquivos de migração versionados do Prisma — a regra acima já bloqueou
+# silenciosamente migrações novas de serem rastreadas pelo git (as existentes só estão
+# versionadas porque foram adicionadas manualmente com `git add -f`).
+!prisma/migrations/**/*.sql
 
 # Temporary/debug files
 debug_login.js

@@ -8,6 +8,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { config } from "../config/environment.js";
 import { blacklistToken, isTokenBlacklisted } from "../services/jwtBlacklistService.js";
+import { eraseUserDataBySocialId } from "../services/lgpdService.js";
 
 // Função para validar access token do Google
 async function validateGoogleToken(accessToken: string): Promise<{
@@ -620,7 +621,7 @@ export class AuthController {
   ): Promise<void> => {
     try {
       const signedRequest = req.body.signed_request;
-      
+
       if (!signedRequest) {
         return next(new BadRequestError('signed_request é obrigatório'));
       }
@@ -628,26 +629,69 @@ export class AuthController {
       // Decodificar o signed_request do Facebook
       const parts = signedRequest.split('.');
       if (parts.length !== 2) return next(new BadRequestError('signed_request inválido'));
-      
-      const payload = parts[1];
-      
+
+      const [encodedSig, payload] = parts;
+
+      // Verifica a assinatura HMAC-SHA256 contra o app secret (algoritmo documentado pela
+      // Meta). Antes desta correção, o payload era decodificado e usado (agora para
+      // disparar uma exclusão real de dados) sem NENHUMA verificação — qualquer um podia
+      // enviar um "signed_request" forjado com um user_id arbitrário e derrubar dados de
+      // outra pessoa. Isso era inofensivo antes (o endpoint não fazia nada de verdade),
+      // mas se torna uma vulnerabilidade real agora que ele executa uma exclusão de fato.
+      const appSecret = process.env.FACEBOOK_CLIENT_SECRET;
+      if (!appSecret) {
+        logger.error('FACEBOOK_CLIENT_SECRET não configurado — não é possível verificar a assinatura do signed_request');
+        return next(new BadRequestError('Callback de exclusão de dados não configurado'));
+      }
+
+      const base64urlToBuffer = (value: string) =>
+        Buffer.from(value.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+
+      const expectedSig = crypto.createHmac('sha256', appSecret).update(payload).digest();
+      const providedSig = base64urlToBuffer(encodedSig);
+
+      if (
+        providedSig.length !== expectedSig.length ||
+        !crypto.timingSafeEqual(providedSig, expectedSig)
+      ) {
+        logger.warn('signed_request com assinatura inválida recebido no callback de exclusão de dados do Facebook');
+        return next(new BadRequestError('Assinatura do signed_request inválida'));
+      }
+
       // Decodificar o payload (base64url)
-      const data = JSON.parse(
-        Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8')
-      );
-      
+      const data = JSON.parse(base64urlToBuffer(payload).toString('utf-8'));
+
+      if (data.algorithm !== 'HMAC-SHA256') {
+        return next(new BadRequestError('Algoritmo de assinatura não suportado'));
+      }
+
       const userId = data.user_id;
-      
+
       if (!userId) {
         return next(new BadRequestError('user_id não encontrado no signed_request'));
       }
       
       logger.info({ facebookUserId: userId }, 'Solicitação de exclusão de dados do Facebook recebida');
-      
+
       const confirmationCode = `FB-DEL-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      
-      logger.info({ facebookId: userId }, 'Solicitação de exclusão registrada (Facebook ID não mapeado para usuário local)');
-      
+
+      // Localiza a conta local pelo ID do Facebook (gravado em socialProviderId a partir
+      // do login social) e anonimiza os dados de verdade — antes, este endpoint só
+      // registrava um log dizendo que o Facebook ID "não era mapeado para usuário local"
+      // e nunca excluía nada.
+      try {
+        const result = await eraseUserDataBySocialId('facebook', String(userId));
+        if (result) {
+          logger.info({ facebookId: userId, userId: result.userId }, 'Dados do usuário anonimizados via callback de exclusão do Facebook');
+        } else {
+          logger.info({ facebookId: userId }, 'Solicitação de exclusão recebida, mas nenhuma conta local está mapeada a este Facebook ID');
+        }
+      } catch (eraseError) {
+        // Não falha a resposta ao Facebook por causa disso — o protocolo exige 200 +
+        // status URL independentemente; registra para investigação manual.
+        logger.error({ err: eraseError, facebookId: userId }, 'Falha ao processar exclusão de dados via callback do Facebook');
+      }
+
       const statusUrl = `${process.env.FRONTEND_URL || 'https://xproducoeseeventos.com.br'}/data-deletion-status?code=${confirmationCode}`;
       
       res.status(200).json({

@@ -116,6 +116,8 @@ export async function handleGoogleCallback(params: { code?: string; state?: stri
   let user = await prisma.user.findUnique({ where: { email } });
   const avatarUrl = (claims as any).picture as string || null;
 
+  const googleSubjectId = ((claims as any).sub as string) || null;
+
   if (!user) {
     isNewUser = true;
     user = await prisma.user.create({
@@ -125,6 +127,7 @@ export async function handleGoogleCallback(params: { code?: string; state?: stri
         passwordHash: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10),
         verified: emailVerified || true,
         socialProvider: 'google',
+        socialProviderId: googleSubjectId,
         avatarUrl,
       },
     });
@@ -149,7 +152,10 @@ export async function handleGoogleCallback(params: { code?: string; state?: stri
       await prisma.user.update({ where: { id: user.id }, data: { verified: true } });
     }
     if (!user.socialProvider) {
-      await prisma.user.update({ where: { id: user.id }, data: { socialProvider: 'google' } });
+      await prisma.user.update({ where: { id: user.id }, data: { socialProvider: 'google', socialProviderId: googleSubjectId } });
+    } else if (user.socialProvider === 'google' && !user.socialProviderId && googleSubjectId) {
+      // Backfill para contas que logaram antes desta correção existir.
+      await prisma.user.update({ where: { id: user.id }, data: { socialProviderId: googleSubjectId } });
     }
   }
 
@@ -257,6 +263,8 @@ export async function handleFacebookCallback(params: { code?: string; state?: st
   let user = await prisma.user.findUnique({ where: { email } });
   const avatarUrl = me.picture?.data?.url || null;
 
+  const facebookUserId = (me.id as string) || null;
+
   if (!user) {
     isNewUser = true;
     user = await prisma.user.create({
@@ -266,6 +274,7 @@ export async function handleFacebookCallback(params: { code?: string; state?: st
         passwordHash: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10),
         verified: true,
         socialProvider: 'facebook',
+        socialProviderId: facebookUserId,
         avatarUrl,
       },
     });
@@ -286,7 +295,11 @@ export async function handleFacebookCallback(params: { code?: string; state?: st
       await prisma.user.update({ where: { id: user.id }, data: { avatarUrl } });
     }
     if (!user.socialProvider) {
-      await prisma.user.update({ where: { id: user.id }, data: { socialProvider: 'facebook' } });
+      await prisma.user.update({ where: { id: user.id }, data: { socialProvider: 'facebook', socialProviderId: facebookUserId } });
+    } else if (user.socialProvider === 'facebook' && !user.socialProviderId && facebookUserId) {
+      // Backfill para contas que logaram antes desta correção existir — sem isso, o
+      // callback de exclusão de dados da Meta nunca conseguiria localizar a conta.
+      await prisma.user.update({ where: { id: user.id }, data: { socialProviderId: facebookUserId } });
     }
   }
 

@@ -43,15 +43,15 @@ jest.mock('jsonwebtoken', () => {
 // Mock do Prisma para evitar conexões reais com banco
 jest.mock('../config/prisma', () => ({
   prisma: {
-    user: { findUnique: jest.fn(), findMany: jest.fn(), count: jest.fn(), update: jest.fn() },
+    user: { findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), count: jest.fn(), update: jest.fn() },
     sponsorLogo: { create: jest.fn(), findMany: jest.fn() },
     newsletterSubscriber: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
-    collaborator: { create: jest.fn() },
-    client: { findFirst: jest.fn() },
-    booking: { findUnique: jest.fn(), update: jest.fn() },
+    collaborator: { create: jest.fn(), updateMany: jest.fn() },
+    client: { findFirst: jest.fn(), updateMany: jest.fn() },
+    booking: { findUnique: jest.fn(), update: jest.fn(), findMany: jest.fn() },
     appSettings: { findFirst: jest.fn(), upsert: jest.fn() },
     collaboratorPayment: { findMany: jest.fn() },
-    review: { findUnique: jest.fn() },
+    review: { findUnique: jest.fn(), findMany: jest.fn() },
     service: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), delete: jest.fn() },
     eventCollaborator: { findMany: jest.fn() },
     // Adicione outros modelos conforme necessário
@@ -117,6 +117,7 @@ jest.mock('../services/uploadService', () => ({
 
 import request from 'supertest';
 import bcrypt from 'bcrypt';
+import crypto from 'node:crypto';
 
 let app: typeof import('../app').default;
 let prisma: any;
@@ -915,6 +916,144 @@ describe('🛡️ Security Blindagem Tests', () => {
         .get('/api/v1/collaborators/search')
         .set('Authorization', 'Bearer valid-admin-token');
       expect(res.headers['ratelimit-limit']).toBeDefined();
+    });
+  });
+
+  describe('LGPD - exportação e exclusão reais dos próprios dados (antes só existia um texto pedindo para mandar email)', () => {
+    afterEach(() => {
+      (prisma.user.findUnique as jest.Mock<any>).mockReset();
+      (prisma.user.update as jest.Mock<any>).mockReset();
+      (prisma.booking.findMany as jest.Mock<any>).mockReset();
+      (prisma.review.findMany as jest.Mock<any>).mockReset();
+      (prisma.client.updateMany as jest.Mock<any>).mockReset();
+      (prisma.collaborator.updateMany as jest.Mock<any>).mockReset();
+    });
+
+    it('GET /users/me/data-export exige autenticação (401 sem token)', async () => {
+      const res = await request(app).get('/api/v1/users/me/data-export');
+      expect(res.status).toBe(401);
+    });
+
+    it('GET /users/me/data-export retorna o perfil, reservas e avaliações do titular autenticado', async () => {
+      (prisma.user.findUnique as jest.Mock<any>).mockResolvedValue({
+        id: 'user-id', name: 'Fulano', email: 'fulano@example.com', role: 'CLIENT',
+        clientProfile: null, collaboratorProfile: null,
+      });
+      (prisma.booking.findMany as jest.Mock<any>).mockResolvedValue([{ id: 'booking-1' }]);
+      (prisma.review.findMany as jest.Mock<any>).mockResolvedValue([{ id: 'review-1' }]);
+
+      const res = await request(app)
+        .get('/api/v1/users/me/data-export')
+        .set('Authorization', 'Bearer valid-user-token');
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.profile.id).toBe('user-id');
+      expect(res.body.data.bookings).toEqual([{ id: 'booking-1' }]);
+    });
+
+    it('POST /users/me/request-deletion exige autenticação (401 sem token)', async () => {
+      const res = await request(app).post('/api/v1/users/me/request-deletion');
+      expect(res.status).toBe(401);
+    });
+
+    it('POST /users/me/request-deletion anonimiza os dados do titular autenticado (200)', async () => {
+      (prisma.user.findUnique as jest.Mock<any>).mockResolvedValue({ id: 'user-id', email: 'fulano@example.com' });
+      (prisma.user.update as jest.Mock<any>).mockResolvedValue({});
+      (prisma.client.updateMany as jest.Mock<any>).mockResolvedValue({ count: 1 });
+      (prisma.collaborator.updateMany as jest.Mock<any>).mockResolvedValue({ count: 0 });
+
+      const res = await request(app)
+        .post('/api/v1/users/me/request-deletion')
+        .set('Authorization', 'Bearer valid-user-token');
+
+      expect(res.status).toBe(200);
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'user-id' } }),
+      );
+    });
+  });
+
+  describe('POST /auth/facebook/data-deletion - verifica a assinatura do signed_request antes de confiar nele', () => {
+    const APP_SECRET = 'facebook-app-secret-for-tests';
+    const originalSecret = process.env.FACEBOOK_CLIENT_SECRET;
+
+    beforeAll(() => {
+      process.env.FACEBOOK_CLIENT_SECRET = APP_SECRET;
+    });
+
+    afterAll(() => {
+      process.env.FACEBOOK_CLIENT_SECRET = originalSecret;
+    });
+
+    afterEach(() => {
+      (prisma.user.findFirst as jest.Mock<any>).mockReset();
+      (prisma.user.findUnique as jest.Mock<any>).mockReset();
+      (prisma.user.update as jest.Mock<any>).mockReset();
+    });
+
+    function base64url(input: Buffer | string): string {
+      return Buffer.from(input)
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+    }
+
+    function makeSignedRequest(payloadObj: Record<string, unknown>, secret: string): string {
+      const payload = base64url(JSON.stringify(payloadObj));
+      const sig = crypto.createHmac('sha256', secret).update(payload).digest();
+      return `${base64url(sig)}.${payload}`;
+    }
+
+    it('rejeita (400) um signed_request com assinatura forjada — antes disparava a exclusão sem checar nada', async () => {
+      const forgedPayload = base64url(JSON.stringify({ algorithm: 'HMAC-SHA256', user_id: 'vitima-123' }));
+      const forgedSig = base64url(crypto.randomBytes(32)); // assinatura aleatória, não corresponde ao payload
+      const signedRequest = `${forgedSig}.${forgedPayload}`;
+
+      const res = await request(app)
+        .post('/api/v1/auth/facebook/data-deletion')
+        .send({ signed_request: signedRequest });
+
+      expect(res.status).toBe(400);
+      expect(prisma.user.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('aceita um signed_request corretamente assinado e aciona a exclusão real de dados', async () => {
+      const signedRequest = makeSignedRequest(
+        { algorithm: 'HMAC-SHA256', user_id: 'fb-real-user-id' },
+        APP_SECRET,
+      );
+      (prisma.user.findFirst as jest.Mock<any>).mockResolvedValue({ id: 'local-user-id' });
+      (prisma.user.findUnique as jest.Mock<any>).mockResolvedValue({ id: 'local-user-id', email: 'x@example.com' });
+      (prisma.user.update as jest.Mock<any>).mockResolvedValue({});
+
+      const res = await request(app)
+        .post('/api/v1/auth/facebook/data-deletion')
+        .send({ signed_request: signedRequest });
+
+      expect(res.status).toBe(200);
+      expect(res.body.confirmation_code).toBeTruthy();
+      expect(prisma.user.findFirst).toHaveBeenCalledWith({
+        where: { socialProvider: 'facebook', socialProviderId: 'fb-real-user-id' },
+        select: { id: true },
+      });
+      expect(prisma.user.update).toHaveBeenCalled();
+    });
+
+    it('retorna 200 com confirmation_code mesmo quando nenhuma conta local está mapeada (protocolo da Meta exige 200)', async () => {
+      const signedRequest = makeSignedRequest(
+        { algorithm: 'HMAC-SHA256', user_id: 'fb-unmapped-user' },
+        APP_SECRET,
+      );
+      (prisma.user.findFirst as jest.Mock<any>).mockResolvedValue(null);
+
+      const res = await request(app)
+        .post('/api/v1/auth/facebook/data-deletion')
+        .send({ signed_request: signedRequest });
+
+      expect(res.status).toBe(200);
+      expect(res.body.confirmation_code).toBeTruthy();
+      expect(prisma.user.update).not.toHaveBeenCalled();
     });
   });
 });
