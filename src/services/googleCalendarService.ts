@@ -1,7 +1,11 @@
 import { google } from 'googleapis';
+import jwt from 'jsonwebtoken';
 import { prisma } from '../config/prisma';
 import logger from '../config/logger';
+import { config } from '../config/environment';
 import { AppError } from '../utils/errors';
+
+const OAUTH_STATE_PURPOSE = 'google-calendar-oauth-state';
 
 // Escopos necessários para ler/escrever no calendário
 const SCOPES = [
@@ -21,20 +25,36 @@ export class GoogleCalendarService {
   // Gera a URL para o usuário autorizar
   generateAuthUrl(userId: string) {
     const client = this.getClient();
+    // `state` é assinado e vinculado ao usuário que iniciou o fluxo, para que o
+    // callback não possa ser enganado por um `state` forjado apontando para a
+    // conta de outra pessoa (o Google apenas ecoa esse valor, não o valida).
+    const state = jwt.sign({ userId, purpose: OAUTH_STATE_PURPOSE }, config.jwtSecret, { expiresIn: '10m' });
     return client.generateAuthUrl({
       access_type: 'offline', // Importante para receber refresh_token
       scope: SCOPES,
-      state: userId, // Passamos o ID do usuário para saber quem é no callback (CSRF mitigation seria ideal, mas id serve por enquanto)
+      state,
       prompt: 'consent' // Força o Google a pedir consentimento (e refresh token) novamente
     });
   }
 
   // Processa o callback do Google
-  async handleCallback(code: string, userId: string) {
+  async handleCallback(code: string, state: string) {
+    let userId: string;
+    try {
+      const decoded = jwt.verify(state, config.jwtSecret) as { userId?: string; purpose?: string };
+      if (decoded.purpose !== OAUTH_STATE_PURPOSE || !decoded.userId) {
+        throw new Error('state inválido');
+      }
+      userId = decoded.userId;
+    } catch (error) {
+      logger.warn('State inválido ou expirado no callback do Google Calendar', error);
+      throw new AppError('Link de autorização inválido ou expirado. Tente novamente.', 400, true, 'GOOGLE_CALENDAR_INVALID_STATE');
+    }
+
     const client = this.getClient();
     try {
       const { tokens } = await client.getToken(code);
-      
+
       client.setCredentials(tokens);
 
       // Busca informações do perfil para salvar o email do calendário (UX)
@@ -50,7 +70,7 @@ export class GoogleCalendarService {
           googleCalendarEmail: calendarEmail
         }
       });
-      
+
       return true;
     } catch (error) {
       logger.error('Erro ao autenticar com Google Calendar', error);
