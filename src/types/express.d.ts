@@ -6,6 +6,11 @@ declare global {
     interface Request {
       file?: multer.File;
       files?: { [fieldname: string]: multer.File[] } | multer.File[];
+      securityInfo?: {
+        ip: string;
+        userAgent: string;
+        timestamp: Date;
+      };
     }
   }
 }

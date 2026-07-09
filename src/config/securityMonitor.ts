@@ -1,3 +1,4 @@
+import type { Request, Response, NextFunction } from "express";
 import logger from "./logger";
 import { metricsCollector } from "./telemetry";
 
@@ -7,7 +8,7 @@ export interface SecurityEvent {
   userAgent: string;
   endpoint: string;
   timestamp: Date;
-  details?: any;
+  details?: unknown;
 }
 
 export interface SecurityMetrics {
@@ -48,8 +49,8 @@ class SecurityMonitor {
 
     // Não deixe este timer manter o event loop ativo (útil para testes)
     try {
-      if (this.cleanupTimer && typeof (this.cleanupTimer as any).unref === 'function') {
-        (this.cleanupTimer as any).unref();
+      if (this.cleanupTimer && typeof this.cleanupTimer.unref === 'function') {
+        this.cleanupTimer.unref();
       }
     } catch (_e) {
       // ignore - fall back to default behaviour
@@ -59,12 +60,12 @@ class SecurityMonitor {
   // Permite que testes ou o processo limpem explicitamente o timer
   stop() {
     if (this.cleanupTimer) {
-      clearInterval(this.cleanupTimer as any);
+      clearInterval(this.cleanupTimer);
       this.cleanupTimer = undefined;
     }
   }
 
-  recordInvalidToken(ip: string, userAgent: string, endpoint: string, details?: any) {
+  recordInvalidToken(ip: string, userAgent: string, endpoint: string, details?: unknown) {
     this.securityMetrics.invalidTokenAttempts++;
     this.recordEvent({
       type: "invalid_token",
@@ -86,7 +87,7 @@ class SecurityMonitor {
     this.checkThresholds();
   }
 
-  recordExpiredToken(ip: string, userAgent: string, endpoint: string, details?: any) {
+  recordExpiredToken(ip: string, userAgent: string, endpoint: string, details?: unknown) {
     this.securityMetrics.expiredTokenAttempts++;
     this.recordEvent({
       type: "expired_token",
@@ -108,7 +109,7 @@ class SecurityMonitor {
     this.checkThresholds();
   }
 
-  recordMalformedToken(ip: string, userAgent: string, endpoint: string, details?: any) {
+  recordMalformedToken(ip: string, userAgent: string, endpoint: string, details?: unknown) {
     this.securityMetrics.malformedTokenAttempts++;
     this.recordEvent({
       type: "malformed_token",
@@ -130,7 +131,7 @@ class SecurityMonitor {
     this.checkThresholds();
   }
 
-  recordSuspiciousActivity(ip: string, userAgent: string, endpoint: string, details?: any) {
+  recordSuspiciousActivity(ip: string, userAgent: string, endpoint: string, details?: unknown) {
     this.securityMetrics.suspiciousActivities++;
     this.recordEvent({
       type: "suspicious_activity",
@@ -269,8 +270,8 @@ class SecurityMonitor {
 export const securityMonitor = new SecurityMonitor();
 
 // Middleware para monitoramento de segurança
-export const securityMonitoringMiddleware = (req: any, res: any, next: any) => {
-  const ip = req.ip || req.connection.remoteAddress || "unknown";
+export const securityMonitoringMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
   const userAgent = req.get("User-Agent") || "unknown";
 
   // Detectar padrões suspeitos
