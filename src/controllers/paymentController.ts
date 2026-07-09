@@ -1,7 +1,19 @@
 import { Request, Response, NextFunction } from "express";
-import * as paymentService from "../services/paymentService";
 import { prisma } from "../config/prisma";
 import { ForbiddenError } from "../utils/errors";
+
+// O gateway de pagamento real (Stripe) ainda não foi integrado — paymentService
+// é inteiramente mock (dados fixos). Em vez de fingir sucesso com dados falsos,
+// os endpoints respondem 501 explicitamente. A checagem de autorização (dono da
+// reserva ou admin) continua ativa mesmo com o recurso desligado, para já estar
+// correta no dia em que o gateway real for ligado.
+function paymentsNotAvailable(res: Response) {
+  return res.status(501).json({
+    success: false,
+    message: "Pagamentos online ainda não estão disponíveis. Em breve.",
+    code: "PAYMENT_NOT_AVAILABLE",
+  });
+}
 
 async function assertOwnsBooking(req: Request, bookingId: string): Promise<void> {
   if (req.userRole === "ADMIN") return;
@@ -31,27 +43,39 @@ export class PaymentController {
           .json({ success: false, message: "O ID da reserva é obrigatório." });
       }
       await assertOwnsBooking(req, bookingId);
-      const session = await paymentService.createCheckoutSession(
-        bookingId,
-        req.userId!,
-      );
-      return res.json({ success: true, data: session });
+      return paymentsNotAvailable(res);
     } catch (error) {
       return next(error);
     }
   };
 
+  // Ponto de integração real preparado para quando o Stripe for adicionado:
+  // validar a assinatura do corpo bruto da requisição com STRIPE_WEBHOOK_SECRET
+  // (ex.: stripe.webhooks.constructEvent(req.rawBody, signature, secret)) antes
+  // de processar qualquer evento. Sem o segredo configurado, não há gateway
+  // real por trás — respondemos 503 em vez de aceitar qualquer POST como válido.
   handleStripeWebhook = async (
     req: Request,
     res: Response,
-    next: NextFunction,
+    _next: NextFunction,
   ) => {
-    try {
-      await paymentService.handleWebhookEvent(req);
-      return res.status(200).json({ success: true, data: { received: true } });
-    } catch (error) {
-      return next(error);
+    const signature = req.headers["stripe-signature"];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!webhookSecret || !signature) {
+      return res.status(503).json({
+        success: false,
+        message: "Webhook de pagamento não configurado.",
+        code: "PAYMENT_WEBHOOK_NOT_CONFIGURED",
+      });
     }
+
+    // TODO(stripe): const event = stripe.webhooks.constructEvent(req.rawBody, signature, webhookSecret);
+    return res.status(503).json({
+      success: false,
+      message: "Webhook de pagamento não configurado.",
+      code: "PAYMENT_WEBHOOK_NOT_CONFIGURED",
+    });
   };
 
   createPaymentIntent = async (
@@ -67,9 +91,7 @@ export class PaymentController {
       }
 
       await assertOwnsBooking(req, bookingId);
-
-      const paymentIntent = await paymentService.createPaymentIntent(bookingId);
-      return res.json({ success: true, data: paymentIntent });
+      return paymentsNotAvailable(res);
     } catch (error) {
       return next(error);
     }
@@ -82,13 +104,12 @@ export class PaymentController {
   ) => {
     try {
       const { paymentIntentId } = req.params as { paymentIntentId: string };
-      
+
       if (!paymentIntentId) {
         return res.status(400).json({ success: false, message: "ID do payment intent é obrigatório." });
       }
 
-      const payment = await paymentService.confirmPayment(paymentIntentId);
-      return res.json({ success: true, data: payment });
+      return paymentsNotAvailable(res);
     } catch (error) {
       return next(error);
     }
@@ -101,14 +122,12 @@ export class PaymentController {
   ) => {
     try {
       const { paymentId } = req.params as { paymentId: string };
-      const { amount } = req.body;
-      
+
       if (!paymentId) {
         return res.status(400).json({ success: false, message: "ID do pagamento é obrigatório." });
       }
 
-      const refund = await paymentService.refund(paymentId, amount);
-      return res.json({ success: true, data: refund });
+      return paymentsNotAvailable(res);
     } catch (error) {
       return next(error);
     }
@@ -120,8 +139,7 @@ export class PaymentController {
     next: NextFunction,
   ) => {
     try {
-      const history = await paymentService.getHistory(req.userId!);
-      return res.json({ success: true, data: history });
+      return paymentsNotAvailable(res);
     } catch (error) {
       return next(error);
     }
@@ -140,9 +158,7 @@ export class PaymentController {
       }
 
       await assertOwnsBooking(req, bookingId);
-
-      const payment = await paymentService.getByBooking(bookingId);
-      return res.json({ success: true, data: payment });
+      return paymentsNotAvailable(res);
     } catch (error) {
       return next(error);
     }
@@ -154,9 +170,7 @@ export class PaymentController {
     next: NextFunction,
   ) => {
     try {
-      const filters = req.query;
-      const payments = await paymentService.getAllPayments(filters);
-      return res.json({ success: true, data: payments });
+      return paymentsNotAvailable(res);
     } catch (error) {
       return next(error);
     }
@@ -168,8 +182,7 @@ export class PaymentController {
     next: NextFunction,
   ) => {
     try {
-      const stats = await paymentService.getPaymentStats();
-      return res.json({ success: true, data: stats });
+      return paymentsNotAvailable(res);
     } catch (error) {
       return next(error);
     }

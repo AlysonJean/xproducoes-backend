@@ -613,7 +613,7 @@ describe('🛡️ Security Blindagem Tests', () => {
     });
   });
 
-  describe('Pagamentos por reserva - IDOR (antes qualquer autenticado via bookingId de outrem)', () => {
+  describe('Pagamentos por reserva - IDOR (antes qualquer autenticado via bookingId de outrem) + Fase 1: endpoints desativados (501) até haver gateway real', () => {
     afterEach(() => {
       (prisma.client.findFirst as jest.Mock<any>).mockReset();
       (prisma.booking.findUnique as jest.Mock<any>).mockReset();
@@ -630,7 +630,7 @@ describe('🛡️ Security Blindagem Tests', () => {
       expect(res.status).toBe(403);
     });
 
-    it('GET /payments/booking/:bookingId deve aceitar quando a reserva pertence ao cliente', async () => {
+    it('GET /payments/booking/:bookingId - dono autorizado recebe 501 (recurso desativado), não dados falsos', async () => {
       (prisma.client.findFirst as jest.Mock<any>).mockResolvedValue({ id: 'client-mine' });
       (prisma.booking.findUnique as jest.Mock<any>).mockResolvedValue({ clientId: 'client-mine' });
 
@@ -638,7 +638,8 @@ describe('🛡️ Security Blindagem Tests', () => {
         .get('/api/v1/payments/booking/booking-1')
         .set('Authorization', 'Bearer valid-user-token');
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(501);
+      expect(res.body.code).toBe('PAYMENT_NOT_AVAILABLE');
     });
 
     it('POST /payments/create-intent/:bookingId deve rejeitar (403) quando a reserva não pertence ao cliente', async () => {
@@ -652,15 +653,37 @@ describe('🛡️ Security Blindagem Tests', () => {
       expect(res.status).toBe(403);
     });
 
-    it('ADMIN não precisa ter registro de client para acessar pagamento de qualquer reserva', async () => {
+    it('ADMIN não precisa ter registro de client para acessar (recebe 501, recurso desativado)', async () => {
       (prisma.booking.findUnique as jest.Mock<any>).mockResolvedValue({ clientId: 'client-outro' });
 
       const res = await request(app)
         .get('/api/v1/payments/booking/booking-1')
         .set('Authorization', 'Bearer valid-admin-token');
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(501);
       expect(prisma.client.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('GET /payments/all e /payments/stats (admin) também retornam 501, não mais totalRevenue fictício', async () => {
+      const resAll = await request(app)
+        .get('/api/v1/payments/all')
+        .set('Authorization', 'Bearer valid-admin-token');
+      const resStats = await request(app)
+        .get('/api/v1/payments/stats')
+        .set('Authorization', 'Bearer valid-admin-token');
+
+      expect(resAll.status).toBe(501);
+      expect(resStats.status).toBe(501);
+      expect(JSON.stringify(resStats.body)).not.toContain('125000');
+    });
+
+    it('POST /payments/webhook sem STRIPE_WEBHOOK_SECRET configurado retorna 503, não "received: true" para qualquer POST', async () => {
+      const res = await request(app)
+        .post('/api/v1/payments/webhook')
+        .send({ type: 'payment_intent.succeeded' });
+
+      expect(res.status).toBe(503);
+      expect(res.body.success).toBe(false);
     });
   });
 });
