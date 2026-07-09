@@ -12,13 +12,28 @@ const SMTP_PASS = process.env.SMTP_PASS;
 const EMAIL_FROM = process.env.EMAIL_FROM || process.env.SMTP_USER;
 const FROM = EMAIL_FROM || SMTP_USER;
 
+interface EmailUser {
+  name: string;
+  email: string;
+}
+
+interface EmailBooking {
+  id: string;
+  equipments?: Array<{ name: string }>;
+  totalPrice?: unknown;
+  eventTitle?: string | null;
+  eventDate: Date | string;
+  location?: string | null;
+  status?: string;
+}
+
 export class EmailService {
   private transporter?: nodemailer.Transporter;
 
   constructor() {
   const useEthereal = process.env.USE_ETHEREAL === 'true';
     // init with safe transporter to avoid uninitialized errors
-    this.transporter = nodemailer.createTransport({ jsonTransport: true } as any);
+    this.transporter = nodemailer.createTransport({ jsonTransport: true });
     // If SMTP is configured and not forcing Ethereal, use it synchronously
     if (!useEthereal && SMTP_HOST && SMTP_PORT && SMTP_USER && SMTP_PASS) {
       this.transporter = nodemailer.createTransport({
@@ -100,7 +115,7 @@ export class EmailService {
 
   // métodos auxiliares para notificações podem ser adicionados aqui
 
-  async sendBookingConfirmation(user: any, booking: any) {
+  async sendBookingConfirmation(user: EmailUser, booking: EmailBooking) {
     const mailOptions = {
       from: FROM,
       to: user.email,
@@ -110,7 +125,7 @@ export class EmailService {
         <p>A sua reserva foi recebida e está agora aguardando confirmação da equipe.</p>
         <p><strong>Detalhes do Pedido:</strong></p>
         <ul>
-          ${(booking.equipments || []).map((eq: any) => `<li>${eq.name}</li>`).join("")}
+          ${(booking.equipments || []).map((eq) => `<li>${eq.name}</li>`).join("")}
         </ul>
         <p><strong>Total Estimado:</strong> R$ ${Number(booking.totalPrice || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         <p>Você será notificado assim que confirmarmos a disponibilidade.</p>
@@ -119,7 +134,7 @@ export class EmailService {
     return this.sendMail(user.email, mailOptions.subject, mailOptions.html);
   }
 
-  async sendBookingApproved(user: { name: string; email: string }, booking: any) {
+  async sendBookingApproved(user: EmailUser, booking: EmailBooking) {
     const frontendUrl = process.env.FRONTEND_URL || 'https://xproducoeseeventos.com.br';
     const bookingUrl = `${frontendUrl}/cliente/reservas/${booking.id}`;
     
@@ -151,7 +166,7 @@ export class EmailService {
     return this.sendMail(user.email, subject, html);
   }
 
-  async sendStatusUpdate(user: any, booking: any) {
+  async sendStatusUpdate(user: EmailUser, booking: EmailBooking) {
     const html = `
       <h1>Olá, ${user.name}!</h1>
       <p>O estado da sua reserva foi atualizado para: <strong>${booking.status}</strong></p>

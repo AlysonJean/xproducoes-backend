@@ -145,8 +145,8 @@ async function initializeWorkers(connection: import('ioredis').default): Promise
 
         case 'booking-confirmation':
           await emailService.sendBookingConfirmation(
-            templateData.user,
-            templateData.booking
+            templateData.user as Parameters<typeof emailService.sendBookingConfirmation>[0],
+            templateData.booking as Parameters<typeof emailService.sendBookingConfirmation>[1]
           );
           break;
         

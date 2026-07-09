@@ -1,3 +1,4 @@
+import type { Request, Response, NextFunction } from "express";
 import { createSafeRouter } from "../middlewares/safeRouter";
 import { AuthController } from "../controllers/authController";
 import { authenticate, requireAdmin } from "../middlewares/unifiedAuth";
@@ -107,20 +108,20 @@ authRoutes.post(
 );
 
 // Rota admin para envio de campanhas simples (segmento por role)
-authRoutes.post('/admin/send-campaign', authenticate, requireAdmin, async (req: any, res: any, next: any) => {
+authRoutes.post('/admin/send-campaign', authenticate, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { subject, html, text, segment } = req.body;
     // segment: { role: 'CLIENT' } ou { ids: ['id1','id2'] }
-    let users: any[] = [];
+    let users: Array<{ id: string; name: string; email: string; role: string; createdAt: Date }> = [];
     if (segment?.ids && Array.isArray(segment.ids)) {
       users = await (await import('../services/userService')).listUsers();
-      users = users.filter((u: any) => segment.ids.includes(u.id));
+      users = users.filter((u) => segment.ids.includes(u.id));
     } else if (segment?.role) {
       users = await (await import('../services/userService')).findAllClients();
       if (segment.role !== 'CLIENT') {
         // fallback: list all users and filter
         users = await (await import('../services/userService')).listUsers();
-        users = users.filter((u: any) => u.role === segment.role);
+        users = users.filter((u) => u.role === segment.role);
       }
     } else {
       users = await (await import('../services/userService')).listUsers();
@@ -131,7 +132,7 @@ authRoutes.post('/admin/send-campaign', authenticate, requireAdmin, async (req: 
     const BATCH = 50;
     for (let i = 0; i < users.length; i += BATCH) {
       const batch = users.slice(i, i + BATCH);
-      await Promise.all(batch.map((u: any) => EmailSvc.sendMail(u.email, subject, html, text)));
+      await Promise.all(batch.map((u) => EmailSvc.sendMail(u.email, subject, html, text)));
       // pequeno delay entre batches
       await new Promise((r) => setTimeout(r, 500));
     }
