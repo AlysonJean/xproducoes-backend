@@ -1,11 +1,54 @@
 /* eslint-disable no-console */
 import fs from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import crypto from "node:crypto";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { Client } from "pg";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+// Ver backupDbSnapshot.js: mesma cifra/derivação (AES-256-GCM), duplicada de propósito
+// porque este script roda direto com `node`, sem passar pelo build TS do app.
+const ALGORITHM = "aes-256-gcm";
+const IV_LENGTH = 12;
+const AUTH_TAG_LENGTH = 16;
+const ENCRYPTED_EXT = ".json.enc";
+
+// Exportado (também) para permitir verificação manual direta destas funções reais —
+// ver instruções de verificação no final deste arquivo / no commit desta mudança.
+export function getEncryptionKey() {
+  const raw = process.env.ENCRYPTION_KEY;
+  if (!raw) {
+    throw new Error("ENCRYPTION_KEY não encontrado no ambiente — obrigatório para decifrar o backup.");
+  }
+  return crypto.createHash("sha256").update(raw).digest();
+}
+
+export function decryptJsonBuffer(encryptedBuffer, key) {
+  const iv = encryptedBuffer.subarray(0, IV_LENGTH);
+  const authTag = encryptedBuffer.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
+  const ciphertext = encryptedBuffer.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
+
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+  decipher.setAuthTag(authTag);
+  const plainBuffer = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  return JSON.parse(plainBuffer.toString("utf8"));
+}
+
+// Lê um arquivo do snapshot: tenta a versão cifrada (formato atual) e cai para a
+// versão em texto puro (formato legado, snapshots tirados antes da Fase 2.7) se a
+// primeira não existir — permite restaurar backups antigos sem migrá-los antes.
+export async function readSnapshotJson(basePathWithoutExt, key) {
+  try {
+    const encrypted = await fs.readFile(`${basePathWithoutExt}${ENCRYPTED_EXT}`);
+    return decryptJsonBuffer(encrypted, key);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    const legacyPlaintext = await fs.readFile(`${basePathWithoutExt}.json`, "utf8");
+    return JSON.parse(legacyPlaintext);
+  }
+}
 
 function getDatabaseUrl() {
   const raw = process.env.DATABASE_URL;
@@ -73,8 +116,8 @@ async function main() {
   const __dirname = path.dirname(__filename);
   const projectRoot = path.resolve(__dirname, "..");
   const snapshotDir = path.resolve(projectRoot, snapshotArg);
-  const manifestPath = path.join(snapshotDir, "manifest.json");
-  const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+  const encryptionKey = getEncryptionKey();
+  const manifest = await readSnapshotJson(path.join(snapshotDir, "manifest"), encryptionKey);
 
   const tables = manifest.tables || [];
   const restoreOrder = topologicalSort(tables, manifest.foreignKeys || []);
@@ -95,11 +138,11 @@ async function main() {
     }
 
     for (const tableName of restoreOrder) {
-      const tableFile = path.join(snapshotDir, "data", `${tableName}.json`);
+      const tableFileBase = path.join(snapshotDir, "data", tableName);
       let rows = [];
 
       try {
-        rows = JSON.parse(await fs.readFile(tableFile, "utf8"));
+        rows = await readSnapshotJson(tableFileBase, encryptionKey);
       } catch {
         rows = [];
       }
@@ -134,7 +177,13 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error("Falha na restauração:", error);
-  process.exitCode = 1;
-});
+// Só roda a restauração de verdade quando o arquivo é executado diretamente (node
+// scripts/restoreDbSnapshot.js ...) — permite importar getEncryptionKey/decryptJsonBuffer/
+// readSnapshotJson para verificação manual (ver commit desta mudança) sem exigir o argumento
+// de snapshot nem conectar ao banco.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error("Falha na restauração:", error);
+    process.exitCode = 1;
+  });
+}

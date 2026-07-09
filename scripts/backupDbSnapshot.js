@@ -1,11 +1,39 @@
 /* eslint-disable no-console */
 import fs from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import crypto from "node:crypto";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { Client } from "pg";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+// Cifra os arquivos do snapshot (Fase 2.7): o dump anterior gravava cada tabela — incluindo
+// passwordHash, tokens de reset de senha e dados de clientes — como JSON em texto puro em
+// disco. Mesma cifra/derivação de src/utils/tokenEncryption.ts, duplicada aqui de propósito:
+// este script roda direto com `node`, sem passar pelo build TS do app.
+const ALGORITHM = "aes-256-gcm";
+const IV_LENGTH = 12;
+const ENCRYPTED_EXT = ".json.enc";
+
+// Exportado (também) para permitir verificação manual direta destas funções reais —
+// ver instruções de verificação no final deste arquivo / no commit desta mudança.
+export function getEncryptionKey() {
+  const raw = process.env.ENCRYPTION_KEY;
+  if (!raw) {
+    throw new Error("ENCRYPTION_KEY não encontrado no ambiente — obrigatório para cifrar o backup.");
+  }
+  return crypto.createHash("sha256").update(raw).digest();
+}
+
+export function encryptJson(value, key) {
+  const plainBuffer = Buffer.from(JSON.stringify(value, null, 2), "utf8");
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+  const ciphertext = Buffer.concat([cipher.update(plainBuffer), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return Buffer.concat([iv, authTag, ciphertext]);
+}
 
 function getDatabaseUrl() {
   const raw = process.env.DATABASE_URL;
@@ -51,6 +79,7 @@ async function main() {
   });
 
   await client.connect();
+  const encryptionKey = getEncryptionKey();
 
   try {
     const dbMeta = await client.query(
@@ -74,10 +103,10 @@ async function main() {
       counts[tableName] = total;
 
       const rowsRes = await client.query(`SELECT * FROM "public"."${tableName}"`);
-      const filePath = path.join(dataDir, `${tableName}.json`);
-      await fs.writeFile(filePath, JSON.stringify(rowsRes.rows, null, 2), "utf8");
+      const filePath = path.join(dataDir, `${tableName}${ENCRYPTED_EXT}`);
+      await fs.writeFile(filePath, encryptJson(rowsRes.rows, encryptionKey));
 
-      console.log(`Tabela ${tableName}: ${total} registro(s) exportado(s).`);
+      console.log(`Tabela ${tableName}: ${total} registro(s) exportado(s) (cifrado).`);
     }
 
     const dependenciesRes = await client.query(`
@@ -102,24 +131,29 @@ async function main() {
       rowCounts: counts,
       foreignKeys: dependenciesRes.rows,
       notes: [
-        "Snapshot lógico em JSON por tabela.",
+        "Snapshot lógico em JSON por tabela, cifrado (AES-256-GCM) com ENCRYPTION_KEY.",
         "Use scripts/restoreDbSnapshot.js para tentativa de restauração automatizada.",
       ],
     };
 
+    // Manifest também cifrado — contém nomes de tabela, contagens e estrutura de FKs.
     await fs.writeFile(
-      path.join(snapshotDir, "manifest.json"),
-      JSON.stringify(manifest, null, 2),
-      "utf8"
+      path.join(snapshotDir, `manifest${ENCRYPTED_EXT}`),
+      encryptJson(manifest, encryptionKey)
     );
 
-    console.log(`Snapshot criado em: ${snapshotDir}`);
+    console.log(`Snapshot cifrado criado em: ${snapshotDir}`);
   } finally {
     await client.end();
   }
 }
 
-main().catch((error) => {
-  console.error("Falha ao criar snapshot:", error);
-  process.exitCode = 1;
-});
+// Só roda o backup de verdade quando o arquivo é executado diretamente (node
+// scripts/backupDbSnapshot.js) — permite importar getEncryptionKey/encryptJson para
+// verificação manual (ver commit desta mudança) sem disparar uma conexão real ao banco.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error("Falha ao criar snapshot:", error);
+    process.exitCode = 1;
+  });
+}
