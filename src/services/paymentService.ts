@@ -1,3 +1,5 @@
+import type { Request } from "express";
+
 // Criação de sessão de checkout (exemplo: integração Stripe)
 export async function createCheckoutSession(bookingId: string, userId: string) {
   // Integração com Stripe ou outro gateway (stub)
@@ -16,7 +18,7 @@ export async function createCheckoutSession(bookingId: string, userId: string) {
 }
 
 // Webhook de pagamento (exemplo: Stripe)
-export async function handleWebhookEvent(req: any) {
+export async function handleWebhookEvent(req: Request) {
   // Lógica de webhook (stub)
   // Exemplo: processar evento recebido do gateway
   // Aqui você pode adicionar a lógica real de webhook
@@ -112,7 +114,7 @@ export async function getByBooking(bookingId: string) {
   };
 }
 
-export async function getAllPayments(filters?: any) {
+export async function getAllPayments(filters?: { status?: string }) {
   // Simulação de listagem de todos os pagamentos (admin)
   const payments = [
     {

@@ -42,7 +42,7 @@ export class CollaboratorRepository {
       userId: data.userId,
       phone: data.phone,
       collaboratorRole: data.collaboratorRole,
-      functionId: (data as any).functionId,
+      functionId: data.functionId,
       specialties: data.specialties,
       hourlyRate: data.hourlyRate,
       status: data.status || "ACTIVE",
@@ -574,10 +574,12 @@ export class CollaboratorRepository {
         }
 
         // Converter Decimal para number de forma segura
-        const toNum = (val: any) => {
+        const toNum = (val: unknown): number => {
           if (!val) return 0;
           if (typeof val === 'number') return val;
-          if (typeof val.toNumber === 'function') return val.toNumber();
+          if (typeof val === 'object' && 'toNumber' in val && typeof val.toNumber === 'function') {
+            return val.toNumber();
+          }
           return Number(val);
         };
 

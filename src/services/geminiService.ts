@@ -69,7 +69,7 @@ export class GeminiService {
         }
         return getMockSuggestion();
 
-    } catch (err: any) {
+    } catch (err: unknown) {
         logger.error({err}, "Erro na chamada Hugging Face");
         throw err;
     }
@@ -136,8 +136,8 @@ export class GeminiService {
       
       return getMockSuggestion();
 
-    } catch (error: any) {
-      logger.error('IA Sugestão falhou:', error?.message || error);
+    } catch (error: unknown) {
+      logger.error('IA Sugestão falhou:', error instanceof Error ? error.message : error);
       if (USE_MOCK_FALLBACK) return getMockSuggestion();
       throw new AppError('Não foi possível gerar a sugestão agora.', 502, true, "AI_SUGGESTION_FAILED");
     }
