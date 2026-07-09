@@ -4,6 +4,7 @@ import { prisma } from '../config/prisma';
 import logger from '../config/logger';
 import { config } from '../config/environment';
 import { AppError } from '../utils/errors';
+import { encryptSecret, decryptSecret } from '../utils/tokenEncryption';
 
 const OAUTH_STATE_PURPOSE = 'google-calendar-oauth-state';
 
@@ -62,11 +63,11 @@ export class GoogleCalendarService {
       const userInfo = await oauth2.userinfo.get();
       const calendarEmail = userInfo.data.email;
 
-      // Salva no banco
+      // Salva no banco (refresh token cifrado em repouso — ver utils/tokenEncryption.ts)
       await prisma.user.update({
         where: { id: userId },
         data: {
-          googleRefreshToken: tokens.refresh_token, // Guardamos apenas o refresh token (access token expira rápido)
+          googleRefreshToken: tokens.refresh_token ? encryptSecret(tokens.refresh_token) : tokens.refresh_token,
           googleCalendarEmail: calendarEmail
         }
       });
@@ -92,9 +93,11 @@ export class GoogleCalendarService {
       }
 
       const client = this.getClient();
-      // Configura credenciais com Refresh Token (Lib gerencia o refresh do access token)
+      // Configura credenciais com Refresh Token (Lib gerencia o refresh do access token).
+      // decryptSecret() também aceita, sem alterações, tokens gravados antes desta
+      // mudança (texto puro) — ver utils/tokenEncryption.ts.
       client.setCredentials({
-        refresh_token: user.googleRefreshToken
+        refresh_token: decryptSecret(user.googleRefreshToken)
       });
 
       const calendar = google.calendar({ version: 'v3', auth: client });

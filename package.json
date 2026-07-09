@@ -29,7 +29,8 @@
     "restore:database": "node ../scripts/disaster-recovery.js restore",
     "verify:backup": "node ../scripts/disaster-recovery.js verify",
     "list:backups": "node ../scripts/disaster-recovery.js list",
-    "check:database-integrity": "node ../scripts/disaster-recovery.js check"
+    "check:database-integrity": "node ../scripts/disaster-recovery.js check",
+    "encrypt:oauth-tokens": "node scripts/encryptOAuthTokens.js"
   },
   "author": "X Produçoes e Eventos",
   "license": "MIT",
