@@ -1,8 +1,11 @@
 // Configuração do Socket.IO para Chat em Tempo Real
+import type { Server as HttpServer } from 'http';
+import type { Server as HttpsServer } from 'https';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import jwt from 'jsonwebtoken';
 import { prisma } from './prisma';
+import { MessageType } from '@prisma/client';
 import { config } from './environment';
 import { extractToken } from './cookies';
 import { isTokenBlacklisted } from '../services/jwtBlacklistService';
@@ -15,6 +18,13 @@ let pubClient: IORedis | null = null;
 
 // Chave do Redis para status global (userId -> socketId)
 const REDIS_ONLINE_KEY = 'xproducoes:online_users';
+
+// O cliente envia messageType em minúsculo; o enum MessageType do Prisma é maiúsculo
+const MESSAGE_TYPE_MAP: Record<'text' | 'image' | 'file', MessageType> = {
+  text: MessageType.TEXT,
+  image: MessageType.IMAGE,
+  file: MessageType.FILE,
+};
 
 // Parser mínimo do cabeçalho Cookie (não usamos cookie-parser aqui: o handshake do
 // Socket.IO só expõe o header cru, não um objeto já parseado como o Express faz).
@@ -80,7 +90,7 @@ export async function resolveSocketTokenPayload(
   }
 }
 
-export async function initializeSocket(server: any) {
+export async function initializeSocket(server: HttpServer | HttpsServer) {
   io = new SocketIOServer(server, {
     cors: {
       origin: process.env.FRONTEND_URL || "http://localhost:5173",
@@ -193,7 +203,7 @@ export async function initializeSocket(server: any) {
             chatId: data.chatId,
             senderId: user.id,
             content: data.content,
-            messageType: data.messageType as any,
+            messageType: MESSAGE_TYPE_MAP[data.messageType],
             fileUrl: data.fileUrl,
             fileName: data.fileName,
           },

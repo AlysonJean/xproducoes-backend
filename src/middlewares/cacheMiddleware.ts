@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import logger from "../config/logger";
 
 // Cache em memória com suporte a TTL configurável
-const cache: Map<string, { data: any; expires: number }> = new Map();
+const cache: Map<string, { data: unknown; expires: number }> = new Map();
 
 // TTLs diferenciados por tipo de conteúdo
 const CACHE_TTL = {
@@ -37,7 +37,7 @@ export function createCacheMiddleware(ttl: number = CACHE_TTL.MEDIUM) {
     }
 
     const originalJson = res.json.bind(res);
-    res.json = (body: any) => {
+    res.json = (body: unknown) => {
       cache.set(key, { data: body, expires: Date.now() + ttl });
       logger.debug({ key, ttl }, 'Cache SET');
       return originalJson(body);

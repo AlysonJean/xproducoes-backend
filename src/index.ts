@@ -229,7 +229,7 @@ async function startServerWithRetries(initialPort: number, maxRetries = 10) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       await new Promise<void>((resolve, reject) => {
-        const onError = (err: any) => reject(err);
+        const onError = (err: NodeJS.ErrnoException) => reject(err);
         server.once('error', onError);
         server.listen(port, () => {
           server.removeListener('error', onError);
@@ -241,10 +241,11 @@ async function startServerWithRetries(initialPort: number, maxRetries = 10) {
       logger.info(`🔌 Socket.IO inicializado na porta ${port} (${protocol.toUpperCase()})`);
       logger.info(`🔐 Configuração SSL: ${sslInfo}`);
       return;
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Tratamento de erro específico de porta em uso
-      if (err && (err.code === 'EADDRINUSE' || err.code === 'EACCES')) {
-        logger.warn(`⚠️ Porta ${port} indisponível (${err.code}). Tentando próxima porta...`);
+      const code = err instanceof Error ? (err as NodeJS.ErrnoException).code : undefined;
+      if (code === 'EADDRINUSE' || code === 'EACCES') {
+        logger.warn(`⚠️ Porta ${port} indisponível (${code}). Tentando próxima porta...`);
         port++;
         // Se for última tentativa, registrar erro e sair
         if (attempt === maxRetries) {
