@@ -229,8 +229,10 @@ export class AdminController {
   // Listar todos os clientes com perfil
   listClients = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { industry, companySize, location } = req.query;
-      
+      const industry = req.query.industry as string | undefined;
+      const companySize = req.query.companySize as string | undefined;
+      const location = req.query.location as string | undefined;
+
       // Configuração de Paginação Otimizada para Recursos
       // Em DEV: Limite alto (1000) para facilitar visualização sem paginação no frontend
       // Em PROD: Limite seguro (50) para economizar RAM, mas cobrir seus ~30 clientes previstos

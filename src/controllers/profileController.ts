@@ -286,7 +286,9 @@ export class ProfileController {
   // Buscar clientes com filtros (centralizado via clientService)
   async getClients(req: Request, res: Response) {
     try {
-      const { industry, companySize, location } = req.query;
+      const industry = req.query.industry as string | undefined;
+      const companySize = req.query.companySize as string | undefined;
+      const location = req.query.location as string | undefined;
       const clients = await clientService.listClientsWithProfiles({ industry, companySize, location });
       return res.json({ success: true, data: clients });
     } catch (error) {

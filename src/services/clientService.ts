@@ -1,15 +1,24 @@
+import { prisma } from "../config/prisma";
+import type { Prisma } from "@prisma/client";
+
+interface ClientListFilter {
+  industry?: string;
+  companySize?: string;
+  location?: string;
+  page?: number;
+  pageSize?: number;
+}
+
 // Conta o total de clientes com perfil, aplicando os mesmos filtros
-export async function countClientsWithProfiles(filter: any = {}) {
+export async function countClientsWithProfiles(filter: ClientListFilter = {}) {
   const { industry, companySize, location } = filter;
-  const whereClause: any = {
+  const whereClause: Prisma.ClientWhereInput = {
     ...(industry && { industry: { contains: industry, mode: "insensitive" } }),
     ...(companySize && { companySize }),
     ...(location && { address: { path: ["city"], equals: location } }), // Ajuste se o campo location estiver em address
   };
   return prisma.client.count({ where: whereClause });
 }
-import { prisma } from "../config/prisma";
-import type { Prisma } from "@prisma/client";
 
 export async function getClientProfileByUserId(userId: string) {
   return prisma.client.findUnique({
@@ -40,7 +49,7 @@ export async function deleteClientProfileByUserId(userId: string) {
   return prisma.client.delete({ where: { userId } });
 }
 
-export async function listClientsWithProfiles(filter: any = {}) {
+export async function listClientsWithProfiles(filter: ClientListFilter = {}) {
   // Filtros opcionais: industry, companySize, location, paginação
   const { industry, companySize, location, page = 1, pageSize = 20 } = filter;
   const whereClause: Prisma.ClientWhereInput = {

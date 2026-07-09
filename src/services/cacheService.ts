@@ -9,7 +9,7 @@ import logger from '../config/logger.js';
 import { duplicateRedisClient } from '../config/redis.js';
 
 interface CacheItem {
-  data: any;
+  data: unknown;
   expires: number;
 }
 
@@ -124,7 +124,7 @@ export class CacheService {
       const item = this.memoryStore.get(key);
       if (item && Date.now() <= item.expires) {
         logger.debug(`🟡 Memory HIT: ${key}`);
-        return item.data;
+        return item.data as T;
       }
 
       // Cache miss
@@ -143,7 +143,7 @@ export class CacheService {
    */
   async set(
     key: string,
-    data: any,
+    data: unknown,
     ttlSeconds: number = 300,
   ): Promise<boolean> {
     try {
@@ -446,8 +446,11 @@ export class CacheService {
     redis: { size?: number; keys?: string[] };
     memory: { size: number; keys: string[] };
   }> {
-    const stats = {
-      redis: {} as any,
+    const stats: {
+      redis: { size?: number; keys?: string[] };
+      memory: { size: number; keys: string[] };
+    } = {
+      redis: {},
       memory: {
         size: this.memoryStore.size,
         keys: Array.from(this.memoryStore.keys()),

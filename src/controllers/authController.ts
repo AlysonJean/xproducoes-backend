@@ -168,8 +168,8 @@ export class AuthController {
     try {
       const result = await this.authService.requestPasswordReset(email, ipAddress, userAgent);
       res.status(200).json(result);
-    } catch (error: any) {
-      if (error.message === 'Usuário não encontrado') {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message === 'Usuário não encontrado') {
         return next(new NotFoundError('Não encontramos nenhuma conta com este e-mail.'));
       }
       next(error);
@@ -203,8 +203,8 @@ export class AuthController {
     try {
       await (await import('../services/userService.js')).verifyEmailByToken(token);
       res.status(200).json({ success: true });
-    } catch (e: any) {
-      next(new BadRequestError(e.message || 'Token inválido'));
+    } catch (e: unknown) {
+      next(new BadRequestError(e instanceof Error ? e.message : 'Token inválido'));
     }
   };
 
@@ -298,8 +298,8 @@ export class AuthController {
     try {
       await this.authService.resetPassword(token, password);
       res.status(200).json({ success: true });
-    } catch (e: any) {
-      next(new BadRequestError(e.message || 'Falha ao completar registro'));
+    } catch (e: unknown) {
+      next(new BadRequestError(e instanceof Error ? e.message : 'Falha ao completar registro'));
     }
   };
 

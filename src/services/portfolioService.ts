@@ -4,14 +4,20 @@ import type { Prisma } from "@prisma/client";
 import { AppError, BadRequestError } from "../utils/errors";
 
 
-export async function updatePortfolio(id: string, data: Partial<{ title: string; description: string; eventDate: string | Date; imageUrl?: string; isPinned?: boolean; uploadedFiles?: any[]; coverIndex?: string | number }>) {
+interface PortfolioUploadedFile {
+  url: string;
+  filename: string;
+  mimetype: string;
+}
+
+export async function updatePortfolio(id: string, data: Partial<{ title: string; description: string; eventDate: string | Date; imageUrl?: string; isPinned?: boolean | string; uploadedFiles?: PortfolioUploadedFile[]; coverIndex?: string | number }>) {
   const updateData: Prisma.PortfolioUpdateInput = {};
   if (data.title) updateData.title = data.title.trim();
   if (data.description) updateData.description = data.description.trim();
-  
+
   // Handle boolean coercion from string (common with FormData)
   if (data.isPinned !== undefined) {
-    updateData.isPinned = data.isPinned === true || (data.isPinned as any) === 'true';
+    updateData.isPinned = data.isPinned === true || data.isPinned === 'true';
   }
 
   if (data.eventDate) {
@@ -67,7 +73,7 @@ export async function create(
     description: string;
     eventDate: string | Date;
     imageUrl?: string;
-    isPinned?: boolean;
+    isPinned?: boolean | string;
     uploadedFiles?: Array<{ url: string; filename: string; mimetype: string; size: number }>;
     coverIndex?: string | number;
   }
@@ -123,7 +129,7 @@ export async function create(
           imageUrl: coverUrl,
           coverImage: coverUrl,
           sortOrder: sortOrder,
-          isPinned: data.isPinned === true || (data.isPinned as any) === 'true',
+          isPinned: data.isPinned === true || data.isPinned === 'true',
         }
       });
 
