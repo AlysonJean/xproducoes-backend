@@ -10,7 +10,7 @@
     "dev:ts-node-dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "dev:detached": "start \"backend\" cmd /k \"npm run dev:tsx\"",
     "build": "node -e \"const fs=require('fs');fs.mkdirSync('.cache/puppeteer',{recursive:true})\" && npx puppeteer browsers install chrome && npm run prisma:generate && node esbuild.config.js",
-    "postbuild": "npx prisma db push --accept-data-loss || echo 'Schema already in sync'",
+    "postbuild": "npx prisma migrate deploy",
     "start": "node dist/index.js",
     "start:prod": "node dist/index.js",
     "prisma:generate": "npx prisma generate",
