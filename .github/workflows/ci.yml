@@ -55,7 +55,25 @@ jobs:
     steps:
       - name: Trigger Render Deploy
         run: |
-          curl -X POST "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/deploys" \
+          # Achado: o curl original não verificava o código de resposta HTTP nem os
+          # secrets — se RENDER_SERVICE_ID/RENDER_API_KEY estivessem vazios ou errados,
+          # a Render rejeitava a chamada (401/404) mas o step aparecia como "success"
+          # (curl não falha por padrão em respostas 4xx/5xx), escondendo silenciosamente
+          # que o deploy nunca foi disparado. Agora falha de verdade nesses casos.
+          if [ -z "${{ secrets.RENDER_SERVICE_ID }}" ] || [ -z "${{ secrets.RENDER_API_KEY }}" ]; then
+            echo "::error::RENDER_SERVICE_ID ou RENDER_API_KEY não configurados nos Secrets do repositório."
+            exit 1
+          fi
+
+          response=$(curl -sS -w "\n%{http_code}" -X POST "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/deploys" \
             -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{}'
+            -d '{}')
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          echo "Render respondeu HTTP $http_code: $body"
+
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "::error::Render rejeitou o disparo do deploy (HTTP $http_code) — o deploy NÃO foi iniciado."
+            exit 1
+          fi
