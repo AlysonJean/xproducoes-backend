@@ -87,8 +87,6 @@ router.delete("/:id", adminOnly, validateId(), deleteCollaborator);
 router.get("/:id/stats", requireAdminOrCollaborator, getCollaboratorStats);
 router.get("/:collaboratorId/events", requireAdminOrCollaborator, getCollaboratorEvents);
 
-// Rotas de disponibilidades (CRUD genérico)
-router.post("/availabilities", adminOnly, createAvailability);
 router.get("/events/:eventId/collaborators", requireAdminOrCollaborator, getEventCollaborators); // validateId('eventId')?
 router.post("/event-assignments", adminOnly, validateBody(eventAssignmentSchema), assignCollaboratorToEvent);
 router.put("/event-assignments/:id", adminOnly, validateId(), validateBody(eventAssignmentUpdateSchema), updateEventCollaborator);
