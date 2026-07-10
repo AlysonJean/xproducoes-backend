@@ -92,12 +92,16 @@ export const getPersonalizedRecommendations = async (req: Request, res: Response
 export const getSimilarRecommendations = async (req: Request, res: Response) => {
   try {
     const type = req.params.type as string;
-    const itemId = req.params.id as string;
+    // Achado: as páginas de detalhe (EquipmentDetailPage/KitDetailPage) navegam por slug e
+    // passam o slug aqui, não o id do Prisma — a busca abaixo aceitava só id, então esta rota
+    // sempre respondia 404 para qualquer chamada real do frontend. Corrigido para aceitar
+    // id OU slug, mesmo padrão já usado em equipmentService.findOne.
+    const idOrSlug = req.params.id as string;
     const limit = parseInt(req.query.limit as string) || 4;
 
     if (type === 'equipment') {
-      const equipment = await prisma.equipment.findUnique({
-        where: { id: itemId },
+      const equipment = await prisma.equipment.findFirst({
+        where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
         include: { category: true }
       });
 
@@ -108,7 +112,7 @@ export const getSimilarRecommendations = async (req: Request, res: Response) => 
       const similar = await prisma.equipment.findMany({
         where: {
           AND: [
-            { id: { not: itemId } },
+            { id: { not: equipment.id } },
             { categoryId: equipment.categoryId },
             { status: 'ACTIVE' }
           ]
@@ -120,9 +124,9 @@ export const getSimilarRecommendations = async (req: Request, res: Response) => 
 
       return res.json({ success: true, data: similar });
     } else if (type === 'kit') {
-      const kit = await prisma.kit.findUnique({
-        where: { id: itemId },
-        include: { 
+      const kit = await prisma.kit.findFirst({
+        where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
+        include: {
           items: { include: { equipment: { include: { category: true } } } }
         }
       });
@@ -132,7 +136,7 @@ export const getSimilarRecommendations = async (req: Request, res: Response) => 
       }
 
       const similar = await prisma.kit.findMany({
-        where: { id: { not: itemId } },
+        where: { id: { not: kit.id } },
         include: { items: { include: { equipment: { include: { category: true } } } } },
         orderBy: { createdAt: 'desc' },
         take: limit
@@ -154,11 +158,24 @@ export const getSimilarRecommendations = async (req: Request, res: Response) => 
 export const getFrequentlyBoughtTogether = async (req: Request, res: Response) => {
   try {
     const type = req.params.type as string;
-    const itemId = req.params.id as string;
+    // Achado: mesmo bug de getSimilarRecommendations — as páginas de detalhe passam o slug
+    // (não o id do Prisma) para esta rota. Sem resolver o slug primeiro, `itemId` nunca batia
+    // com nenhum id real, então bookingsWithItem/o fallback por categoria sempre ficavam
+    // vazios (resposta 200 com data: [], sem erro visível — por isso a seção "Frequentemente
+    // Comprados Juntos" nunca mostrava nada, mas sem gerar um 404 como no endpoint /similar).
+    const idOrSlug = req.params.id as string;
     const limit = parseInt(req.query.limit as string) || 4;
 
     if (type !== 'equipment' && type !== 'kit') {
       return res.status(400).json({ success: false, message: 'Invalid type' });
+    }
+
+    const itemId = type === 'equipment'
+      ? (await prisma.equipment.findFirst({ where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] }, select: { id: true } }))?.id
+      : (await prisma.kit.findFirst({ where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] }, select: { id: true } }))?.id;
+
+    if (!itemId) {
+      return res.status(404).json({ success: false, message: `${type === 'equipment' ? 'Equipment' : 'Kit'} not found` });
     }
 
     const bookingsWithItem = await prisma.booking.findMany({
