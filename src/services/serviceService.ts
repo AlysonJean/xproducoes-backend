@@ -111,10 +111,18 @@ export class ServiceService {
       select: { imageUrl: true }
     });
 
+    // Mesma checagem de referência compartilhada que equipmentService.delete() — duplicate()
+    // copia imageUrl por referência, então excluir um serviço não pode apagar do Cloudinary
+    // uma imagem que outro serviço ainda usa.
     if (service?.imageUrl) {
-      const { UploadService } = await import('./uploadService');
-      const uploadService = new UploadService();
-      await uploadService.deleteFile(service.imageUrl);
+      const stillReferenced = await prisma.service.count({
+        where: { imageUrl: service.imageUrl, id: { not: id } }
+      });
+      if (stillReferenced === 0) {
+        const { UploadService } = await import('./uploadService');
+        const uploadService = new UploadService();
+        await uploadService.deleteFile(service.imageUrl);
+      }
     }
 
     await prisma.service.delete({

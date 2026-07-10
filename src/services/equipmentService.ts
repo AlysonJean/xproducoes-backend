@@ -152,11 +152,19 @@ export class EquipmentService {
       select: { imageUrl: true }
     });
 
-    // Delete from Cloudinary if has image
+    // Delete from Cloudinary if has image — mas só se nenhum outro equipamento ainda aponta
+    // para a mesma imagem. duplicate() copia imageUrl por referência (mesmo public_id no
+    // Cloudinary) em vez de subir uma cópia própria; sem essa checagem, excluir um dos dois
+    // apaga o arquivo do Cloudinary por baixo do outro, que fica com um link quebrado.
     if (equipment?.imageUrl) {
-      const { UploadService } = await import('./uploadService');
-      const uploadService = new UploadService();
-      await uploadService.deleteFile(equipment.imageUrl);
+      const stillReferenced = await prisma.equipment.count({
+        where: { imageUrl: equipment.imageUrl, id: { not: id } }
+      });
+      if (stillReferenced === 0) {
+        const { UploadService } = await import('./uploadService');
+        const uploadService = new UploadService();
+        await uploadService.deleteFile(equipment.imageUrl);
+      }
     }
 
     // Se estiver em Kits, o relacionamento será removido automaticamente (Cascade em tabela pivot implícita)

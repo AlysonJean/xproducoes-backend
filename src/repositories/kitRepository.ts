@@ -80,16 +80,35 @@ export class KitRepository {
       select: { imageUrl: true, coverImage: true }
     });
 
-    // Delete images from Cloudinary if they exist
+    // Delete images from Cloudinary if they exist — mas só se nenhum outro kit ainda aponta
+    // para a mesma imagem. duplicate() copia imageUrl/coverImage por referência (mesmo
+    // public_id no Cloudinary) em vez de subir uma cópia própria; sem essa checagem, excluir
+    // um dos dois apaga o arquivo do Cloudinary por baixo do outro.
     if (kit) {
       const { UploadService } = await import('../services/uploadService');
       const uploadService = new UploadService();
-      
+
       if (kit.imageUrl) {
-        await uploadService.deleteFile(kit.imageUrl);
+        const stillReferenced = await prisma.kit.count({
+          where: {
+            id: { not: id },
+            OR: [{ imageUrl: kit.imageUrl }, { coverImage: kit.imageUrl }]
+          }
+        });
+        if (stillReferenced === 0) {
+          await uploadService.deleteFile(kit.imageUrl);
+        }
       }
-      if (kit.coverImage) {
-        await uploadService.deleteFile(kit.coverImage);
+      if (kit.coverImage && kit.coverImage !== kit.imageUrl) {
+        const stillReferenced = await prisma.kit.count({
+          where: {
+            id: { not: id },
+            OR: [{ imageUrl: kit.coverImage }, { coverImage: kit.coverImage }]
+          }
+        });
+        if (stillReferenced === 0) {
+          await uploadService.deleteFile(kit.coverImage);
+        }
       }
     }
 
