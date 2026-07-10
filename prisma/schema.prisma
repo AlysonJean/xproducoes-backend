@@ -387,6 +387,8 @@ model Booking {
   chats              Chat[]              @relation("BookingChats")
   tasks              BookingTask[]
   expenses           BookingExpense[]
+  collaboratorPayments      CollaboratorPayment[]
+  collaboratorAvailabilities CollaboratorAvailability[]
 
   @@index([clientId])
   @@index([creatorId])
@@ -555,10 +557,12 @@ model CollaboratorAvailability {
   updatedAt      DateTime           @updatedAt
   collaboratorId String
   collaborator   Collaborator       @relation(fields: [collaboratorId], references: [id], onDelete: Cascade)
+  event          Booking?           @relation(fields: [eventId], references: [id], onDelete: SetNull)
 
   @@index([collaboratorId])
   @@index([date])
   @@index([status])
+  @@index([eventId])
   @@map("collaborator_availabilities")
 }
 
@@ -589,10 +593,12 @@ model CollaboratorPayment {
   updatedAt      DateTime                  @updatedAt
   collaboratorId String
   collaborator   Collaborator              @relation(fields: [collaboratorId], references: [id], onDelete: Cascade)
+  event          Booking                   @relation(fields: [eventId], references: [id], onDelete: Restrict)
 
   @@index([collaboratorId])
   @@index([status])
   @@index([dueDate])
+  @@index([eventId])
   @@map("collaborator_payments")
 }
 

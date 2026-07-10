@@ -67,7 +67,7 @@ type AvailabilityUpdateData = Partial<CollaboratorAvailability>;
 
 interface PaymentRecordData {
   collaboratorId: string;
-  eventId?: string;
+  eventId: string;
   amount: number;
   type: PaymentType;
   description?: string;

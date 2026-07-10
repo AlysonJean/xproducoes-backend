@@ -292,7 +292,7 @@ export class CollaboratorRepository {
   // Controle de Valores a Pagar (não processamento de pagamento)
   async createPaymentRecord(data: {
     collaboratorId: string;
-    eventId?: string;
+    eventId: string;
     amount: number;
     type: PaymentType;
     description?: string;
@@ -303,7 +303,7 @@ export class CollaboratorRepository {
     const result = await prisma.collaboratorPayment.create({
       data: {
         collaboratorId: data.collaboratorId,
-        eventId: data.eventId || "placeholder",
+        eventId: data.eventId,
         amount: data.amount,
         type: data.type || "HOURLY",
         description: data.description || "Pagamento de colaborador",
