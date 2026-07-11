@@ -58,9 +58,20 @@ jobs:
       # histórico de commits, não só o snapshot do commit atual (é assim que o vazamento
       # histórico do .env.production do frontend, achado nesta mesma auditoria, teria
       # sido pego automaticamente se essa varredura já existisse).
+      #
+      # persist-credentials: false evita que actions/checkout configure o remote "origin"
+      # com um token de acesso — sem remote configurado, `git log --all` (usado abaixo) não
+      # tem como enxergar refs de outras branches remotas, só a do commit sendo testado.
+      # Achado real: enquanto feat/security-hardening ainda existia no repositório (branch
+      # obsoleta com credenciais vazadas, já removida), o `--log-opts="--all"` do gitleaks
+      # pegava o conteúdo dela via essas remote-tracking refs e derrubava o CI de main com
+      # achados de uma branch completamente diferente — não era um falso positivo do
+      # gitleaks, era o comportamento correto do `--all` genuinamente enxergando outra
+      # branch; o problema era o escopo do comando, não a ferramenta.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       # CLI open source direto (não a Action empacotada gitleaks/gitleaks-action, que exige
       # licença paga para contas GitHub Organization) — o binário em si é livre para
@@ -76,8 +87,12 @@ jobs:
       # teste com JWT falso, e placeholders do .env.example — nenhum segredo real; ver
       # commit desta mudança) para o gate não ficar permanentemente vermelho por ruído
       # conhecido. Qualquer segredo NOVO, fora da baseline, ainda falha o step normalmente.
-      - name: Rodar gitleaks (todo o histórico, exceto baseline conhecida)
-        run: gitleaks detect --source . --log-opts="--all" --redact --baseline-path .gitleaks-baseline.json -v
+      #
+      # --log-opts="HEAD" (em vez de "--all") escopa a varredura ao histórico do próprio
+      # commit sendo testado — não de qualquer outra branch que porventura exista no
+      # repositório no momento (ver achado acima sobre feat/security-hardening).
+      - name: Rodar gitleaks (histórico do commit testado, exceto baseline conhecida)
+        run: gitleaks detect --source . --log-opts="HEAD" --redact --baseline-path .gitleaks-baseline.json -v
 
   deploy:
     name: Deploy to Render
