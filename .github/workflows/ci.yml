@@ -72,8 +72,12 @@ jobs:
           sudo mv gitleaks /usr/local/bin/gitleaks
           gitleaks version
 
-      - name: Rodar gitleaks (todo o histórico)
-        run: gitleaks detect --source . --log-opts="--all" --redact -v
+      # --baseline-path suprime os 9 achados históricos já avaliados e aceitos (fixtures de
+      # teste com JWT falso, e placeholders do .env.example — nenhum segredo real; ver
+      # commit desta mudança) para o gate não ficar permanentemente vermelho por ruído
+      # conhecido. Qualquer segredo NOVO, fora da baseline, ainda falha o step normalmente.
+      - name: Rodar gitleaks (todo o histórico, exceto baseline conhecida)
+        run: gitleaks detect --source . --log-opts="--all" --redact --baseline-path .gitleaks-baseline.json -v
 
   deploy:
     name: Deploy to Render
