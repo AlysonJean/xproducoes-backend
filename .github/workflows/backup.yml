@@ -1,0 +1,52 @@
+name: Backup do banco de dados
+
+# Achado (auditoria): não existia nenhum agendamento automático de backup — nem cron
+# job na aplicação (src/cron/ só tem sendReminders.ts e socialScheduler.ts), nem workflow
+# agendado. O processo era 100% manual (alguém precisava lembrar de rodar
+# `npm run backup:database`). Os scripts de backup em si já eram reais e bem construídos
+# (AES-256-GCM, restauração com ordenação topológica de FKs) — só faltava agendamento.
+#
+# Roda diariamente às 03:00 UTC (meia-noite em horário de Brasília) e sob demanda. O
+# snapshot cifrado é subido como artifact do GitHub Actions (retenção de 90 dias) em vez
+# de qualquer storage novo (S3/GCS) — evita introduzir credenciais/infraestrutura nova
+# além do que o repositório já usa.
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    name: Snapshot cifrado do banco
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verificar secrets necessários
+        run: |
+          if [ -z "${{ secrets.DATABASE_URL }}" ] || [ -z "${{ secrets.ENCRYPTION_KEY }}" ]; then
+            echo "::error::DATABASE_URL ou ENCRYPTION_KEY não configurados nos Secrets do repositório — backup não pode rodar sem eles."
+            exit 1
+          fi
+
+      - name: Rodar backup
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+        run: npm run backup:database
+
+      - name: Publicar snapshot cifrado como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backups/
+          retention-days: 90
+          if-no-files-found: error
