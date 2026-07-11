@@ -47,9 +47,37 @@ jobs:
       - name: Testes
         run: npm test
 
+  secret-scan:
+    name: Varredura de segredos (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      # Achado: package.json tinha um script "scan-history-secrets" apontando para
+      # ../scripts/scan_history_secrets.js, que não existe em lugar nenhum do
+      # repositório — rodar dava "Cannot find module", e não havia nenhuma varredura de
+      # segredo real no CI. fetch-depth: 0 é necessário para o gitleaks examinar todo o
+      # histórico de commits, não só o snapshot do commit atual (é assim que o vazamento
+      # histórico do .env.production do frontend, achado nesta mesma auditoria, teria
+      # sido pego automaticamente se essa varredura já existisse).
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # CLI open source direto (não a Action empacotada gitleaks/gitleaks-action, que exige
+      # licença paga para contas GitHub Organization) — o binário em si é livre para
+      # qualquer uso.
+      - name: Instalar gitleaks
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz -o gitleaks.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Rodar gitleaks (todo o histórico)
+        run: gitleaks detect --source . --log-opts="--all" --redact -v
+
   deploy:
     name: Deploy to Render
-    needs: test
+    needs: [test, secret-scan]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
