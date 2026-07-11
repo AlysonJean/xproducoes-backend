@@ -142,9 +142,18 @@ export function initSentry(app: Express) {
 /**
  * Error handler for Sentry
  * Must be placed after all other error handlers
+ *
+ * Achado (upgrade @sentry/node 10.38.0 → 10.65.0, trazido por `npm audit fix --force` ao
+ * resolver vulnerabilidades não relacionadas): `Sentry.expressErrorHandler(...)` sozinho
+ * retorna `ExpressErrorMiddleware`, um tipo próprio do Sentry que não bate mais com as
+ * sobrecargas de `app.use()` do Express nesta versão — `app.use(sentryErrorHandler())`
+ * (padrão antigo) parou de compilar. `setupExpressErrorHandler(app, options)` é o padrão
+ * atual recomendado pelo próprio Sentry para isso (registra o middleware internamente,
+ * com tipagem compatível), então migramos para ele em vez de apenas prender a versão
+ * antiga do pacote.
  */
-export function sentryErrorHandler() {
-  return Sentry.expressErrorHandler({
+export function sentryErrorHandler(app: Express) {
+  Sentry.setupExpressErrorHandler(app, {
     shouldHandleError: (error: ErrorWithStatus) => {
       // Only send errors that are not 4xx status codes
       const status = Number(error.status ?? error.statusCode ?? 500);

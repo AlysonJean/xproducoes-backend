@@ -192,7 +192,7 @@ app.use((req, res) => {
 });
 
 // Sentry error handler (deve vir antes do error handler global)
-app.use(sentryErrorHandler());
+sentryErrorHandler(app);
 
 // Error handler global enterprise-grade
 app.use(globalErrorHandler);
