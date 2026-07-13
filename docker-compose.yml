@@ -67,6 +67,11 @@ services:
       retries: 3
       start_period: 40s
 
+  # ⚠️ Achado (auditoria): este serviço builda o frontend/Dockerfile, que serve um
+  # bundle estático via Nginx (sem SSR) — não reflete a produção real (Vercel SSR
+  # serverless, ver comentário no topo de frontend/Dockerfile). Útil apenas para
+  # exercitar o backend/DB localmente atrás de algo em :3000; não confie nele para
+  # validar comportamento de SSR.
   frontend:
     build:
       context: ../frontend
