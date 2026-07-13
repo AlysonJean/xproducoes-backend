@@ -48,7 +48,7 @@ jest.mock('../config/prisma', () => ({
     newsletterSubscriber: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
     collaborator: { create: jest.fn(), updateMany: jest.fn() },
     client: { findFirst: jest.fn(), updateMany: jest.fn() },
-    booking: { findUnique: jest.fn(), update: jest.fn(), findMany: jest.fn() },
+    booking: { findUnique: jest.fn(), update: jest.fn(), findMany: jest.fn(), updateMany: jest.fn() },
     appSettings: { findFirst: jest.fn(), upsert: jest.fn() },
     collaboratorPayment: { findMany: jest.fn() },
     review: { findUnique: jest.fn(), findMany: jest.fn() },

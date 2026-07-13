@@ -9,6 +9,7 @@ jest.mock('../../config/prisma', () => ({
     },
     booking: {
       findMany: jest.fn(),
+      updateMany: jest.fn(),
     },
     review: {
       findMany: jest.fn(),
@@ -98,6 +99,26 @@ describe('lgpdService', () => {
       expect(mockedPrisma.collaborator.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { userId: 'user-2' } }),
       );
+    });
+
+    // Achado (auditoria): clientName/clientContact/clientEmail são um snapshot gravado
+    // direto em Booking na criação da reserva (bookingService.ts), independente da relação
+    // com Client/User — eraseUserData() anonimizava User/Client/Collaborator mas nunca
+    // tocava esses campos, deixando nome/contato/e-mail do titular em texto puro em todo o
+    // histórico de reservas mesmo após a "exclusão" de dados.
+    it('anonimiza clientName/clientContact/clientEmail nas reservas do titular', async () => {
+      mockedPrisma.user.findUnique.mockResolvedValue({ id: 'user-2', email: 'real@example.com' });
+
+      await eraseUserData('user-2');
+
+      expect(mockedPrisma.booking.updateMany).toHaveBeenCalledWith({
+        where: { client: { userId: 'user-2' } },
+        data: {
+          clientName: 'Cliente removido',
+          clientContact: null,
+          clientEmail: null,
+        },
+      });
     });
 
     it('lança NotFoundError quando o usuário não existe', async () => {
