@@ -153,7 +153,16 @@ app.get("/health", healthCheck);
 app.get("/ready", readinessCheck);
 
 // Metrics endpoints - SRE Dashboard data
-app.get("/metrics", metricsEndpoint);
+// Achado (auditoria): esta rota expunha uso de memória (process.memoryUsage()) e
+// estatísticas por endpoint (contagem de requisições, taxa de erro, latência p50/p95/p99)
+// sem autenticação — inconsistente com /internal/metrics e /internal/dashboard logo
+// abaixo, que já exigem isValidInternalKey para o mesmo tipo de dado.
+app.get("/metrics", (req, res) => {
+  if (!isValidInternalKey(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  metricsEndpoint(req, res);
+});
 
 // Advanced Prometheus/Grafana metrics endpoint (with authentication)
 app.get("/internal/metrics", (req, res) => {

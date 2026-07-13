@@ -905,6 +905,32 @@ describe('🛡️ Security Blindagem Tests', () => {
     });
   });
 
+  describe('GET /metrics - antes exposto sem autenticação, inconsistente com /internal/metrics', () => {
+    const originalInternalKey = process.env.INTERNAL_API_KEY;
+
+    afterEach(() => {
+      process.env.INTERNAL_API_KEY = originalInternalKey;
+    });
+
+    it('rejeita (401) sem X-Internal-Key', async () => {
+      process.env.INTERNAL_API_KEY = 'test-internal-key';
+
+      const res = await request(app).get('/metrics');
+
+      expect(res.status).toBe(401);
+    });
+
+    it('aceita com X-Internal-Key correta', async () => {
+      process.env.INTERNAL_API_KEY = 'test-internal-key';
+
+      const res = await request(app)
+        .get('/metrics')
+        .set('X-Internal-Key', 'test-internal-key');
+
+      expect(res.status).not.toBe(401);
+    });
+  });
+
   describe('searchRateLimit agora está de fato aplicado às rotas de busca (antes existia mas não era usado em nenhuma)', () => {
     it('GET /equipment/search carrega o rate limiter (cabeçalho RateLimit-Limit presente)', async () => {
       const res = await request(app).get('/api/v1/equipment/search?q=camera');
