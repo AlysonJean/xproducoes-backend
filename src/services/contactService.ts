@@ -8,8 +8,15 @@ export async function createSubmission(data: {
   return prisma.contact.create({ data });
 }
 
+// Achado (auditoria): sem limite algum, esta consulta cresce sem fim conforme o volume
+// histórico do formulário público de contato — o admin (ContactSubmissionsListPage.tsx)
+// já faz busca/filtro/estatísticas no lado do cliente sobre a lista inteira, sem nenhuma
+// paginação de UI, então trocar para paginação de verdade no backend exigiria reescrever
+// essa tela também (fora do escopo deste achado pontual). Em vez disso, um teto de
+// segurança: os 1000 mais recentes (já ordenados por createdAt desc) — folga generosa
+// sobre o volume atual (poucas centenas), sem mudar o formato da resposta.
 export async function getAllSubmissions() {
-  return prisma.contact.findMany({ orderBy: { createdAt: "desc" } });
+  return prisma.contact.findMany({ orderBy: { createdAt: "desc" }, take: 1000 });
 }
 
 export async function markAsRead(id: string) {

@@ -158,8 +158,13 @@ export async function create(
   }
 }
 
+// Achado (auditoria): sem limite algum. Diferente de contactService, portfólio é conteúdo
+// curado manualmente pelo admin (não cresce organicamente com tráfego público), então o
+// risco real é bem menor — mesmo assim, um teto de segurança evita que a consulta cresça
+// sem fim indefinidamente, sem mudar o formato da resposta (a página de portfólio depende
+// de ordenação/pin, não de paginação de UI).
 export async function findAll() {
-  return prisma.portfolio.findMany({ 
+  return prisma.portfolio.findMany({
     include: {
       media: {
         orderBy: { sortOrder: 'asc' }
@@ -169,7 +174,8 @@ export async function findAll() {
       { isPinned: "desc" },
       { sortOrder: "asc" },
       { eventDate: "desc" }
-    ] 
+    ],
+    take: 500,
   });
 }
 
