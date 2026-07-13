@@ -43,17 +43,18 @@ const config = {
   // Desabilita testes em produção
   collectCoverage: process.env.NODE_ENV !== 'production',
   // Achado (auditoria): cobertura nunca tinha sido medida/gatilhada neste repo. Piso definido
-  // um pouco abaixo da cobertura real medida em 2026-07-13 (statements 38.32%, branches
-  // 21.05%, functions 23.47%, lines 39.05%) — não é uma meta aspiracional (subir isso exigiria
-  // escrever um volume grande de testes novos, fora do escopo deste ciclo), é só um piso para
-  // travar regressão: se alguém apagar testes ou adicionar bastante código sem testar, o CI
-  // falha em vez de deixar a cobertura cair silenciosamente.
+  // um pouco abaixo da cobertura real medida em 2026-07-13 — não é uma meta aspiracional (subir
+  // isso exigiria escrever um volume grande de testes novos, fora do escopo deste ciclo), é só
+  // um piso para travar regressão: se alguém apagar testes ou adicionar bastante código sem
+  // testar, o CI falha em vez de deixar a cobertura cair silenciosamente. Atualizado no mesmo
+  // dia após os testes de caracterização de bookingService.ts (statements 40.10%, branches
+  // 23.71%, functions 25.15%, lines 40.87% — piso original era 37/20/22/38).
   coverageThreshold: process.env.NODE_ENV === 'production' ? undefined : {
     global: {
-      statements: 37,
-      branches: 20,
-      functions: 22,
-      lines: 38,
+      statements: 39,
+      branches: 22,
+      functions: 24,
+      lines: 39,
     },
   },
   // Configuração condicional baseada no ambiente
