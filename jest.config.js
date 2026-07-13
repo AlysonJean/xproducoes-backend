@@ -12,7 +12,6 @@ const integrationIgnorePatterns = [
   "src/utils/__tests__/review\\.test\\.ts$",
   "src/utils/__tests__/users\\.test\\.ts$",
   "src/utils/__tests__/userController\\.test\\.ts$",
-  "src/utils/__tests__/cache\\.test\\.ts$",
 ];
 
 const config = {
