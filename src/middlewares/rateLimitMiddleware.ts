@@ -277,6 +277,34 @@ export const contactRateLimit = rateLimit({
   },
 });
 
+// Rate limiting para sugestão de tema via IA - Protege custo de API paga por request
+// Achado (auditoria): a rota GET /gemini/suggest-theme é pública e sem cache, cada acerto
+// dispara uma chamada real à API paga (Gemini/Hugging Face). O limite já existia, mas era
+// um Map em memória própria do controller (geminiController.ts) que nunca removia chaves
+// antigas — em um processo Node de longa duração, cada IP/usuário único que já bateu na
+// rota fica para sempre no Map (vazamento de memória lento). Substituído aqui pela mesma
+// infra express-rate-limit usada em todo o resto do app, que já expira entradas
+// automaticamente — mesmo limite (3/min) e mesma mensagem de antes, só a implementação
+// muda.
+export const aiSuggestionRateLimit = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: 3, // 3 sugestões de IA por minuto
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: userKeyGenerator,
+  handler: (req: Request, res: Response) => {
+    logger.warn({
+      userId: req.userId,
+      ip: req.ip,
+      path: req.path,
+    }, '[RATE LIMIT] Sugestão de IA excedida');
+    res.status(429).json({
+      success: false,
+      message: 'Muitas solicitações de IA. Tente novamente em 1 minuto.',
+    });
+  },
+});
+
 export const rateLimiters = {
   auth: authRateLimit,
   api: apiRateLimit,
@@ -294,4 +322,5 @@ export const rateLimiters = {
   user: userRateLimit,
   userWrite: userWriteRateLimit,
   adaptive: adaptiveRateLimit,
+  aiSuggestion: aiSuggestionRateLimit,
 };
