@@ -102,7 +102,7 @@ describe('lgpdService', () => {
     });
 
     // Achado (auditoria): clientName/clientContact/clientEmail são um snapshot gravado
-    // direto em Booking na criação da reserva (bookingService.ts), independente da relação
+    // direto em Booking na criação da reserva (bookingCrudService.ts), independente da relação
     // com Client/User — eraseUserData() anonimizava User/Client/Collaborator mas nunca
     // tocava esses campos, deixando nome/contato/e-mail do titular em texto puro em todo o
     // histórico de reservas mesmo após a "exclusão" de dados.

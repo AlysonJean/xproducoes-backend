@@ -1,14 +1,11 @@
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { prisma } from "../config/prisma";
-import { BookingService } from "./bookingService";
 import logger from "../config/logger";
 import { cacheService } from "./cacheService";
 
 
 export class DashboardService {
 
-  private bookingService = new BookingService();
-  
   // ===== MÉTODOS OTIMIZADOS PARA PERFORMANCE COM CACHE =====
 
   async getStats() {

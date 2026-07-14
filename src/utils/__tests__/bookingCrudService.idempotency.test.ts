@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { BookingService } from '../../services/bookingService';
+import { BookingCrudService } from '../../services/booking/bookingCrudService';
 
 jest.mock('../../config/prisma', () => {
   return {
@@ -27,8 +27,10 @@ jest.mock('../../config/prisma', () => {
 
 const { prisma } = require('../../config/prisma');
 
-describe('BookingService idempotency', () => {
-  const service = new BookingService();
+// Achado (decomposição de bookingService.ts em 6 services): createBooking agora vive em
+// BookingCrudService — só o import e o tipo mudaram, o comportamento testado é idêntico.
+describe('BookingCrudService idempotency', () => {
+  const service = new BookingCrudService();
 
   beforeEach(() => {
     jest.clearAllMocks();

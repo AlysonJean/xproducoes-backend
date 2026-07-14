@@ -1,12 +1,15 @@
 import { Request, Response, NextFunction } from "express";
-import { BookingService, ConfirmCollaboratorInput } from "../services/bookingService";
+import { ConfirmCollaboratorInput, bookingStatusService } from "../services/booking/bookingStatusService";
+import { bookingCrudService } from "../services/booking/bookingCrudService";
+import { bookingCalendarService } from "../services/booking/bookingCalendarService";
+import { bookingReportingService } from "../services/booking/bookingReportingService";
+import { bookingAttachmentService } from "../services/booking/bookingAttachmentService";
+import { bookingTaskService } from "../services/booking/bookingTaskService";
 import { prisma } from "../config/prisma";
 import { BookingStatus, DeliveryStatus } from "@prisma/client";
 import logger from "../config/logger";
 import { BadRequestError, ForbiddenError, NotFoundError } from "../utils/errors";
 import { getSocketIO } from "../config/socket";
-
-const bookingService = new BookingService();
 
 export class BookingController {
   create = async (req: Request, res: Response, next: NextFunction) => {
@@ -17,7 +20,7 @@ export class BookingController {
 
       // Suporte a idempotency
       const idempotencyKey = (req.header('Idempotency-Key') || req.header('x-idempotency-key')) as string | undefined;
-      const booking = await bookingService.createBooking(validatedData, req.userId!, idempotencyKey);
+      const booking = await bookingCrudService.createBooking(validatedData, req.userId!, idempotencyKey);
       
       return res.status(201).json({
         success: true,
@@ -59,7 +62,7 @@ export class BookingController {
         return res.json({ success: true, data: [] });
       }
 
-      const bookings = await bookingService.getBookingsByClient(client.id);
+      const bookings = await bookingCrudService.getBookingsByClient(client.id);
 
       res.json({ success: true, data: bookings });
     } catch (error) {
@@ -104,10 +107,10 @@ export class BookingController {
         take: limit
       };
 
-      const bookings = await bookingService.getAllBookings(filters);
+      const bookings = await bookingCrudService.getAllBookings(filters);
       
       // Buscar total para meta
-      const total = await bookingService.countBookings({
+      const total = await bookingCrudService.countBookings({
         status,
         eventDateFrom: startDate,
         eventDateTo: endDate,
@@ -150,7 +153,7 @@ export class BookingController {
     if (!id) throw new BadRequestError("ID da reserva é obrigatório.");
 
 
-    const updatedBooking = await bookingService.updateBookingStatus(id, status);
+    const updatedBooking = await bookingStatusService.updateBookingStatus(id, status);
     
     res.json({
       success: true,
@@ -174,7 +177,7 @@ export class BookingController {
 
 
 
-      const updatedBooking = await bookingService.updateDeliveryStatus(id, status);
+      const updatedBooking = await bookingStatusService.updateDeliveryStatus(id, status);
       
       res.json({
         success: true,
@@ -202,7 +205,7 @@ export class BookingController {
       const monthNum = month ? Number(month) : undefined;
       const yearNum = year ? Number(year) : undefined;
       
-      const events = await bookingService.getCalendar(monthNum, yearNum);
+      const events = await bookingCalendarService.getCalendar(monthNum, yearNum);
       
       res.json({
         success: true,
@@ -246,7 +249,7 @@ export class BookingController {
         }
 
         // Verificar se a booking pertence ao cliente
-        const booking = await bookingService.getBookingById(id);
+        const booking = await bookingCrudService.getBookingById(id);
         if (booking.clientId !== client.id) {
           res.status(403).json({ 
             success: false,
@@ -256,7 +259,7 @@ export class BookingController {
         }
       }
 
-      const booking = await bookingService.getBookingById(id);
+      const booking = await bookingCrudService.getBookingById(id);
       
       res.json({
         success: true,
@@ -298,7 +301,7 @@ export class BookingController {
           return;
         }
 
-        const booking = await bookingService.getBookingById(id);
+        const booking = await bookingCrudService.getBookingById(id);
         if (booking.clientId !== client.id) {
           res.status(403).json({ 
             success: false,
@@ -312,7 +315,7 @@ export class BookingController {
       // endereço do cliente etc. não devem ir para o agregador de logs).
       logger.info({ id, fields: Object.keys(req.body || {}) }, "[BOOKING UPDATE] Atualização recebida");
 
-      const updatedBooking = await bookingService.updateBooking(id, req.body);
+      const updatedBooking = await bookingCrudService.updateBooking(id, req.body);
       res.json({
         success: true,
         message: "Reserva atualizada com sucesso",
@@ -348,7 +351,7 @@ export class BookingController {
           return;
         }
 
-        const booking = await bookingService.getBookingById(id);
+        const booking = await bookingCrudService.getBookingById(id);
         if (booking.clientId !== client.id) {
           res.status(403).json({ success: false, message: 'Acesso negado. Esta reserva não pertence a você.' });
           return;
@@ -361,7 +364,7 @@ export class BookingController {
         return;
       }
 
-      const attachment = await bookingService.addAttachment(id, { url, filename, mimeType });
+      const attachment = await bookingAttachmentService.addAttachment(id, { url, filename, mimeType });
 
       res.status(201).json({ success: true, data: attachment });
     } catch (error) {
@@ -388,14 +391,14 @@ export class BookingController {
           return;
         }
 
-        const booking = await bookingService.getBookingById(id);
+        const booking = await bookingCrudService.getBookingById(id);
         if (booking.clientId !== client.id) {
           res.status(403).json({ success: false, message: 'Acesso negado. Esta reserva não pertence a você.' });
           return;
         }
       }
 
-      const removed = await bookingService.removeAttachment(attachmentId);
+      const removed = await bookingAttachmentService.removeAttachment(attachmentId);
       res.json({ success: true, data: removed });
     } catch (error) {
       logger.error({ err: error }, 'Erro ao remover attachment');
@@ -428,7 +431,7 @@ export class BookingController {
           return;
         }
 
-        const booking = await bookingService.getBookingById(id);
+        const booking = await bookingCrudService.getBookingById(id);
         if (booking.clientId !== client.id) {
           res.status(403).json({ 
             success: false,
@@ -438,7 +441,7 @@ export class BookingController {
         }
       }
 
-      await bookingService.deleteBooking(id);
+      await bookingCrudService.deleteBooking(id);
       
       res.status(204).send();
     } catch (error) {
@@ -477,7 +480,7 @@ export class BookingController {
           return;
         }
 
-        const existingBooking = await bookingService.getBookingById(id);
+        const existingBooking = await bookingCrudService.getBookingById(id);
         if (existingBooking.clientId !== client.id) {
           res.status(403).json({
             success: false,
@@ -487,7 +490,7 @@ export class BookingController {
         }
       }
 
-      const booking = await bookingService.confirm(id);
+      const booking = await bookingStatusService.confirm(id);
       
       res.json({
         success: true,
@@ -521,7 +524,7 @@ export class BookingController {
         return;
       }
 
-      const booking = await bookingService.confirmWithDetails(id, { totalPrice, collaborators });
+      const booking = await bookingStatusService.confirmWithDetails(id, { totalPrice, collaborators });
       res.json({ success: true, message: 'Reserva confirmada com detalhes', data: booking });
     } catch (error) {
       logger.error({ err: error }, 'Erro no controller confirmWithDetails');
@@ -555,7 +558,7 @@ export class BookingController {
           return;
         }
 
-        const existingBooking = await bookingService.getBookingById(id);
+        const existingBooking = await bookingCrudService.getBookingById(id);
         if (existingBooking.clientId !== client.id) {
           res.status(403).json({
             success: false,
@@ -565,7 +568,7 @@ export class BookingController {
         }
       }
 
-      const booking = await bookingService.cancel(id, reason);
+      const booking = await bookingStatusService.cancel(id, reason);
       
       res.json({
         success: true,
@@ -592,7 +595,7 @@ export class BookingController {
         return res.json({ success: true, data: [] });
       }
 
-      const bookings = await bookingService.getUpcoming(client.id);
+      const bookings = await bookingCalendarService.getUpcoming(client.id);
       
       res.json({
         success: true,
@@ -618,7 +621,7 @@ export class BookingController {
         return res.json({ success: true, data: [] });
       }
 
-      const bookings = await bookingService.getHistory(client.id);
+      const bookings = await bookingCalendarService.getHistory(client.id);
       
       res.json({
         success: true,
@@ -647,7 +650,7 @@ export class BookingController {
     }
 
     try {
-      const stats = await bookingService.getDashboardStats();
+      const stats = await bookingReportingService.getDashboardStats();
       
       res.json({
         success: true,
@@ -674,7 +677,7 @@ export class BookingController {
       const monthNum = month ? Number(month) : undefined;
       const yearNum = year ? Number(year) : undefined;
       
-      const calendar = await bookingService.getCalendar(monthNum, yearNum);
+      const calendar = await bookingCalendarService.getCalendar(monthNum, yearNum);
       
       res.json({
         success: true,
@@ -745,7 +748,7 @@ export class BookingController {
         }
       }
 
-      const roadmap = await bookingService.getEventRoadmap(id);
+      const roadmap = await bookingTaskService.getEventRoadmap(id);
       res.json({ success: true, data: roadmap });
     } catch (error) {
       logger.error({ err: error, bookingId: req.params.id }, "Erro no controller getRoadmap");
@@ -766,7 +769,7 @@ export class BookingController {
         throw new BadRequestError("Título da tarefa é obrigatório.");
       }
 
-      const created = await bookingService.createBookingTask(bookingId, {
+      const created = await bookingTaskService.createBookingTask(bookingId, {
         title: title.trim(),
         description: description?.trim() || undefined,
       });
@@ -793,7 +796,7 @@ export class BookingController {
         throw new BadRequestError("ID da tarefa é obrigatório.");
       }
 
-      const updated = await bookingService.toggleTaskStatus(taskId, isCompleted);
+      const updated = await bookingTaskService.toggleTaskStatus(taskId, isCompleted);
       
       // Emitir via Socket.IO para tempo real
       try {
@@ -818,7 +821,7 @@ export class BookingController {
         throw new BadRequestError("ID da reserva é obrigatório.");
       }
 
-      const expense = await bookingService.createBookingExpense({
+      const expense = await bookingTaskService.createBookingExpense({
         bookingId: id,
         collaboratorId: req.userId!,
         amount,

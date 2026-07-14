@@ -1,8 +1,10 @@
-import { BookingService } from "../../services/bookingService";
+import { BookingCrudService } from "../../services/booking/bookingCrudService";
 import { BookingValidationError } from "../bookingErrors";
 
-describe("BookingService - cálculo de preço total", () => {
-  let service: BookingService;
+// Achado (decomposição de bookingService.ts em 6 services): createBooking agora vive em
+// BookingCrudService — só o import e o tipo mudaram, o comportamento testado é idêntico.
+describe("BookingCrudService - cálculo de preço total", () => {
+  let service: BookingCrudService;
   let mockPrisma: any;
 
   beforeEach(() => {
@@ -15,8 +17,8 @@ describe("BookingService - cálculo de preço total", () => {
       client: { upsert: jest.fn() },
       booking: { create: jest.fn().mockResolvedValue({ id: "b1" }) },
     };
-    service = new BookingService();
-    // @ts-expect-error - prisma é private em BookingService; injeção só para teste
+    service = new BookingCrudService();
+    // @ts-expect-error - prisma é private em BookingCrudService; injeção só para teste
     service.prisma = mockPrisma;
   });
 

@@ -20,7 +20,9 @@ import { Request, Response, NextFunction } from "express";
 import * as userService from "../services/userService";
 import * as clientService from "../services/clientService";
 import { prisma } from "../config/prisma";
-import { BookingService } from "../services/bookingService";
+import { bookingCrudService } from "../services/booking/bookingCrudService";
+import { bookingStatusService } from "../services/booking/bookingStatusService";
+import { bookingReportingService } from "../services/booking/bookingReportingService";
 import { EquipmentService } from "../services/equipmentService";
 import logger from "../config/logger";
 import { UploadService } from "../services/uploadService";
@@ -31,7 +33,6 @@ import { BookingStatus, Client, User, Prisma } from "@prisma/client";
 import { isPrismaError } from "../types/common";
 import { NotFoundError } from "../utils/errors";
 
-const bookingService = new BookingService();
 const equipmentService = new EquipmentService();
 
 // ✅ Helper function para mapear cliente (elimina duplicação)
@@ -445,12 +446,12 @@ export class AdminController {
   // Dashboard e estatísticas
   async getDashboard(req: Request, res: Response, next: NextFunction) {
     try {
-      const dashboardStats = await bookingService.getDashboardStats();
+      const dashboardStats = await bookingReportingService.getDashboardStats();
       const stats = {
         totalUsers: await userService.getTotalUsers(),
         totalBookings: dashboardStats.totalBookings,
         totalEquipments: await equipmentService.getTotalEquipments(),
-        recentBookings: await bookingService.getAllBookings({ eventDateFrom: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }),
+        recentBookings: await bookingCrudService.getAllBookings({ eventDateFrom: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }),
       };
       res.json({ success: true, data: stats });
     } catch (error) {
@@ -477,8 +478,8 @@ export class AdminController {
       };
       
       const [bookings, total] = await Promise.all([
-        bookingService.getAllBookings(filters),
-        bookingService.countBookings(filters)
+        bookingCrudService.getAllBookings(filters),
+        bookingCrudService.countBookings(filters)
       ]);
       
       // Aplicar paginação manualmente (idealmente seria no service)
@@ -506,7 +507,7 @@ export class AdminController {
       const { id } = req.params as { id: string };
       const { status } = req.body;
       
-      const booking = await bookingService.updateBookingStatus(id, status);
+      const booking = await bookingStatusService.updateBookingStatus(id, status);
       res.json({ success: true, data: booking });
     } catch (error) {
       logger.error('Erro ao atualizar status da reserva: ' + String(error));

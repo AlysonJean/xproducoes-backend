@@ -606,7 +606,7 @@ describe('🛡️ Security Blindagem Tests', () => {
 
   describe('Dados operacionais de colaborador (events/availabilities/stats) - antes visíveis a qualquer CLIENT', () => {
     // beforeEach (não só afterEach): uma chamada assíncrona "fire-and-forget" deixada
-    // pendente por um teste anterior (bookingService.notifyCollaborators, disparado sem
+    // pendente por um teste anterior (bookingStatusService.notifyCollaborators, disparado sem
     // await no fluxo de confirm) pode resolver entre um teste e outro e incrementar essa
     // mesma mock — reseta antes de cada teste aqui para não depender da ordem de execução.
     beforeEach(() => {

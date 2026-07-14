@@ -157,7 +157,7 @@ export async function eraseUserData(userId: string) {
   });
 
   // Reservas: clientName/clientContact/clientEmail são um snapshot direto gravado na
-  // criação da reserva (bookingService.ts), independente da relação com Client/User —
+  // criação da reserva (bookingCrudService.ts), independente da relação com Client/User —
   // existem para reservas de clientes não cadastrados. Sem isso, o nome/contato/e-mail do
   // titular continuava em texto puro em todo o histórico de reservas mesmo depois da
   // anonimização acima, que só atinge User/Client/Collaborator. mantém totalPrice/

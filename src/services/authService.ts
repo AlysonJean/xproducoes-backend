@@ -41,9 +41,8 @@ export class AuthService {
 
     if (user && user.role === 'CLIENT') {
       try {
-        const { BookingService } = await import('./bookingService.js');
-        const bookingService = new BookingService();
-        await bookingService.linkBookingsToUser(user.id, user.email, data.bookingId);
+        const { bookingCrudService } = await import('./booking/bookingCrudService.js');
+        await bookingCrudService.linkBookingsToUser(user.id, user.email, data.bookingId);
       } catch (e) {
         logger.error({ err: e }, 'Erro ao vincular orçamentos no registro');
       }

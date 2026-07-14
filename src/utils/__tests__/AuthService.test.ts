@@ -16,11 +16,11 @@ jest.mock("../../services/userService", () => ({
   changePassword: jest.fn(async (_userId: string, _currentPassword: string, _newPassword: string) => ({ success: true })),
 }));
 
-// Mock do BookingService para evitar conexão real com banco durante o register
-jest.mock("../../services/bookingService", () => ({
-  BookingService: jest.fn().mockImplementation(() => ({
+// Mock do BookingCrudService para evitar conexão real com banco durante o register
+jest.mock("../../services/booking/bookingCrudService", () => ({
+  bookingCrudService: {
     linkBookingsToUser: jest.fn().mockResolvedValue(undefined),
-  })),
+  },
 }));
 
 describe("AuthService", () => {
