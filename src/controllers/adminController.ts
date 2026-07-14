@@ -471,24 +471,24 @@ export class AdminController {
           ? (status as BookingStatus)
           : undefined;
       
-      const filters = {
+      const countFilters = {
         status: normalizedStatus,
         eventDateFrom: startDate ? new Date(startDate as string) : undefined,
         eventDateTo: endDate ? new Date(endDate as string) : undefined,
       };
-      
+
+      // Achado (auditoria — mesma causa raiz corrigida em bookingCrudService.getAllBookings):
+      // este endpoint buscava a tabela inteira e fatiava em memória (comentário original:
+      // "idealmente seria no service") — funcionava, mas buscava todas as reservas do banco
+      // a cada página. Agora que o service aceita skip/take de verdade, pagina no banco.
       const [bookings, total] = await Promise.all([
-        bookingCrudService.getAllBookings(filters),
-        bookingCrudService.countBookings(filters)
+        bookingCrudService.getAllBookings({ ...countFilters, skip: (page - 1) * limit, take: limit }),
+        bookingCrudService.countBookings(countFilters)
       ]);
-      
-      // Aplicar paginação manualmente (idealmente seria no service)
-      const start = (page - 1) * limit;
-      const paginatedBookings = bookings.slice(start, start + limit);
-      
+
       res.json({
         success: true,
-        data: paginatedBookings,
+        data: bookings,
         meta: {
           total,
           page,

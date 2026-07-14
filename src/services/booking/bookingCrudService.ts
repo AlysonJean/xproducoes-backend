@@ -319,10 +319,18 @@ export class BookingCrudService {
         }
       }
 
+      // Achado (auditoria): bookingController.findAll() já calculava skip/take a partir de
+      // page/limit e injetava no objeto de filtros, mas este método nunca os lia de volta —
+      // toda "página" retornava o mesmo resultado completo, mesmo a resposta anunciando
+      // page/limit/totalPages/hasMore. skip/take são opcionais (undefined = sem paginação,
+      // Prisma ignora), preservando o comportamento de quem chama sem paginar (ex.:
+      // adminController.ts, getBookingsByClient).
       const bookings = await this.prisma.booking.findMany({
         where,
         include: this.bookingInclude,
-        orderBy: { eventDate: "asc" }
+        orderBy: { eventDate: "asc" },
+        skip: filters.skip,
+        take: filters.take,
       });
 
       return bookings;

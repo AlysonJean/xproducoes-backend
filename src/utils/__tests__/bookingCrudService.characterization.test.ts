@@ -80,6 +80,22 @@ describe("BookingCrudService — testes de caracterização", () => {
         })
       );
     });
+
+    it("aplica skip/take de verdade na query (achado: antes eram calculados no controller e descartados)", async () => {
+      mockPrisma.booking.findMany.mockResolvedValue([]);
+      await service.getAllBookings({ skip: 20, take: 10 });
+      expect(mockPrisma.booking.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 20, take: 10 })
+      );
+    });
+
+    it("não restringe a busca quando skip/take não são informados (chamadores sem paginação continuam recebendo tudo)", async () => {
+      mockPrisma.booking.findMany.mockResolvedValue([]);
+      await service.getAllBookings({ clientId: "cli1" });
+      expect(mockPrisma.booking.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: undefined, take: undefined })
+      );
+    });
   });
 
   describe("countBookings", () => {

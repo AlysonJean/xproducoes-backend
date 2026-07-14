@@ -132,6 +132,14 @@ export const bookingCreateSchema = bookingBaseSchema
   );
 
 // Schema para filtros de busca
+// Achado (auditoria — investigando a convenção de paginação do projeto): skip/take não
+// existiam aqui, mas bookingController.findAll() já calculava e injetava esses dois campos
+// no objeto de filtros antes de chamar bookingCrudService.getAllBookings(filters) — só que
+// getAllBookings nunca os lia de volta (bug pré-existente à decomposição em 6 services,
+// confirmado no histórico do git). TypeScript não pegou porque a checagem de propriedades
+// excedentes só vale para literais de objeto, não para uma variável repassada. Resultado
+// real: toda "página" da listagem de reservas retornava o mesmo resultado completo, sem
+// paginar de verdade — mesmo a resposta anunciando page/limit/totalPages/hasMore.
 export const bookingFiltersSchema = z.object({
   status: z.nativeEnum(BookingStatus).optional(),
   deliveryStatus: z.nativeEnum(DeliveryStatus).optional(),
@@ -142,6 +150,8 @@ export const bookingFiltersSchema = z.object({
   assigneeId: idSchema.optional(),
   kitId: idSchema.optional(),
   equipmentIds: idArraySchema.optional(),
+  skip: z.number().int().nonnegative().optional(),
+  take: z.number().int().positive().optional(),
 });
 
 // Schema para atualização de booking
