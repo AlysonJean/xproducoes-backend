@@ -20,6 +20,8 @@ import {
   getMyStats, // Novo
   getMyEvents, // Novo
   getMyNotifications, // Novo
+  getMySettings,
+  updateMySettings,
   getCollaboratorAvailabilities,
   getAvailableCollaborators,
   getAllAvailabilities,
@@ -77,6 +79,8 @@ router.get('/me/payments', requireAdminOrCollaborator, getMyPayments);
 router.get('/me/stats', requireAdminOrCollaborator, getMyStats);
 router.get('/me/events', requireAdminOrCollaborator, getMyEvents);
 router.get('/me/notifications', requireAdminOrCollaborator, getMyNotifications);
+router.get('/me/settings', requireAdminOrCollaborator, getMySettings);
+router.put('/me/settings', requireAdminOrCollaborator, updateMySettings);
 // ---------------------------------------------
 
 router.get("/:id", validateId(), getCollaboratorById);

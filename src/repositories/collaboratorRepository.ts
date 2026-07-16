@@ -486,6 +486,10 @@ export class CollaboratorRepository {
     averageRating: number;
     completionRate: number;
     monthlyEarnings: Array<{ month: string; earnings: number; events: number }>;
+    monthlyRatings: Array<{ month: string; averageRating: number }>;
+    mostProductiveHour: number | null;
+    averageEventDuration: number;
+    workingDaysPerMonth: number;
   }> {
     const whereClause: import("@prisma/client").Prisma.EventCollaboratorWhereInput =
       {
@@ -529,6 +533,46 @@ export class CollaboratorRepository {
 
     // Ganhos mensais (últimos 12 meses)
     const monthlyEarnings = await this.getMonthlyEarnings(id);
+    const monthlyRatings = await this.getMonthlyRatings(id);
+
+    // Duração média dos eventos concluídos (Booking.eventDuration, em horas)
+    const durations = events
+      .map((e) => e.booking?.eventDuration)
+      .filter((d): d is number => typeof d === "number" && d > 0);
+    const averageEventDuration =
+      durations.length > 0
+        ? durations.reduce((sum, d) => sum + d, 0) / durations.length
+        : 0;
+
+    // Horário mais produtivo: moda da hora de início (EventCollaborator.startTime, "HH:MM")
+    const hourCounts = new Map<number, number>();
+    events.forEach((e) => {
+      const hour = parseInt((e.startTime || "").split(":")[0], 10);
+      if (!isNaN(hour)) hourCounts.set(hour, (hourCounts.get(hour) || 0) + 1);
+    });
+    let mostProductiveHour: number | null = null;
+    let maxHourCount = 0;
+    for (const [hour, count] of hourCounts) {
+      if (count > maxHourCount) {
+        maxHourCount = count;
+        mostProductiveHour = hour;
+      }
+    }
+
+    // Dias trabalhados por mês: média de dias distintos com evento concluído, por mês
+    const daysByMonth = new Map<string, Set<string>>();
+    events.forEach((e) => {
+      if (!e.booking?.eventDate) return;
+      const date = new Date(e.booking.eventDate);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      const dayKey = date.toISOString().slice(0, 10);
+      if (!daysByMonth.has(monthKey)) daysByMonth.set(monthKey, new Set());
+      daysByMonth.get(monthKey)!.add(dayKey);
+    });
+    const workingDaysPerMonth =
+      daysByMonth.size > 0
+        ? Array.from(daysByMonth.values()).reduce((sum, days) => sum + days.size, 0) / daysByMonth.size
+        : 0;
 
     return {
       totalEvents,
@@ -536,7 +580,52 @@ export class CollaboratorRepository {
       averageRating,
       completionRate,
       monthlyEarnings,
+      monthlyRatings,
+      mostProductiveHour,
+      averageEventDuration,
+      workingDaysPerMonth,
     };
+  }
+
+  // Histórico mensal de avaliação (últimos 12 meses) — mesmo padrão de getMonthlyEarnings,
+  // usando EventCollaborator.rating (nota por evento) em vez do valor pago.
+  private async getMonthlyRatings(collaboratorId: string) {
+    try {
+      const oneYearAgo = new Date();
+      oneYearAgo.setMonth(oneYearAgo.getMonth() - 12);
+
+      const events = await prisma.eventCollaborator.findMany({
+        where: {
+          collaboratorId,
+          status: "COMPLETED",
+          createdAt: { gte: oneYearAgo },
+          rating: { not: null },
+        },
+        select: { createdAt: true, rating: true },
+        orderBy: { createdAt: "desc" },
+      });
+
+      const monthlyData = events.reduce((acc, event) => {
+        const date = new Date(event.createdAt);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+        if (!acc[monthKey]) {
+          acc[monthKey] = { month: monthKey, total: 0, count: 0 };
+        }
+
+        acc[monthKey].total += event.rating || 0;
+        acc[monthKey].count += 1;
+
+        return acc;
+      }, {} as Record<string, { month: string; total: number; count: number }>);
+
+      return Object.values(monthlyData)
+        .map((m) => ({ month: m.month, averageRating: m.count > 0 ? m.total / m.count : 0 }))
+        .sort((a, b) => b.month.localeCompare(a.month));
+    } catch (error) {
+      logger.error({ error, collaboratorId }, "Erro ao calcular avaliações mensais");
+      return [];
+    }
   }
 
   private async getMonthlyEarnings(collaboratorId: string) {

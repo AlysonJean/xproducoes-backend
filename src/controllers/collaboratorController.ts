@@ -389,6 +389,43 @@ export class CollaboratorController {
     return res.json({ success: true, data: notifications });
   }
 
+  // Achado (auditoria de produto): CollaboratorSettingsPage salvava privacidade/pagamento
+  // chamando PUT /collaborators/me/settings, uma rota que nunca existiu no backend — o botão
+  // "Salvar Alterações" reportava sucesso mas nada era persistido. Guardado em
+  // User.profileSettings (Json), o mesmo campo que a página já lê de volta em getMyProfile.
+  async getMySettings(req: Request, res: Response, _next: NextFunction) {
+    const userId = req.userId as string;
+    if (!userId) throw new UnauthorizedError('Usuário não autenticado');
+
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { profileSettings: true } });
+    return res.json({ success: true, data: user?.profileSettings || {} });
+  }
+
+  async updateMySettings(req: Request, res: Response, _next: NextFunction) {
+    const userId = req.userId as string;
+    if (!userId) throw new UnauthorizedError('Usuário não autenticado');
+
+    const { privacy, payment, security } = req.body;
+
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { profileSettings: true } });
+    const currentSettings = (user?.profileSettings as Record<string, unknown>) || {};
+
+    const updatedSettings = {
+      ...currentSettings,
+      ...(privacy !== undefined ? { privacy } : {}),
+      ...(payment !== undefined ? { payment } : {}),
+      ...(security !== undefined ? { security } : {}),
+    };
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { profileSettings: updatedSettings },
+      select: { profileSettings: true },
+    });
+
+    return res.json({ success: true, data: updatedUser.profileSettings });
+  }
+
   // --- MÉTODOS DE ADMIN / GESTÃO ---
 
   async getAllAvailabilities(req: Request, res: Response, _next: NextFunction) {
@@ -559,6 +596,8 @@ export const {
   getMyStats,
   getMyEvents,
   getMyNotifications,
+  getMySettings,
+  updateMySettings,
 } = collaboratorController;
 
 // Alias para createEventCollaborator
