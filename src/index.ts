@@ -12,6 +12,7 @@ import crypto from "crypto";
 import { initializeQueues, closeQueues } from "./config/jobQueue";
 import { startSocialScheduler } from "./cron/socialScheduler";
 import { startReminderScheduler } from "./cron/sendReminders";
+import { startAbandonedCartReminderScheduler } from "./cron/abandonedCartReminder";
 import { initializeRateLimiters } from "./middlewares/adaptiveRateLimiter";
 import { registerGlobalCrashHandlers } from "./config/crashHandlers";
 
@@ -276,6 +277,8 @@ Promise.all([
     startSocialScheduler();
     // Iniciar agendador de lembretes
     startReminderScheduler();
+    // Iniciar agendador de recuperação de orçamento abandonado
+    startAbandonedCartReminderScheduler();
   })
   .catch(err => {
     logger.error({obj:err}, 'Erro fatal ao iniciar servidor:');
