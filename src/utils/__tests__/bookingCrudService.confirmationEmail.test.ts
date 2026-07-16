@@ -33,8 +33,13 @@ jest.mock('../../services/cacheService', () => ({
   },
 }));
 
+jest.mock('../../services/notificationService', () => ({
+  notifyAdmins: jest.fn().mockResolvedValue(undefined),
+}));
+
 const { prisma } = require('../../config/prisma');
 const { queueEmail } = require('../../config/jobQueue');
+const { notifyAdmins } = require('../../services/notificationService');
 
 // Achado (auditoria de produto): quem enviava um orçamento não recebia nenhuma
 // confirmação até um admin aprovar manualmente. createBooking agora enfileira o e-mail
@@ -69,14 +74,18 @@ describe('BookingCrudService — e-mail de confirmação ao criar orçamento', (
         }),
       })
     );
+    expect(notifyAdmins).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'BOOKING_CREATED', actionUrl: '/admin/reservas/b1' })
+    );
   });
 
-  it('não enfileira e-mail quando a reserva criada é um carrinho em rascunho (DRAFT)', async () => {
+  it('não enfileira e-mail nem notifica admins quando a reserva criada é um carrinho em rascunho (DRAFT)', async () => {
     (prisma.booking.create as jest.Mock).mockResolvedValue({ id: 'b2', status: BookingStatus.DRAFT, equipments: [], totalPrice: 0 });
 
     await service.createBooking({ ...bookingData, status: BookingStatus.DRAFT } as any, creator.id);
 
     expect(queueEmail).not.toHaveBeenCalled();
+    expect(notifyAdmins).not.toHaveBeenCalled();
   });
 
   it('não lança erro para o chamador quando o envio do e-mail falha (só loga, não bloqueante)', async () => {

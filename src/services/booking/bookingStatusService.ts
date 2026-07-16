@@ -8,6 +8,7 @@ import { googleCalendarService } from "../googleCalendarService.js";
 import { bookingIncludeConfig, BookingWithIncludes } from "./bookingShared.js";
 import { bookingCrudService } from "./bookingCrudService.js";
 import { bookingCalendarService } from "./bookingCalendarService.js";
+import { createNotification } from "../notificationService.js";
 
 export interface ConfirmCollaboratorInput {
   collaboratorId: string;
@@ -87,6 +88,16 @@ export class BookingStatusService {
         // WhatsApp Notification
         void whatsappService.sendBookingConfirmation(updatedBooking).catch((e: unknown) => {
             logger.warn({ error: e }, 'Erro ao enviar notificação WhatsApp');
+        });
+
+        // Achado (auditoria de produto): sino de notificação nunca recebia dado nenhum —
+        // avisa o cliente dentro da própria plataforma, além do e-mail/WhatsApp.
+        void createNotification({
+          userId: updatedBooking.creatorId,
+          type: "BOOKING_UPDATED",
+          title: "Reserva confirmada!",
+          message: `Sua reserva${updatedBooking.eventTitle ? ` para "${updatedBooking.eventTitle}"` : ""} foi confirmada.`,
+          actionUrl: `/cliente/reservas/${updatedBooking.id}`,
         });
 
         // Notify Collaborators (WhatsApp + Google Calendar)

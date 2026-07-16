@@ -11,6 +11,7 @@ import { generateSemanticBookingId } from "../../utils/bookingIdGenerator.js";
 import { cacheService } from "../cacheService.js";
 import { bookingIncludeConfig, BookingUpdateExtras } from "./bookingShared.js";
 import { queueEmail } from "../../config/jobQueue.js";
+import { notifyAdmins } from "../notificationService.js";
 
 // CRUD de reservas: criar, buscar (por id/lista/filtros/cliente), atualizar, deletar, e
 // vincular orçamentos manuais a um usuário recém-registrado. Extraído de bookingService.ts
@@ -220,6 +221,15 @@ export class BookingCrudService {
             booking,
           },
         }).catch((e) => logger.warn({ err: e }, "Falha ao enfileirar e-mail de confirmação de orçamento (não bloqueante)"));
+
+        // Achado (auditoria de produto): sino de notificação nunca recebia dado nenhum —
+        // avisa a equipe de admin que um novo orçamento chegou e precisa de revisão.
+        void notifyAdmins({
+          type: "BOOKING_CREATED",
+          title: "Novo orçamento recebido",
+          message: `${creator.name} solicitou um orçamento${booking.eventTitle ? ` para "${booking.eventTitle}"` : ""}.`,
+          actionUrl: `/admin/reservas/${booking.id}`,
+        });
       }
 
       return booking;

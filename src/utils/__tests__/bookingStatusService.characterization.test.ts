@@ -10,6 +10,7 @@
 import { BookingStatus, DeliveryStatus } from "@prisma/client";
 import { BookingStatusService } from "../../services/booking/bookingStatusService";
 import { bookingCrudService } from "../../services/booking/bookingCrudService";
+import { createNotification } from "../../services/notificationService";
 
 jest.mock("../../services/booking/bookingCrudService", () => ({
   bookingCrudService: {
@@ -42,6 +43,10 @@ jest.mock("../../services/emailService", () => ({
   default: {
     sendBookingApproved: jest.fn().mockResolvedValue(undefined),
   },
+}));
+
+jest.mock("../../services/notificationService", () => ({
+  createNotification: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("../../services/cacheService", () => ({
@@ -109,6 +114,9 @@ describe("BookingStatusService — testes de caracterização", () => {
       expect(result.status).toBe(BookingStatus.CONFIRMED);
       expect(mockPrisma.booking.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: { status: BookingStatus.CONFIRMED } })
+      );
+      expect(createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: baseBooking.creatorId, type: "BOOKING_UPDATED" })
       );
     });
 
