@@ -10,6 +10,11 @@ import { BookingStatus, DeliveryStatus } from "@prisma/client";
 import logger from "../config/logger";
 import { BadRequestError, ForbiddenError, NotFoundError } from "../utils/errors";
 import { getSocketIO } from "../config/socket";
+import { findOrCreateGuestUser } from "../services/userService";
+import { AuthService } from "../services/authService";
+import { setAuthCookies } from "../config/cookies";
+
+const authService = new AuthService();
 
 export class BookingController {
   create = async (req: Request, res: Response, next: NextFunction) => {
@@ -21,7 +26,7 @@ export class BookingController {
       // Suporte a idempotency
       const idempotencyKey = (req.header('Idempotency-Key') || req.header('x-idempotency-key')) as string | undefined;
       const booking = await bookingCrudService.createBooking(validatedData, req.userId!, idempotencyKey);
-      
+
       return res.status(201).json({
         success: true,
         message: "Reserva criada com sucesso",
@@ -40,6 +45,62 @@ export class BookingController {
       }
 
       // BookingValidationError do Service
+      if (error instanceof Error && error.constructor.name === 'BookingValidationError') {
+        return res.status(400).json({
+          success: false,
+          error: "Erro de Negócio",
+          message: error.message
+        });
+      }
+
+      next(error);
+    }
+  };
+
+  /**
+   * Checkout de convidado: cria (ou reaproveita) uma conta a partir de nome/e-mail e
+   * já cria a reserva com essa conta como criadora — sem exigir login prévio. O usuário
+   * fica autenticado ao final (mesmos cookies/token do login normal), então "Minhas
+   * Reservas" funciona imediatamente sem passo extra de cadastro.
+   */
+  createGuest = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const validatedData = req.body;
+      const guestName: string | undefined = validatedData.clientName;
+      const guestEmail: string | undefined = validatedData.clientEmail;
+      const guestPhone: string | undefined = validatedData.clientContact;
+
+      if (!guestName || !guestEmail) {
+        throw new BadRequestError("Nome e e-mail são obrigatórios para enviar um orçamento sem login.");
+      }
+
+      const guestUser = await findOrCreateGuestUser({ name: guestName, email: guestEmail, phone: guestPhone });
+
+      const idempotencyKey = (req.header('Idempotency-Key') || req.header('x-idempotency-key')) as string | undefined;
+      const booking = await bookingCrudService.createBooking(validatedData, guestUser.id, idempotencyKey);
+
+      const { token, refreshToken } = await authService.loginById(guestUser.id);
+      setAuthCookies(res, token, refreshToken);
+
+      return res.status(201).json({
+        success: true,
+        message: "Reserva criada com sucesso",
+        data: booking,
+        user: guestUser,
+        token,
+        refreshToken,
+      });
+    } catch (error) {
+      logger.error({ err: error }, "Erro no controller Booking.createGuest");
+
+      if (error instanceof BadRequestError || error instanceof ForbiddenError || error instanceof NotFoundError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.name,
+          message: error.message
+        });
+      }
+
       if (error instanceof Error && error.constructor.name === 'BookingValidationError') {
         return res.status(400).json({
           success: false,

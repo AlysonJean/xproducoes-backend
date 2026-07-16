@@ -1,21 +1,26 @@
 import { createSafeRouter } from "../middlewares/safeRouter";
 import { BookingController } from "../controllers/bookingController";
-import { criticalEndpointRateLimit } from '../middlewares/rateLimitMiddleware';
+import { criticalEndpointRateLimit, quoteRateLimit } from '../middlewares/rateLimitMiddleware';
 import { validateJsonContentType } from "../middlewares/contentTypeValidation";
 import { authenticate, adminOnly, adminOrCollaborator } from "../middlewares/unifiedAuth";
 import { validateBody, validateId } from "../config/validation";
-import { 
-  bookingCreateSchema, 
-  bookingUpdateSchema, 
+import {
+  bookingCreateSchema,
+  bookingUpdateSchema,
   bookingStatusUpdateSchema,
   deliveryStatusUpdateSchema,
-  bookingCancelSchema 
+  bookingCancelSchema
 } from "../validators/bookingSchema";
 
 const router = createSafeRouter();
 const bookingController = new BookingController();
 
-// Todas as rotas requerem autenticação
+// Checkout de convidado: rota pública (sem autenticação prévia) para permitir que quem
+// não tem conta ainda envie um orçamento — cria a conta e já autentica ao final. Precisa
+// vir ANTES de router.use(authenticate) abaixo, senão cairia sob o gate de autenticação.
+router.post("/guest", validateJsonContentType, quoteRateLimit, validateBody(bookingCreateSchema), bookingController.createGuest);
+
+// Todas as rotas abaixo requerem autenticação
 router.use(authenticate);
 
 // Rotas públicas (qualquer usuário autenticado)

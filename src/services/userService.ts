@@ -273,6 +273,46 @@ export async function register(data: RegisterInput) {
   return { ...user, needsEmailVerification: role !== 'ADMIN' } as const;
 }
 
+export type GuestUserInput = { name: string; email: string; phone?: string };
+
+/**
+ * Acha ou cria uma conta para um checkout de convidado (orçamento sem cadastro prévio).
+ * Reaproveita a mesma conta em pedidos futuros do mesmo e-mail. A senha é aleatória e
+ * nunca é comunicada ao usuário — o acesso inicial acontece via login automático
+ * (authService.loginById) logo após o checkout; para acessar depois de outro dispositivo,
+ * o fluxo já existente de "esqueci minha senha" funciona normalmente com este e-mail.
+ * `verified: true` evita a fricção de verificação de e-mail para uma conta que o próprio
+ * sistema criou, não que o usuário pediu proativamente.
+ */
+export async function findOrCreateGuestUser(data: GuestUserInput): Promise<{ id: string; name: string; email: string; role: UserRole; isNewAccount: boolean }> {
+  const existing = await prisma.user.findUnique({ where: { email: data.email } });
+  if (existing) {
+    return { id: existing.id, name: existing.name, email: existing.email, role: existing.role, isNewAccount: false };
+  }
+
+  const randomPassword = crypto.randomBytes(24).toString("hex");
+  const hash = await bcrypt.hash(randomPassword, 10);
+
+  const user = await prisma.user.create({
+    data: {
+      name: data.name,
+      email: data.email,
+      passwordHash: hash,
+      role: UserRole.CLIENT,
+      verified: true,
+    },
+    select: { id: true, name: true, email: true, role: true },
+  });
+
+  try {
+    await prisma.client.create({ data: { userId: user.id, phone: data.phone } });
+  } catch (e) {
+    logger.warn({ obj: e }, "Falha ao criar perfil de cliente para conta de convidado (não bloqueante):");
+  }
+
+  return { ...user, isNewAccount: true };
+}
+
 export async function login(data: LoginInput) {
   await assertNotLocked(data.email);
 
