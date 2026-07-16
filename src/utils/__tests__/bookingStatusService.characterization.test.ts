@@ -9,10 +9,12 @@
 
 import { BookingStatus, DeliveryStatus } from "@prisma/client";
 import { BookingStatusService } from "../../services/booking/bookingStatusService";
+import { bookingCrudService } from "../../services/booking/bookingCrudService";
 
 jest.mock("../../services/booking/bookingCrudService", () => ({
   bookingCrudService: {
     getBookingById: jest.fn().mockResolvedValue({ id: "b1" }),
+    checkEquipmentConflicts: jest.fn().mockResolvedValue([]),
   },
 }));
 
@@ -108,6 +110,20 @@ describe("BookingStatusService — testes de caracterização", () => {
       expect(mockPrisma.booking.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: { status: BookingStatus.CONFIRMED } })
       );
+    });
+
+    it("bloqueia a confirmação quando o equipamento já está reservado em outro evento confirmado no mesmo período", async () => {
+      (bookingCrudService.getBookingById as jest.Mock).mockResolvedValueOnce({
+        ...baseBooking,
+        equipments: [{ id: "eq1", name: "Caixa JBL" }],
+        kitId: null,
+      });
+      (bookingCrudService.checkEquipmentConflicts as jest.Mock).mockResolvedValueOnce([
+        { id: "b2", eventTitle: "Casamento Silva", eventDate: new Date("2027-01-10T18:00:00Z") },
+      ]);
+
+      await expect(service.updateBookingStatus("b1", BookingStatus.CONFIRMED)).rejects.toThrow(/Casamento Silva/);
+      expect(mockPrisma.booking.update).not.toHaveBeenCalled();
     });
   });
 

@@ -297,6 +297,51 @@ export class BookingCrudService {
   }
 
   /**
+   * Achado (auditoria de produto): não existia NENHUMA checagem de conflito de
+   * agenda em todo o fluxo de reservas — o endpoint que parecia prometer isso
+   * (GET /equipments/:id/availability) era um stub sempre "disponível" e, mais
+   * importante, nunca era chamado por nenhuma tela. O risco real não é esse endpoint
+   * órfão, é o app permitir confirmar duas reservas com o MESMO equipamento físico no
+   * mesmo período sem aviso nenhum. Só considera conflito contra reservas já
+   * CONFIRMED/IN_PROGRESS de outros clientes — dois orçamentos PENDING concorrendo pelo
+   * mesmo equipamento são normais (a equipe decide na hora de confirmar), não um erro.
+   */
+  async checkEquipmentConflicts(
+    bookingId: string,
+    equipmentIds: string[],
+    kitId: string | null,
+    eventDate: Date,
+    eventEndDate: Date
+  ) {
+    if (equipmentIds.length === 0 && !kitId) return [];
+
+    const orConditions: Prisma.BookingWhereInput[] = [];
+    if (equipmentIds.length > 0) {
+      orConditions.push({ equipments: { some: { id: { in: equipmentIds } } } });
+    }
+    if (kitId) {
+      orConditions.push({ kitId });
+    }
+
+    return this.prisma.booking.findMany({
+      where: {
+        id: { not: bookingId },
+        status: { in: [BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS] },
+        eventDate: { lt: eventEndDate },
+        eventEndDate: { gt: eventDate },
+        OR: orConditions,
+      },
+      select: {
+        id: true,
+        eventTitle: true,
+        eventDate: true,
+        equipments: { select: { id: true, name: true } },
+        kit: { select: { id: true, name: true } },
+      },
+    });
+  }
+
+  /**
    * Busca todas as reservas com filtros
    */
   async getAllBookings(filters: BookingFilters = {}) {

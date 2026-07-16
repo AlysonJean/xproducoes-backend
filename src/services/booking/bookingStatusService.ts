@@ -1,5 +1,5 @@
 import { Prisma, BookingStatus, DeliveryStatus, CollaboratorRole } from "@prisma/client";
-import { BookingNotFoundError, BookingBusinessLogicError } from "../../utils/bookingErrors.js";
+import { BookingNotFoundError, BookingBusinessLogicError, BookingConflictError } from "../../utils/bookingErrors.js";
 import logger from "../../config/logger.js";
 import { prisma } from "../../config/prisma.js";
 import { cacheService } from "../cacheService.js";
@@ -33,7 +33,28 @@ export class BookingStatusService {
   async updateBookingStatus(id: string, status: BookingStatus) {
     try {
       // Valida se a reserva existe
-      await bookingCrudService.getBookingById(id);
+      const existingBooking = await bookingCrudService.getBookingById(id);
+
+      // Checagem de conflito de agenda: só no momento de CONFIRMAR (reservas PENDING
+      // concorrendo pelo mesmo equipamento são normais — a equipe decide na confirmação).
+      if (status === BookingStatus.CONFIRMED) {
+        const equipmentIds = (existingBooking.equipments ?? []).map((e) => e.id);
+        const conflicts = await bookingCrudService.checkEquipmentConflicts(
+          id,
+          equipmentIds,
+          existingBooking.kitId,
+          existingBooking.eventDate,
+          existingBooking.eventEndDate
+        );
+        if (conflicts.length > 0) {
+          const details = conflicts
+            .map((c) => `"${c.eventTitle || c.id}" em ${new Date(c.eventDate).toLocaleDateString('pt-BR')}`)
+            .join(', ');
+          throw new BookingConflictError(
+            `Não é possível confirmar: equipamento(s) já reservado(s) para outro evento confirmado no mesmo período: ${details}`
+          );
+        }
+      }
 
       const updatedBooking = await this.prisma.booking.update({
         where: { id },
