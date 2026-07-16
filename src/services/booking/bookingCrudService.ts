@@ -10,6 +10,7 @@ import { prisma } from "../../config/prisma.js";
 import { generateSemanticBookingId } from "../../utils/bookingIdGenerator.js";
 import { cacheService } from "../cacheService.js";
 import { bookingIncludeConfig, BookingUpdateExtras } from "./bookingShared.js";
+import { queueEmail } from "../../config/jobQueue.js";
 
 // CRUD de reservas: criar, buscar (por id/lista/filtros/cliente), atualizar, deletar, e
 // vincular orçamentos manuais a um usuário recém-registrado. Extraído de bookingService.ts
@@ -204,6 +205,23 @@ export class BookingCrudService {
       logger.info(`Booking created successfully: ${booking.id}`);
       // Invalida cache do dashboard
       void cacheService.invalidateBookingCaches(booking.id);
+
+      // Achado (auditoria de produto): quem enviava um orçamento não recebia nenhuma
+      // confirmação — nem e-mail nem WhatsApp — até (e se) um admin aprovasse
+      // manualmente depois. O tipo de e-mail 'booking-confirmation' já existia no
+      // worker da fila (jobQueue.ts) mas nunca era enfileirado por ninguém. Não dispara
+      // para o carrinho em rascunho (DRAFT) — só para pedido de fato enviado.
+      if (booking.status !== BookingStatus.DRAFT && creator.email) {
+        void queueEmail({
+          type: "booking-confirmation",
+          to: creator.email,
+          templateData: {
+            user: { name: creator.name, email: creator.email },
+            booking,
+          },
+        }).catch((e) => logger.warn({ err: e }, "Falha ao enfileirar e-mail de confirmação de orçamento (não bloqueante)"));
+      }
+
       return booking;
 
     } catch (error) {
