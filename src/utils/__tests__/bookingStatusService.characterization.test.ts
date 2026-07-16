@@ -49,6 +49,10 @@ jest.mock("../../services/notificationService", () => ({
   createNotification: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("../../services/chatService", () => ({
+  getOrCreateEventChat: jest.fn().mockResolvedValue(null),
+}));
+
 jest.mock("../../services/cacheService", () => ({
   cacheService: {
     invalidateBookingCaches: jest.fn().mockResolvedValue(undefined),

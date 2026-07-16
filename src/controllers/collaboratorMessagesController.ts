@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../config/prisma';
 import logger from "../config/logger";
 import { getSocketIO } from '../config/socket';
+import { getOrCreateEventChat } from '../services/chatService';
 
 
 export class CollaboratorMessagesController {
@@ -360,6 +361,46 @@ export class CollaboratorMessagesController {
       return res.status(500).json({ success: false, message: 'Erro ao criar chat de suporte' });
     }
   }
+
+  // Buscar (ou criar) o chat do evento de uma reserva — usado pelo cliente para conversar
+  // sobre o próprio orçamento/reserva, sem depender de a reserva já estar CONFIRMED.
+  async getOrCreateBookingChat(req: Request, res: Response) {
+    try {
+      const { bookingId } = req.params as { bookingId: string };
+      const userId = req.userId as string;
+
+      if (!userId) {
+        return res.status(400).json({ success: false, message: 'Usuário não autenticado' });
+      }
+
+      const booking = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        select: { id: true, creatorId: true }
+      });
+
+      if (!booking) {
+        return res.status(404).json({ success: false, message: 'Reserva não encontrada' });
+      }
+
+      const isOwner = booking.creatorId === userId;
+      const staffRoles = ['ADMIN', 'MANAGER', 'COLLABORATOR'];
+      const isStaff = typeof req.userRole === 'string' && staffRoles.includes(req.userRole);
+
+      if (!isOwner && !isStaff) {
+        return res.status(403).json({ success: false, message: 'Acesso negado a esta reserva' });
+      }
+
+      const chat = await getOrCreateEventChat(bookingId);
+      if (!chat) {
+        return res.status(404).json({ success: false, message: 'Reserva não encontrada' });
+      }
+
+      return res.json({ success: true, data: chat });
+    } catch (error) {
+      logger.error({ obj: error }, 'Erro ao buscar/criar chat da reserva:');
+      return res.status(500).json({ success: false, message: 'Erro ao buscar/criar chat da reserva' });
+    }
+  }
 }
 
 // Instância única do controller
@@ -371,4 +412,5 @@ export const {
   getChatMessages,
   sendMessage,
   createSupportChat,
+  getOrCreateBookingChat,
 } = collaboratorMessagesController;

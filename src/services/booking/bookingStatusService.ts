@@ -9,6 +9,7 @@ import { bookingIncludeConfig, BookingWithIncludes } from "./bookingShared.js";
 import { bookingCrudService } from "./bookingCrudService.js";
 import { bookingCalendarService } from "./bookingCalendarService.js";
 import { createNotification } from "../notificationService.js";
+import { getOrCreateEventChat } from "../chatService.js";
 
 export interface ConfirmCollaboratorInput {
   collaboratorId: string;
@@ -125,52 +126,11 @@ export class BookingStatusService {
   }
 
   /**
-   * Sincroniza chat operacional do evento
+   * Sincroniza chat operacional do evento (garante cliente + colaboradores + admins como participantes)
    */
   private async syncEventChat(bookingId: string) {
     try {
-      const booking = await this.prisma.booking.findUnique({
-        where: { id: bookingId },
-        include: {
-          eventCollaborators: { include: { collaborator: true } },
-          creator: true
-        }
-      });
-
-      if (!booking) return;
-
-      let chat = await this.prisma.chat.findFirst({
-        where: { bookingId, type: 'EVENT' }
-      });
-
-      const participantIds = new Set<string>();
-      if (booking.creator.role === 'ADMIN' || booking.creator.role === 'MANAGER') {
-        participantIds.add(booking.creatorId);
-      }
-      booking.eventCollaborators.forEach((ec) => participantIds.add(ec.collaborator.userId));
-
-      if (!chat) {
-        chat = await this.prisma.chat.create({
-          data: {
-            name: `Evento: ${booking.eventTitle || booking.id}`,
-            type: 'EVENT',
-            bookingId,
-            participants: {
-              create: Array.from(participantIds).map(userId => ({ userId }))
-            }
-          }
-        });
-        logger.info(`Chat de evento criado: ${chat.id}`);
-      } else {
-        // Atualizar participantes se necessário
-        for (const userId of participantIds) {
-          await this.prisma.chatParticipant.upsert({
-            where: { chatId_userId: { chatId: chat.id, userId } },
-            create: { chatId: chat.id, userId },
-            update: {}
-          });
-        }
-      }
+      await getOrCreateEventChat(bookingId);
     } catch (error) {
       logger.error('Erro ao sincronizar chat do evento', error);
     }

@@ -86,6 +86,8 @@ router.use("/monitoring", enterpriseMonitoringRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/uploads', uploadRoutes);
 router.use('/collaborator-payments', collaboratorPaymentRoutes);
+// Nome histórico ("collaborator") — as rotas são hoje compartilhadas por ADMIN/COLLABORATOR
+// e clientes autenticados (dono da reserva), controladas por participação no chat.
 router.use('/collaborator/messages', collaboratorMessagesRoutes);
 router.use('/collaborator/checklists', checklistRoutes);
 router.use('/settings', settingsRoutes);

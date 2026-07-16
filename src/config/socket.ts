@@ -46,6 +46,16 @@ export function parseCookieHeader(cookieHeader: string | undefined): Record<stri
   return result;
 }
 
+// Achado: join_chat/send_message só checavam `if (!user) return` — qualquer usuário
+// autenticado (de qualquer papel) podia entrar na sala de QUALQUER chat e enviar mensagens
+// nele, sem checar se era de fato participante (ChatParticipant). Isso ficou mais exposto ao
+// abrir o chat de evento para clientes comuns (antes só ADMIN/COLLABORATOR alcançavam esta
+// feature) — corrigido checando participação antes de entrar na sala ou persistir mensagem.
+async function isChatParticipant(chatId: string, userId: string): Promise<boolean> {
+  const participant = await prisma.chatParticipant.findFirst({ where: { chatId, userId } });
+  return !!participant;
+}
+
 export type SocketHandshakeLike = {
   auth?: { token?: string };
   query?: Record<string, unknown>;
@@ -159,8 +169,11 @@ export async function initializeSocket(server: HttpServer | HttpsServer) {
       }
     });
 
-    socket.on('join_chat', (chatId: string) => {
+    socket.on('join_chat', async (chatId: string) => {
       if (!user) return;
+      if (!(await isChatParticipant(chatId, user.id))) {
+        return socket.emit('message_error', { error: 'Acesso negado ao chat' });
+      }
       socket.join(`chat_${chatId}`);
       logger.info({ userName: user.name, chatId }, 'Usuário entrou no chat');
     });
@@ -185,6 +198,10 @@ export async function initializeSocket(server: HttpServer | HttpsServer) {
     }) => {
       if (!user) {
         return socket.emit('message_error', { error: 'Não autenticado' });
+      }
+
+      if (!(await isChatParticipant(data.chatId, user.id))) {
+        return socket.emit('message_error', { error: 'Acesso negado ao chat' });
       }
 
       // Enforce rate limit
