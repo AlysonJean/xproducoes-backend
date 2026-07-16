@@ -82,13 +82,15 @@ export class BookingController {
       const { token, refreshToken } = await authService.loginById(guestUser.id);
       setAuthCookies(res, token, refreshToken);
 
+      // Achado (auditoria): o interceptor de resposta do frontend (api.ts) desembrulha
+      // { success, data } substituindo response.data pelo valor de `data` — qualquer campo
+      // irmão de `data` (como um `user`/`token` soltos no nível raiz) é descartado e nunca
+      // chega ao código que consome a resposta. Por isso booking/user/token vão todos
+      // aninhados dentro de `data`, não como irmãos.
       return res.status(201).json({
         success: true,
         message: "Reserva criada com sucesso",
-        data: booking,
-        user: guestUser,
-        token,
-        refreshToken,
+        data: { booking, user: guestUser, token, refreshToken },
       });
     } catch (error) {
       logger.error({ err: error }, "Erro no controller Booking.createGuest");

@@ -141,6 +141,14 @@ export const bookingIncludeConfig = {
         select: { id: true, name: true, avatarUrl: true }
       }
     }
+  },
+  coupon: {
+    select: {
+      id: true,
+      code: true,
+      discountType: true,
+      discountValue: true
+    }
   }
 } satisfies Prisma.BookingInclude;
 

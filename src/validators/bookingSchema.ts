@@ -87,6 +87,9 @@ const bookingBaseSchema = z.object({
   paymentProofUrl: z.string().url().optional(),
   setupTime: z.string().optional(),
   pickupTime: z.string().optional(),
+
+  // Cupom de desconto (opcional)
+  couponCode: z.string().min(1).optional(),
 });
 
 // Schema para criação de booking (com validações cruzadas)

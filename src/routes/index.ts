@@ -35,6 +35,7 @@ import whatsappRoutes from "./whatsappRoutes";
 import sponsorRoutes from "./sponsorRoutes";
 import collaboratorFunctionRoutes from "./collaboratorFunctionRoutes";
 import recommendationRoutes from "./recommendationRoutes";
+import couponRoutes from "./couponRoutes";
 
 const router: RouterType = Router();
 
@@ -90,6 +91,7 @@ router.use('/collaborator/checklists', checklistRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/newsletter', newsletterRoutes);
 router.use('/banners', bannerRoutes);
+router.use('/coupons', couponRoutes);
 router.use(socialRoutes);
 
 // Recommendation routes (optional auth - better results when authenticated)

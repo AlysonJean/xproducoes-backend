@@ -92,10 +92,10 @@ model User {
   googleCalendarEmail          String?
   googleRefreshToken           String?
   googleResourceId             String?
-  socialProvider               String?    // 'google' | 'facebook' | null = local account
-  socialProviderId             String?    // ID do usuário no provedor (ex.: Facebook user_id) —
-                                           // usado para localizar a conta a partir do callback
-                                           // de exclusão de dados da Meta (LGPD/Facebook Platform Policy)
+  socialProvider               String? // 'google' | 'facebook' | null = local account
+  socialProviderId             String? // ID do usuário no provedor (ex.: Facebook user_id) —
+  // usado para localizar a conta a partir do callback
+  // de exclusão de dados da Meta (LGPD/Facebook Platform Policy)
   auditLogs                    BookingAuditLog[]
   assignedBookings             Booking[]             @relation("BookingAssignee")
   createdBookings              Booking[]             @relation("BookingCreator")
@@ -327,68 +327,71 @@ model Service {
 }
 
 model Booking {
-  id                 String              @id @default(cuid())
-  idempotencyKey     String?             @unique
-  eventTitle         String?
-  eventDate          DateTime
-  eventEndDate       DateTime
-  totalPrice         Decimal             @db.Decimal(10, 2)
-  serviceValue       Decimal?            @db.Decimal(10, 2)
-  paymentProofUrl    String?
-  status             BookingStatus       @default(DRAFT)
-  requiresStairs     Boolean             @default(false)
-  isCovered          Boolean             @default(true)
-  hasParking         Boolean             @default(true)
-  eventDuration      Int?
-  location           String?
-  street             String?
-  neighborhood       String?
-  city               String?
-  state              String?
-  zipCode            String?
-  addressNumber      String?
-  addressComplement  String?
-  clientName         String?
-  clientContact      String?
-  clientEmail        String?
-  notes              String?
-  internalNotes      String?
-  specialRequests    String?
-  deliveryStatus     DeliveryStatus      @default(PENDING)
-  setupTime          DateTime?
-  pickupTime         DateTime?
-  reminderEmailSent  Boolean             @default(false)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  clientId           String?
-  creatorId          String
-  assigneeId         String?
-  kitId              String?
-  attachments        BookingAttachment[]
-  auditLogs          BookingAuditLog[]
-  assignee           User?               @relation("BookingAssignee", fields: [assigneeId], references: [id])
-  client             Client?             @relation("ClientBookings", fields: [clientId], references: [id])
-  creator            User                @relation("BookingCreator", fields: [creatorId], references: [id])
-  kit                Kit?                @relation(fields: [kitId], references: [id])
-  eventCollaborators EventCollaborator[]
-  socialSetting      EventSocialSetting?
-  messages           Message[]
-  review             Review?
-  tvDevices          TVDevice[]
-  items              BookingItem[]
-  equipments         Equipment[]         @relation("BookingEquipments")
-  services           Service[]           @relation("BookingServices")
-  validUntil         DateTime?
-  technicalRider     String?
-  technicalRiderUrl  String?
-  locationUrl        String?
-  venueContactName   String?
-  venueContactPhone  String?
-  chats              Chat[]              @relation("BookingChats")
-  tasks              BookingTask[]
-  expenses           BookingExpense[]
-  collaboratorPayments      CollaboratorPayment[]
+  id                         String                     @id @default(cuid())
+  idempotencyKey             String?                    @unique
+  eventTitle                 String?
+  eventDate                  DateTime
+  eventEndDate               DateTime
+  totalPrice                 Decimal                    @db.Decimal(10, 2)
+  serviceValue               Decimal?                   @db.Decimal(10, 2)
+  paymentProofUrl            String?
+  status                     BookingStatus              @default(DRAFT)
+  requiresStairs             Boolean                    @default(false)
+  isCovered                  Boolean                    @default(true)
+  hasParking                 Boolean                    @default(true)
+  eventDuration              Int?
+  location                   String?
+  street                     String?
+  neighborhood               String?
+  city                       String?
+  state                      String?
+  zipCode                    String?
+  addressNumber              String?
+  addressComplement          String?
+  clientName                 String?
+  clientContact              String?
+  clientEmail                String?
+  notes                      String?
+  internalNotes              String?
+  specialRequests            String?
+  deliveryStatus             DeliveryStatus             @default(PENDING)
+  setupTime                  DateTime?
+  pickupTime                 DateTime?
+  reminderEmailSent          Boolean                    @default(false)
+  createdAt                  DateTime                   @default(now())
+  updatedAt                  DateTime                   @updatedAt
+  clientId                   String?
+  creatorId                  String
+  assigneeId                 String?
+  kitId                      String?
+  attachments                BookingAttachment[]
+  auditLogs                  BookingAuditLog[]
+  assignee                   User?                      @relation("BookingAssignee", fields: [assigneeId], references: [id])
+  client                     Client?                    @relation("ClientBookings", fields: [clientId], references: [id])
+  creator                    User                       @relation("BookingCreator", fields: [creatorId], references: [id])
+  kit                        Kit?                       @relation(fields: [kitId], references: [id])
+  eventCollaborators         EventCollaborator[]
+  socialSetting              EventSocialSetting?
+  messages                   Message[]
+  review                     Review?
+  tvDevices                  TVDevice[]
+  items                      BookingItem[]
+  equipments                 Equipment[]                @relation("BookingEquipments")
+  services                   Service[]                  @relation("BookingServices")
+  validUntil                 DateTime?
+  technicalRider             String?
+  technicalRiderUrl          String?
+  locationUrl                String?
+  venueContactName           String?
+  venueContactPhone          String?
+  chats                      Chat[]                     @relation("BookingChats")
+  tasks                      BookingTask[]
+  expenses                   BookingExpense[]
+  collaboratorPayments       CollaboratorPayment[]
   collaboratorAvailabilities CollaboratorAvailability[]
+  couponId                   String?
+  discountAmount             Decimal?                   @db.Decimal(10, 2)
+  coupon                     Coupon?                    @relation(fields: [couponId], references: [id])
 
   @@index([clientId])
   @@index([creatorId])
@@ -400,7 +403,29 @@ model Booking {
   @@index([creatorId, status])
   @@index([clientId, status])
   @@index([eventDate, eventEndDate])
+  @@index([couponId])
   @@map("bookings")
+}
+
+model Coupon {
+  id                String             @id @default(cuid())
+  code              String             @unique
+  description       String?
+  discountType      CouponDiscountType
+  discountValue     Decimal            @db.Decimal(10, 2)
+  minOrderValue     Decimal?           @db.Decimal(10, 2)
+  maxDiscountAmount Decimal?           @db.Decimal(10, 2)
+  maxUses           Int?
+  maxUsesPerClient  Int?
+  validFrom         DateTime?
+  validUntil        DateTime?
+  active            Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  bookings          Booking[]
+
+  @@index([active])
+  @@map("coupons")
 }
 
 model BookingAttachment {
@@ -1187,4 +1212,9 @@ enum BookingItemType {
   SERVICE
   KIT
   CUSTOM
+}
+
+enum CouponDiscountType {
+  PERCENTAGE
+  FIXED
 }

@@ -12,6 +12,7 @@ import { cacheService } from "../cacheService.js";
 import { bookingIncludeConfig, BookingUpdateExtras } from "./bookingShared.js";
 import { queueEmail } from "../../config/jobQueue.js";
 import { notifyAdmins } from "../notificationService.js";
+import { validateCoupon } from "../couponService.js";
 
 // CRUD de reservas: criar, buscar (por id/lista/filtros/cliente), atualizar, deletar, e
 // vincular orçamentos manuais a um usuário recém-registrado. Extraído de bookingService.ts
@@ -74,6 +75,22 @@ export class BookingCrudService {
         const equipmentsPrice = equipments.reduce((sum, eq) => sum + Number(eq.pricePerHour), 0) * duration;
         const servicesPrice = services.reduce((sum, s) => sum + Number(s.price), 0);
         totalPrice = kitsPrice + equipmentsPrice + servicesPrice;
+      }
+
+      // Achado (auditoria de produto): não existia nenhum mecanismo de cupom/desconto por
+      // código — só um campo livre de desconto por item, preenchido manualmente pelo admin.
+      // Validação (validade, pedido mínimo, limite de uso total/por cliente) roda sobre o
+      // subtotal calculado acima, antes de aplicar o desconto ao totalPrice final.
+      let couponId: string | undefined;
+      let discountAmount = 0;
+      if (data.couponCode) {
+        const couponResult = await validateCoupon(data.couponCode, { subtotal: totalPrice, userId: creatorId });
+        if (!couponResult.valid) {
+          throw new BookingValidationError(couponResult.reason || "Cupom inválido.");
+        }
+        couponId = couponResult.coupon!.id;
+        discountAmount = couponResult.discountAmount ?? 0;
+        totalPrice = Math.max(0, totalPrice - discountAmount);
       }
 
       // BACK-002: Lidar com cliente usando upsert para evitar race condition
@@ -148,6 +165,8 @@ export class BookingCrudService {
         deliveryStatus: data.deliveryStatus || DeliveryStatus.PENDING,
         specialRequests: data.specialRequests,
         totalPrice: totalPrice,
+        couponId: couponId,
+        discountAmount: discountAmount || undefined,
         idempotencyKey: idempotencyKey || undefined,
         kitId: data.kitId,
         technicalRider: data.technicalRider,

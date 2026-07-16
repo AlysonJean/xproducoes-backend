@@ -231,6 +231,21 @@ export const quoteRateLimit = rateLimit({
   },
 });
 
+// Rate limiting para validação de cupom - Anti-enumeração de códigos
+export const couponValidateRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutos
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req: Request, res: Response) => {
+    res.status(429).json({
+      success: false,
+      error: 'COUPON_RATE_LIMIT',
+      message: 'Muitas tentativas de cupom. Aguarde alguns minutos.',
+    });
+  },
+});
+
 // Rate limiting para review/comentários - Anti-spam
 export const reviewRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hora
