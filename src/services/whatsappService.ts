@@ -9,6 +9,7 @@ class WhatsappService {
   private isReady = false;
 
   private currentQr: string | null = null;
+  private listenersAttached = false;
 
   constructor() {
     const puppeteerOptions: NonNullable<ClientOptions['puppeteer']> = {
@@ -40,21 +41,19 @@ class WhatsappService {
     });
   }
 
-  public initialize() {
-    if (this.isReady || this.currentQr) return; // Already running or starting
-
-    // Guard against OOM on Render free tier (512MB limit):
-    // Chromium can spike to 500-800MB; restart when approaching limit.
-    const memoryGuard = setInterval(() => {
-      const usage = process.memoryUsage();
-      if (usage.heapUsed > 400 * 1024 * 1024) { // 400MB threshold
-        logger.warn({ heapMB: Math.round(usage.heapUsed / 1024 / 1024) }, 'WhatsApp heap alto — reiniciando cliente');
-        clearInterval(memoryGuard);
-        void this.restart();
-      }
-    }, 30_000);
-    // Don't keep event loop alive (Neon scale-to-zero)
-    memoryGuard.unref();
+  // Achado (auditoria de produto): fora do modo dev, NADA no sistema chamava
+  // initialize() — nem no boot (guardado a NODE_ENV==='development' logo abaixo desta
+  // classe), nem restart()/logout() (que chamavam this.client.initialize() bruto,
+  // pulando este método por completo). Resultado real em produção: os listeners
+  // qr/ready/authenticated nunca eram anexados, então `isReady` nunca virava true, e
+  // TODO envio de WhatsApp falhava silenciosamente ("Cliente não está pronto"),
+  // independente de restart. Extraído para um método próprio, idempotente
+  // (listenersAttached), para que restart()/logout() possam garantir que os listeners
+  // existem sem depender de initialize() já ter rodado antes — e sem duplicar
+  // listeners a cada novo restart.
+  private attachListeners() {
+    if (this.listenersAttached) return;
+    this.listenersAttached = true;
 
     this.client.on('qr', (qr: string) => {
       logger.info('QR Code do WhatsApp gerado! Escaneie no terminal ou na página Admin:');
@@ -82,8 +81,27 @@ class WhatsappService {
        this.isReady = false;
        this.currentQr = null;
        // Opcional: Reiniciar automaticamente após desconexão
-       // this.client.initialize(); 
+       // this.client.initialize();
     });
+  }
+
+  public initialize() {
+    if (this.isReady || this.currentQr) return; // Already running or starting
+
+    // Guard against OOM on Render free tier (512MB limit):
+    // Chromium can spike to 500-800MB; restart when approaching limit.
+    const memoryGuard = setInterval(() => {
+      const usage = process.memoryUsage();
+      if (usage.heapUsed > 400 * 1024 * 1024) { // 400MB threshold
+        logger.warn({ heapMB: Math.round(usage.heapUsed / 1024 / 1024) }, 'WhatsApp heap alto — reiniciando cliente');
+        clearInterval(memoryGuard);
+        void this.restart();
+      }
+    }, 30_000);
+    // Don't keep event loop alive (Neon scale-to-zero)
+    memoryGuard.unref();
+
+    this.attachListeners();
 
     this.client.initialize().catch((err: unknown) => {
       logger.error('Erro ao inicializar cliente WhatsApp:', err);
@@ -133,6 +151,7 @@ class WhatsappService {
           this.isReady = false;
           this.currentQr = null;
           // Após logout, pode ser necessário reinicializar para gerar novo QR
+          this.attachListeners();
           setTimeout(() => {
              this.client.initialize().catch((e: unknown) => logger.error('Erro ao reinicializar pós-logout', e));
           }, 1000);
@@ -148,6 +167,7 @@ class WhatsappService {
           await this.client.destroy();
           this.isReady = false;
           this.currentQr = null;
+          this.attachListeners();
           await this.client.initialize();
           return true;
       } catch (error) {
