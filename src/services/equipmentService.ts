@@ -112,7 +112,7 @@ export class EquipmentService {
           status: { in: ['ACTIVE', 'MAINTENANCE', 'COMING_SOON'] }
         },
         orderBy: { name: 'desc' },
-        select: { slug: true }
+        select: { id: true, slug: true }
       }),
       prisma.equipment.findFirst({
         where: {
@@ -121,14 +121,16 @@ export class EquipmentService {
           status: { in: ['ACTIVE', 'MAINTENANCE', 'COMING_SOON'] }
         },
         orderBy: { name: 'asc' },
-        select: { slug: true }
+        select: { id: true, slug: true }
       })
     ]);
 
     return {
       ...equipment,
-      prevSlug: prev?.slug || null,
-      nextSlug: next?.slug || null
+      // Achado: mesma causa do bug de "Serviço não encontrado" em serviceService.ts —
+      // cai pro id quando o vizinho não tiver slug, sem precisar mudar o frontend.
+      prevSlug: prev ? (prev.slug || prev.id) : null,
+      nextSlug: next ? (next.slug || next.id) : null
     };
   }
 

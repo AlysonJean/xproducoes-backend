@@ -79,6 +79,10 @@ export class ServiceService {
     if (!service) return null;
 
     // Fetch neighbors (Previous and Next by name)
+    // Achado: mesma causa do bug de "Serviço não encontrado" ao navegar por kits (slug pode
+    // ser null) — select também inclui id para poder cair de volta nele quando o vizinho não
+    // tiver slug, sem precisar de nenhuma mudança no frontend (prevSlug/nextSlug continuam
+    // sendo só "o identificador pra usar na URL", não necessariamente um slug de verdade).
     const [prev, next] = await Promise.all([
       prisma.service.findFirst({
         where: {
@@ -86,7 +90,7 @@ export class ServiceService {
           status: { in: ['ACTIVE', 'MAINTENANCE', 'COMING_SOON'] }
         },
         orderBy: { name: 'desc' },
-        select: { slug: true }
+        select: { id: true, slug: true }
       }),
       prisma.service.findFirst({
         where: {
@@ -94,14 +98,14 @@ export class ServiceService {
           status: { in: ['ACTIVE', 'MAINTENANCE', 'COMING_SOON'] }
         },
         orderBy: { name: 'asc' },
-        select: { slug: true }
+        select: { id: true, slug: true }
       })
     ]);
 
     return {
       ...service,
-      prevSlug: prev?.slug || null,
-      nextSlug: next?.slug || null
+      prevSlug: prev ? (prev.slug || prev.id) : null,
+      nextSlug: next ? (next.slug || next.id) : null
     };
   }
 
