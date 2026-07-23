@@ -150,6 +150,9 @@ model Client {
   favorites           ClientFavorite[]
   user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   notifications       Notification[]
+  // Cupom pessoal de indicação ("indique um amigo") — criado sob demanda na primeira vez
+  // que o cliente acessa a própria página de indicação (ver referralService.ts).
+  referralCoupon      Coupon?          @relation("ClientReferralCode")
 
   @@index([userId])
   @@map("clients")
@@ -392,6 +395,10 @@ model Booking {
   couponId                   String?
   discountAmount             Decimal?                   @db.Decimal(10, 2)
   coupon                     Coupon?                    @relation(fields: [couponId], references: [id])
+  // Marcadores de disparo único (mesmo padrão de reminderEmailSent acima) — evita reenviar
+  // pedido de avaliação ou emitir recompensa de indicação de novo se o status oscilar.
+  reviewRequestSentAt        DateTime?
+  referralRewardIssuedAt     DateTime?
 
   @@index([clientId])
   @@index([creatorId])
@@ -423,8 +430,16 @@ model Coupon {
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   bookings          Booking[]
+  // Programa de indicação: se setado, este é o código pessoal de indicação deste cliente
+  // (compartilhável livremente com amigos — não confundir com restrictedToUserId abaixo).
+  referrerClientId  String?            @unique
+  referrerClient    Client?            @relation("ClientReferralCode", fields: [referrerClientId], references: [id])
+  // Se setado, só esse usuário pode validar/usar este cupom — usado nas recompensas de
+  // indicação (pessoais, não compartilháveis), diferente do código de indicação em si.
+  restrictedToUserId String?
 
   @@index([active])
+  @@index([referrerClientId])
   @@map("coupons")
 }
 
@@ -1107,6 +1122,7 @@ enum NotificationType {
   MESSAGE_RECEIVED
   SYSTEM_ALERT
   MAINTENANCE_SCHEDULED
+  REFERRAL_REWARD
 }
 
 enum ChatType {

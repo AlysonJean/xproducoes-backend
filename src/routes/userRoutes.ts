@@ -3,6 +3,8 @@ import { createSafeRouter } from "../middlewares/safeRouter.js";
 import * as userController from "../controllers/userController.js";
 import * as userService from "../services/userService.js";
 import * as favoriteService from "../services/favoriteService.js";
+import * as referralService from "../services/referralService.js";
+import { prisma } from "../config/prisma.js";
 import { authenticate, requireAdmin, AuthenticatedRequest } from "../middlewares/unifiedAuth.js";
 import { uploadSingle, processUpload } from "../middlewares/upload.js";
 import { uploadRateLimit } from '../middlewares/rateLimitMiddleware.js';
@@ -61,6 +63,22 @@ userRoutes.delete("/favorites/:itemId", authenticate, async (req: Request, res: 
     }
     await favoriteService.removeFavorite(req.userId!, itemId, itemType);
     res.status(200).json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Programa de indicação: código pessoal do cliente (criado sob demanda) + estatísticas
+// de uso. Só clientes têm código de indicação (não admin/colaborador).
+userRoutes.get("/referral", authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const client = await prisma.client.findUnique({ where: { userId: req.userId! } });
+    if (!client) {
+      res.status(404).json({ success: false, message: "Apenas clientes têm código de indicação." });
+      return;
+    }
+    const data = await referralService.getReferralStats(client.id);
+    res.json({ success: true, data });
   } catch (error) {
     next(error);
   }

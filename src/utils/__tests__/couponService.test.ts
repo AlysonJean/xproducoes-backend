@@ -7,6 +7,7 @@ jest.mock('../../config/prisma', () => ({
   prisma: {
     coupon: { findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), delete: jest.fn() },
     booking: { count: jest.fn() },
+    client: { findUnique: jest.fn() },
   },
 }));
 
@@ -140,6 +141,42 @@ describe('couponService', () => {
       expect(mockedPrisma.booking.count).toHaveBeenCalledWith({
         where: { couponId: 'coupon-1', status: { not: BookingStatus.CANCELLED } },
       });
+    });
+
+    // Achado (programa de indicação): recompensas são cupons restritos a um único usuário
+    // (ver referralService.ts) — não podem vazar/ser usados por outra pessoa.
+    it('rejeita cupom restrito quando o usuário não é o dono', async () => {
+      mockedPrisma.coupon.findUnique.mockResolvedValue({ ...baseCoupon, restrictedToUserId: 'user-dono' });
+      const result = await couponService.validateCoupon('BEMVINDO10', { subtotal: 100, userId: 'outro-user' });
+      expect(result.valid).toBe(false);
+      expect(result.reason).toMatch(/pessoal/);
+    });
+
+    it('aceita cupom restrito quando o usuário é o dono', async () => {
+      mockedPrisma.coupon.findUnique.mockResolvedValue({ ...baseCoupon, restrictedToUserId: 'user-dono' });
+      const result = await couponService.validateCoupon('BEMVINDO10', { subtotal: 100, userId: 'user-dono' });
+      expect(result.valid).toBe(true);
+    });
+
+    it('rejeita cupom restrito sem userId (convidado tentando usar recompensa pessoal)', async () => {
+      mockedPrisma.coupon.findUnique.mockResolvedValue({ ...baseCoupon, restrictedToUserId: 'user-dono' });
+      const result = await couponService.validateCoupon('BEMVINDO10', { subtotal: 100 });
+      expect(result.valid).toBe(false);
+    });
+
+    it('rejeita quando o cliente tenta usar o próprio código de indicação', async () => {
+      mockedPrisma.coupon.findUnique.mockResolvedValue({ ...baseCoupon, referrerClientId: 'client-1' });
+      mockedPrisma.client.findUnique.mockResolvedValue({ id: 'client-1', userId: 'user-1' });
+      const result = await couponService.validateCoupon('MARIAX7K2', { subtotal: 100, userId: 'user-1' });
+      expect(result.valid).toBe(false);
+      expect(result.reason).toMatch(/próprio código de indicação/);
+    });
+
+    it('aceita quando outro cliente usa um código de indicação que não é o seu', async () => {
+      mockedPrisma.coupon.findUnique.mockResolvedValue({ ...baseCoupon, referrerClientId: 'client-1' });
+      mockedPrisma.client.findUnique.mockResolvedValue({ id: 'client-2', userId: 'user-2' });
+      const result = await couponService.validateCoupon('MARIAX7K2', { subtotal: 100, userId: 'user-2' });
+      expect(result.valid).toBe(true);
     });
   });
 

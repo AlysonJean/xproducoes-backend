@@ -71,6 +71,21 @@ export async function validateCoupon(
   if (!coupon) return { valid: false, reason: "Cupom não encontrado." };
   if (!coupon.active) return { valid: false, reason: "Este cupom não está mais ativo." };
 
+  // Achado (programa de indicação): recompensas são cupons pessoais, restritos a um único
+  // usuário (ver referralService.ts) — não confundir com o código de indicação em si, que
+  // continua público/compartilhável (sem restrictedToUserId).
+  if (coupon.restrictedToUserId && coupon.restrictedToUserId !== userId) {
+    return { valid: false, reason: "Este cupom é pessoal e não pode ser usado por você." };
+  }
+
+  // Ninguém usa o próprio código de indicação (auto-indicação para ganhar desconto).
+  if (coupon.referrerClientId && userId) {
+    const ownClient = await prisma.client.findUnique({ where: { userId } });
+    if (ownClient && ownClient.id === coupon.referrerClientId) {
+      return { valid: false, reason: "Você não pode usar seu próprio código de indicação." };
+    }
+  }
+
   const now = new Date();
   if (coupon.validFrom && now < coupon.validFrom) {
     return { valid: false, reason: "Este cupom ainda não é válido." };

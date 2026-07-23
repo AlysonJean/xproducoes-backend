@@ -10,6 +10,7 @@ import { bookingCrudService } from "./bookingCrudService.js";
 import { bookingCalendarService } from "./bookingCalendarService.js";
 import { createNotification } from "../notificationService.js";
 import { getOrCreateEventChat } from "../chatService.js";
+import { issueReferralRewardIfApplicable } from "../referralService.js";
 
 export interface ConfirmCollaboratorInput {
   collaboratorId: string;
@@ -115,6 +116,15 @@ export class BookingStatusService {
         void this.syncEventChat(updatedBooking.id);
       }
 
+      // Achado (produto): negócio pediu trazer mais clientes via indicação + avaliações no
+      // Google — ambos disparados na CONCLUSÃO (não na confirmação), pra não recompensar
+      // nem pedir avaliação de um evento que ainda pode ser cancelado.
+      if (status === BookingStatus.COMPLETED) {
+        void this.handleBookingCompleted(updatedBooking).catch((e: unknown) => {
+          logger.warn({ error: e }, 'Erro ao processar efeitos de conclusão da reserva');
+        });
+      }
+
       return updatedBooking;
 
     } catch (error) {
@@ -123,6 +133,27 @@ export class BookingStatusService {
       }
       throw new BookingBusinessLogicError(`Erro ao atualizar status da reserva: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
+  }
+
+  /**
+   * Efeitos colaterais de uma reserva concluída: pede avaliação no Google e, se a reserva
+   * usou um código de indicação, emite a recompensa pro indicador. Ambos com guarda contra
+   * reenvio (reviewRequestSentAt/referralRewardIssuedAt) caso o status oscile.
+   */
+  private async handleBookingCompleted(booking: BookingWithIncludes) {
+    if (!booking.reviewRequestSentAt) {
+      try {
+        await whatsappService.sendReviewRequest(booking);
+        await this.prisma.booking.update({
+          where: { id: booking.id },
+          data: { reviewRequestSentAt: new Date() },
+        });
+      } catch (e: unknown) {
+        logger.warn({ error: e }, 'Erro ao enviar pedido de avaliação');
+      }
+    }
+
+    await issueReferralRewardIfApplicable(booking);
   }
 
   /**

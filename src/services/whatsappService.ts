@@ -217,6 +217,45 @@ Obrigado pela preferência! 🚀`;
 
     await this.sendMessage(clientPhone, message);
   }
+
+  /**
+   * Pede avaliação no Google após o evento concluído (achado: negócio pediu isso pra
+   * ajudar no ranqueamento do "pacote local" do Google — avaliações recentes pesam muito
+   * mais que SEO de conteúdo pra negócio local). Não bloqueia nem falha o fluxo se
+   * GOOGLE_REVIEW_LINK não estiver configurado — só registra e não envia.
+   */
+  public async sendReviewRequest(booking: {
+    id: string;
+    client?: ({ phone?: string | null; user?: ({ phone?: string | null } & Record<string, unknown>) | null } & Record<string, unknown>) | null;
+    clientContact?: string | null;
+    clientName?: string | null;
+    eventTitle?: string | null;
+  }) {
+    const reviewLink = process.env.GOOGLE_REVIEW_LINK;
+    if (!reviewLink) {
+      logger.debug('GOOGLE_REVIEW_LINK não configurado — pulando pedido de avaliação.');
+      return;
+    }
+
+    const clientPhone = booking.client?.phone || booking.client?.user?.phone || booking.clientContact;
+    if (!clientPhone) {
+      logger.warn(`Reserva ${booking.id} sem telefone para pedido de avaliação.`);
+      return;
+    }
+
+    const message =
+`Olá *${booking.clientName || 'Cliente'}*! 🙌
+
+Esperamos que seu evento${booking.eventTitle ? ` "${booking.eventTitle}"` : ''} tenha sido um sucesso!
+
+Se puder dedicar 1 minutinho pra avaliar nosso trabalho no Google, isso ajuda demais a gente a chegar em mais gente:
+
+⭐ ${reviewLink}
+
+Muito obrigado pela confiança! 🙏`;
+
+    await this.sendMessage(clientPhone, message);
+  }
 }
 
 export const whatsappService = new WhatsappService();
