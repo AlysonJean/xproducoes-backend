@@ -60,7 +60,7 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
-    "node-cron": "^4.2.1",
+    "node-cron": "^4.6.0",
     "nodemailer": "^9.0.3",
     "pg": "^8.17.2",
     "pino": "^9.7.0",
