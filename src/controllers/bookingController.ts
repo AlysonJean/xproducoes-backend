@@ -789,28 +789,8 @@ export class BookingController {
       const { id } = req.params as { id: string };
       if (!id) throw new BadRequestError("ID da reserva é obrigatório.");
 
-      // Auth check
-      if (req.userRole !== "ADMIN") {
-        const collaborator = await prisma.collaborator.findFirst({
-          where: { userId: req.userId }
-        });
-
-        if (!collaborator) {
-          throw new ForbiddenError("Acesso negado. Perfil de colaborador não encontrado.");
-        }
-
-        const isAssigned = await prisma.eventCollaborator.findFirst({
-          where: {
-            bookingId: id,
-            collaboratorId: collaborator.id
-          }
-        });
-
-        if (!isAssigned) {
-          throw new ForbiddenError("Acesso negado. Você não está escalado para este evento.");
-        }
-      }
-
+      // Autorização (admin OU colaborador escalado neste evento) já verificada pelo
+      // middleware requireEventCollaboratorAssignment na rota (bookingRoutes.ts).
       const roadmap = await bookingTaskService.getEventRoadmap(id);
       res.json({ success: true, data: roadmap });
     } catch (error) {

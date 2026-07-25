@@ -3,6 +3,7 @@ import { BookingController } from "../controllers/bookingController";
 import { criticalEndpointRateLimit, quoteRateLimit } from '../middlewares/rateLimitMiddleware';
 import { validateJsonContentType } from "../middlewares/contentTypeValidation";
 import { authenticate, adminOnly, adminOrCollaborator } from "../middlewares/unifiedAuth";
+import { requireEventCollaboratorAssignment, bookingIdFromParam, bookingIdFromTaskParam } from "../middlewares/bookingAssignmentGuard";
 import { validateBody, validateId } from "../config/validation";
 import {
   bookingCreateSchema,
@@ -49,10 +50,13 @@ router.get("/dashboard/stats", adminOnly, bookingController.getDashboardStats);
 router.post('/:id/attachments', validateId(), bookingController.addAttachment);
 router.delete('/:id/attachments/:attachmentId', validateId(), bookingController.removeAttachment);
 
-// Checklist e Despesas (Crew Experience)
-router.get("/roadmap/:id", adminOrCollaborator, validateId(), bookingController.getRoadmap);
+// Checklist e Despesas (Crew Experience) — adminOrCollaborator checa a ROLE; o guard abaixo
+// checa se ESTE colaborador está de fato escalado NESTA reserva/tarefa (achado de auditoria:
+// addExpense e toggleTask não tinham essa segunda checagem, permitindo qualquer colaborador
+// agir em evento alheio).
+router.get("/roadmap/:id", adminOrCollaborator, validateId(), requireEventCollaboratorAssignment(bookingIdFromParam("id")), bookingController.getRoadmap);
 router.post("/:id/tasks", adminOnly, validateId(), validateJsonContentType, bookingController.createTask);
-router.put("/tasks/:taskId/toggle", adminOrCollaborator, bookingController.toggleTask);
-router.post("/:id/expenses", adminOrCollaborator, bookingController.addExpense);
+router.put("/tasks/:taskId/toggle", adminOrCollaborator, requireEventCollaboratorAssignment(bookingIdFromTaskParam), bookingController.toggleTask);
+router.post("/:id/expenses", adminOrCollaborator, requireEventCollaboratorAssignment(bookingIdFromParam("id")), bookingController.addExpense);
 
 export default router;
