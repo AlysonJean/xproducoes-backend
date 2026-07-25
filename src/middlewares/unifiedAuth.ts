@@ -435,37 +435,6 @@ export function requireManager(req: Request, res: Response, next: NextFunction) 
   return next();
 }
 
-/**
- * Acesso ao próprio recurso OU ser staff
- */
-export function requireSelfOrStaff(getUserId: (req: Request) => string) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Não autenticado",
-        code: "NOT_AUTHENTICATED",
-      });
-    }
-
-    const targetUserId = getUserId(req);
-    const isOwner = req.userId === targetUserId;
-    const isStaff = ["ADMIN", "MANAGER", "OPERATOR", "COLLABORATOR"].includes(
-      req.userRole as string,
-    );
-
-    if (!isOwner && !isStaff) {
-      return res.status(403).json({
-        success: false,
-        message: "Acesso negado: recurso privado",
-        code: "PRIVATE_RESOURCE",
-      });
-    }
-
-    next();
-  };
-}
-
 // ===== HIERARQUIA DE ROLES =====
 
 /**
@@ -484,61 +453,6 @@ export function hasMinimumRole(userRole: UserRole, minimumRole: UserRole): boole
   const minimumLevel = hierarchy.indexOf(minimumRole);
   
   return userLevel >= minimumLevel;
-}
-
-// ===== RATE LIMITING POR USUÁRIO =====
-
-/**
- * Rate limiting específico por usuário autenticado
- */
-export function rateLimitByUser(maxRequests: number, windowMs: number) {
-  const userRequests = new Map<string, { count: number; resetTime: number }>();
-  
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.userId) {
-      next();
-      return;
-    }
-
-    const userId = req.userId;
-    const now = Date.now();
-    const userLimit = userRequests.get(userId);
-
-    if (!userLimit || now > userLimit.resetTime) {
-      userRequests.set(userId, { count: 1, resetTime: now + windowMs });
-      next();
-      return;
-    }
-
-    if (userLimit.count >= maxRequests) {
-      return res.status(429).json({
-        success: false,
-        message: "Limite de requisições excedido",
-        code: "RATE_LIMIT_EXCEEDED",
-        retryAfter: Math.ceil((userLimit.resetTime - now) / 1000),
-      });
-    }
-
-    userLimit.count++;
-    next();
-  };
-}
-
-// ===== GERAÇÃO DE TOKEN =====
-
-/**
- * Gera JWT token para usuário
- */
-export function generateToken(userId: string, email: string, role: UserRole): string {
-  const payload: JWTPayload = {
-    userId,
-    email,
-    role,
-    iat: Math.floor(Date.now() / 1000),
-    jti: `${userId}-${Date.now()}`,
-  };
-  
-  return jwt.sign(payload, config.jwtSecret, { expiresIn: "24h" });
 }
 
 // ===== OPÇÕES DE COOKIES SEGURAS =====
@@ -572,10 +486,7 @@ export default {
   requireAdminOrCollaborator,
   requireStaff,
   requireManager,
-  requireSelfOrStaff,
   hasMinimumRole,
-  rateLimitByUser,
-  generateToken,
   defaultCookieOptions,
   // Aliases
   authMiddleware: authenticate,
