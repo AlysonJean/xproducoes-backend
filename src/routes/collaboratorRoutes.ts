@@ -83,7 +83,9 @@ router.get('/me/settings', requireAdminOrCollaborator, getMySettings);
 router.put('/me/settings', requireAdminOrCollaborator, updateMySettings);
 // ---------------------------------------------
 
-router.get("/:id", validateId(), getCollaboratorById);
+// Achado de auditoria: sem restrição de role, qualquer CLIENT autenticado conseguia ver
+// eventAssignments (preço/data/status de reservas) de qualquer colaborador.
+router.get("/:id", requireAdminOrCollaborator, validateId(), getCollaboratorById);
 router.put("/:id", adminOnly, validateId(), validateBody(collaboratorUpdateSchema), updateCollaborator);
 router.delete("/:id", adminOnly, validateId(), deleteCollaborator);
 

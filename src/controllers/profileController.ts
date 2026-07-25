@@ -19,6 +19,31 @@ import { prisma } from "../config/prisma";
 import logger from "../config/logger";
 import { AppError } from "../utils/errors";
 
+// Achado de auditoria (crítico): as queries deste arquivo usavam `include` sem `select` no
+// nível de User, então o Prisma devolvia TODOS os campos escalares — incluindo
+// passwordHash, passwordResetToken (utilizável para takeover se houver um reset pendente),
+// emailVerificationToken e googleRefreshToken (cifrado) — direto em res.json(). Isso valia
+// tanto para o próprio usuário (getProfile) quanto, de forma muito mais grave, para
+// getCollaborators/getCollaboratorDetails, que qualquer usuário autenticado (inclusive um
+// CLIENT recém-cadastrado, sem checagem de role na rota) podia chamar para ler as
+// credenciais de QUALQUER OUTRO usuário. Centralizado aqui para as quatro queries do
+// arquivo usarem a mesma lista seleta de campos — nenhuma delas precisa dos campos de
+// credencial/token para o que o frontend efetivamente consome.
+const SAFE_USER_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  avatarUrl: true,
+  role: true,
+  bio: true,
+  location: true,
+  website: true,
+  socialLinks: true,
+  isVip: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
 export class ProfileController {
   // Buscar perfil completo do usuário
@@ -31,7 +56,8 @@ export class ProfileController {
 
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        include: {
+        select: {
+          ...SAFE_USER_SELECT,
           clientProfile: {
             include: {
               favorites: {
@@ -79,7 +105,8 @@ export class ProfileController {
           website,
           socialLinks,
         },
-        include: {
+        select: {
+          ...SAFE_USER_SELECT,
           clientProfile: true,
           collaboratorProfile: true,
         },
@@ -114,7 +141,8 @@ export class ProfileController {
 
       const collaborators = await prisma.user.findMany({
         where: whereClause,
-        include: {
+        select: {
+          ...SAFE_USER_SELECT,
           collaboratorProfile: {
             include: {
               // portfolioItems: { // Comentado - modelo não existe no schema
@@ -147,7 +175,8 @@ export class ProfileController {
 
       const collaborator = await prisma.user.findUnique({
         where: { id },
-        include: {
+        select: {
+          ...SAFE_USER_SELECT,
           collaboratorProfile: {
             include: {
               // portfolioItems: { // Comentado - modelo não existe no schema
