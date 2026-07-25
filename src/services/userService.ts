@@ -346,11 +346,15 @@ export async function login(data: LoginInput) {
     { expiresIn: "15m" }, // Access token com 15 minutos
   );
 
-  // Gerar refresh token com expiração maior
+  // Gerar refresh token com expiração maior. 7 dias para bater com o maxAge real do cookie
+  // (config/cookies.ts) e com os outros dois lugares que emitem refresh token
+  // (authController.refresh, authService.loginById) — achado de auditoria: este era o único
+  // dos três emitindo 3 dias, então o cookie guardava um JWT que expirava 4 dias antes do
+  // próprio cookie, e a primeira renovação silenciosamente "esticava" a sessão pra 7 dias.
   const refreshToken = jwt.sign(
     { userId: user.id, role: user.role, type: "refresh" },
     config.jwtSecret,
-    { expiresIn: "3d" }, // Refresh token com 3 dias
+    { expiresIn: "7d" },
   );
   
   // Adicionar rota de redirecionamento baseada no role
