@@ -5,6 +5,7 @@ import { getSocketIO } from '../config/socket'; // Assuming this exists or simil
 import { triggerImmediateSync } from '../config/jobQueue';
 import { Prisma, SocialPostStatus } from '@prisma/client';
 import { UploadService } from '../services/uploadService';
+import { contentMatchesMimetype } from '../utils/fileSignature';
 
 const uploadService = new UploadService();
 
@@ -703,6 +704,18 @@ export class SocialController {
 
             if (!file) {
                 return res.status(400).json({ success: false, message: 'Nenhuma imagem enviada' });
+            }
+
+            // Achado de auditoria: este é um endpoint PÚBLICO (sem login — qualquer pessoa com
+            // o QR code do evento). O mimetype em `file.mimetype` vem do Content-Type
+            // declarado pelo próprio cliente, forjável. O tamanho/tipo de arquivo já são
+            // filtrados no multer (uploadService.getCloudinaryMulterConfig, ver socialRoutes.ts),
+            // mas a validação real de conteúdo (assinatura binária) só é possível aqui, depois
+            // que o buffer existe — mesma checagem que middlewares/upload.ts já faz para os
+            // uploads autenticados, reaproveitada para não deixar este caminho sem ela.
+            if (!contentMatchesMimetype(file.buffer, file.mimetype, file.originalname)) {
+                logger.warn({ obj: { mimetype: file.mimetype, originalname: file.originalname } }, '[SocialController] Conteúdo do arquivo não bate com o mimetype declarado (upload público)');
+                return res.status(400).json({ success: false, message: 'O conteúdo do arquivo não corresponde ao tipo declarado.' });
             }
 
             const setting = await prisma.eventSocialSetting.findUnique({

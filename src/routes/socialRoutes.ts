@@ -1,9 +1,9 @@
 import { createSafeRouter } from '../middlewares/safeRouter.js';
 import socialController from '../controllers/socialController.js';
 import { authenticate, requireAdmin } from '../middlewares/unifiedAuth.js';
-import multer from 'multer';
+import { uploadRateLimit } from '../middlewares/rateLimitMiddleware.js';
+import { uploadSingle } from '../middlewares/upload.js';
 
-const upload = multer({ storage: multer.memoryStorage() });
 const router = createSafeRouter();
 
 // --- Admin Routes ---
@@ -55,7 +55,12 @@ router.post('/tv/pair', authenticate, requireAdmin, socialController.pairDevice)
 // GET /api/tv/config - Public but requires code
 router.get('/tv/config', socialController.getDeviceConfig);
 
-// Public upload from QR Code
-router.post('/public/social/upload/:slug', upload.single('image'), socialController.directUpload);
+// Public upload from QR Code — uploadRateLimit por IP, já que este endpoint é
+// intencionalmente anônimo (não dá para exigir login sem quebrar o fluxo do QR code).
+// uploadSingle('image') reaproveita o multer config + tratamento de erro já usado pelos
+// uploads autenticados (limite de 50MB, filtro de mimetype, erros viram JSON 400 em vez de
+// vazar como erro 500 não tratado); a validação de conteúdo real (magic bytes) continua
+// dentro do controller, que é onde o buffer do arquivo passa a existir.
+router.post('/public/social/upload/:slug', uploadRateLimit, uploadSingle('image'), socialController.directUpload);
 
 export default router;
