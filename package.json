@@ -39,7 +39,7 @@
     "@huggingface/inference": "^4.13.11",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "7.8.0",
-    "@sentry/node": "^10.38.0",
+    "@sentry/node": "^10.68.0",
     "@socket.io/redis-adapter": "^8.3.0",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.67.2",
